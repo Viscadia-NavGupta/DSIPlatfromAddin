@@ -502,7 +502,7 @@ export async function downloadAndInsertDataFromExcel(s3Url, sheetName) {
   } catch (error) {
       console.error("❌ Error:", error);
       return { success: false, error: error.message };
-  }git add .
+  }
 }
 
 
