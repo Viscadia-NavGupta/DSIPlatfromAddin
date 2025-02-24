@@ -4,8 +4,8 @@
   <Version>1.0.0.0</Version>
   <ProviderName>Viscadia</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="DSI Forecast Solution"/>
-  <Description DefaultValue="click to Proceed"/>
+  <DisplayName DefaultValue="Viscadia Forecast Solution"/>
+  <Description DefaultValue="Click to Proceed"/>
   <IconUrl DefaultValue="https://www.contoso.com/assets/icon-32.png"/>
   <HighResolutionIconUrl DefaultValue="https://www.contoso.com/assets/icon-64.png"/>
   <SupportUrl DefaultValue="https://viscadia.com/contact-us/"/>
@@ -73,12 +73,12 @@
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Your forecast platfrom is ready, login to see details"/>
-        <bt:String id="CommandsGroup.Label" DefaultValue="Commands Group"/>
-        <bt:String id="TaskpaneButton.Label" DefaultValue="Show Task Pane"/>
+        <bt:String id="CommandsGroup.Label" DefaultValue="Forecast Confidence"/>
+        <bt:String id="TaskpaneButton.Label" DefaultValue="Viscadia Forecast Solution"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="GetStarted.Description" DefaultValue="Your forecast platfrom is ready, login to see details"/>
-        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Click to Show a Taskpane"/>
+        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Click to open platfrom "/>
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>
