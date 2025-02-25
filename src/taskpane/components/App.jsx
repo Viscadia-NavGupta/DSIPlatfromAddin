@@ -19,6 +19,7 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Login status
   const [userName, setUserName] = useState(""); // User's full name
   const [loadingMessage, setLoadingMessage] = useState("Processing request..."); // 🔹 Dynamic loading message
+  const [saveForecastMessage, setSaveForecastMessage] = useState("Forecast is saved");
 
   /**
    * Handles user login authentication with AWS Cognito.
@@ -114,7 +115,9 @@ function App() {
    */
   const setPageValue = (value, message = "Processing request...") => {
     if (value === "LoadingCircleComponent") {
-      setLoadingMessage(message); // ✅ Set the custom loading message
+      setLoadingMessage(message);
+    } else if (value === "SaveForecastPageinterim") {
+      setSaveForecastMessage(message);
     }
     setPage(value);
   };
@@ -167,7 +170,7 @@ function App() {
       case "SaveForecastPage":
         return <SaveForecastPage setPageValue={setPageValue} />;
       case "SaveForecastPageinterim":
-        return <SaveForecastPageinterim setPageValue={setPageValue} />;
+        return <SaveForecastPageinterim setPageValue={setPageValue} message={saveForecastMessage} />;
       case "LoadingCircleComponent":
         return <LoadingCircleComponent message={loadingMessage} />;
       case "LoadScenario":

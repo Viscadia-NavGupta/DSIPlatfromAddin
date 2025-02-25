@@ -62,6 +62,7 @@ const HomePage = ({ userName, setPageValue }) => {
   const handleReportGenie = async () => {
     console.log("📜 Report Genie Clicked - Generate reports.");
     await excelfucntions.generateLongFormData("US");
+    // await excelfucntions.extractNamedRanges();
   };
 
   const buttons = [

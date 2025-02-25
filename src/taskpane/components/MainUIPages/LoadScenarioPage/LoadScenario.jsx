@@ -70,7 +70,7 @@ const LoadScenario = ({ setPageValue }) => {
           const ModelNameValue = ModelName.values[0][0] || "";
           const ModelIDValue = ModelID.values[0][0] || "";
 
-          setHeading(`Save Scenario for: ${ModelNameValue}`);
+          setHeading(`Import Scenario for: ${ModelNameValue}`);
           setIsOutputSheet(true);
           setModelIDValue(ModelIDValue);
 
@@ -148,6 +148,7 @@ const LoadScenario = ({ setPageValue }) => {
     console.log("📌 Extracted Forecast IDs:", forecastIdArray);
     // forecastIdArray[0]= forecastIdArray[0]
     // forecastIdArray[0]="09374eab-e205-4f1b-8104-4e02aef9d907.xlsx";
+    setPageValue("LoadingCircleComponent", "Importing Scenario...");
 
     let Downloadflag = await AWSconnections.service_orchestration(
       "IMPORT_ASSUMPTIONS",
@@ -161,8 +162,8 @@ const LoadScenario = ({ setPageValue }) => {
     );
         console.log(Downloadflag);
 
-    if (SaveFlag === "Saved Forecast") {
-      setPageValue("SaveForecastPageinterim");
+    if (Downloadflag.status === "Scenario Imported") {
+      setPageValue("SaveForecastPageinterim", "Scenario Imported");
     }
   };
 

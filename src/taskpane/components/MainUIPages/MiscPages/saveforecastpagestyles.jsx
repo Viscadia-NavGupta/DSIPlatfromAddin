@@ -50,6 +50,6 @@ export const SaveButton = styled("button")({
   border: "none",
   cursor: "pointer",
   "&:hover": {
-    backgroundColor: "#005f99",
+    backgroundColor: "#8A1F1A",
   },
 });

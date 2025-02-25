@@ -103,20 +103,29 @@ export const DisabledOverlay = styled("div")({
   },
 });
 
+export const TooltipWrapper = styled("div")({
+  position: "relative",
+  display: "inline-block",
+  "&:hover div": {
+    display: "block", // Shows tooltip when hovering over the wrapper
+  },
+});
+
+
 // Tooltip styling
 export const Tooltip = styled("div")({
   display: "none",
   position: "absolute",
-  bottom: "calc(100% + 10px)",
+  bottom: "calc(0%)",
   left: "50%",
   transform: "translateX(-50%)",
   backgroundColor: "#B4322A",
   color: "#fff",
   padding: "8px",
-  fontSize: "0.75rem",
+  fontSize: "0.6rem",
   borderRadius: "4px",
   whiteSpace: "normal",
-  maxWidth: "200px",
+  maxWidth: "250px",
   textAlign: "center",
   zIndex: 10,
   boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",

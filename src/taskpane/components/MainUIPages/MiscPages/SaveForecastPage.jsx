@@ -6,14 +6,14 @@ import {
   SaveButton,
 } from "./saveforecastpagestyles";
 
-const SaveForecastPageinterim = ({ setPageValue }) => {
+const SaveForecastPageinterim = ({ setPageValue, message }) => {
   const handleButtonClick = () => {
     setPageValue("Home");
   };
 
   return (
     <Container>
-      <MessageBox>Forecast is saved</MessageBox>
+      <MessageBox>{message}</MessageBox>
       <SaveButton onClick={handleButtonClick}>Go to Home</SaveButton>
     </Container>
   );

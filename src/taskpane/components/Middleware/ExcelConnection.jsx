@@ -32,51 +32,63 @@ export async function getAllSheetUsedRangesArray() {
   }
 }
 
+// 
 export async function extractLevelData() {
   try {
     return await Excel.run(async (context) => {
+      console.log("🔍 Starting extractLevelData function...");
       let workbook = context.workbook;
       let namedRange = workbook.names.getItemOrNullObject("DataModel");
       await context.sync();
 
       if (namedRange.isNullObject) {
-        console.error("DataModel range not found.");
+        // console.error("❌ DataModel range not found.");
         return [];
       }
 
       let dataModelRange = namedRange.getRange();
       dataModelRange.load("values");
-      let allNamedRanges = workbook.names;
-      allNamedRanges.load("items");
       await context.sync();
 
-      let namedRangeMap = {};
+      // console.log("🔍 Extracting all named ranges...");
+      let namedRangesArray = await extractNamedRanges(); // ✅ Fetch all named ranges from workbook
 
-      // Preload all named ranges in a single batch
-      let rangesToLoad = [];
-      allNamedRanges.items.forEach((nameItem) => {
-        let range = nameItem.getRangeOrNullObject(); // Avoid errors on missing ranges
-        range.load(["worksheet/name", "address"]);
-        namedRangeMap[nameItem.name] = range;
-        rangesToLoad.push(range);
-      });
-
-      await context.sync(); // Sync after loading all named ranges
-
+      // console.log("✅ Named ranges extracted successfully.");
       let dataArray = dataModelRange.values;
       let outputArray = [];
 
-      // Replace named ranges in the dataArray with their addresses
+      // ✅ Replace named ranges in dataArray using namedRangesArray
       for (let a = 2; a < 19; a++) {
-        // Adjusted index for 0-based JS arrays
         for (let b = 0; b < dataArray.length; b++) {
           if (typeof dataArray[b][a] === "string") {
-            dataArray[b][a] = dataArray[b][a].replace("=", "");
+            dataArray[b][a] = dataArray[b][a].replace("=", "").trim(); // ✅ Trim spaces
           }
 
-          if (namedRangeMap[dataArray[b][a]] && !namedRangeMap[dataArray[b][a]].isNullObject) {
-            let range = namedRangeMap[dataArray[b][a]];
-            dataArray[b][a] = `${range.address}`;
+          if (!dataArray[b][a]) {
+            // console.warn(`⚠️ Skipping empty or invalid named range at [${b}, ${a}].`);
+            continue; // ✅ Skip empty values
+          }
+
+          // console.log(`🔎 Processing data: '${dataArray[b][a]}'...`);
+
+          let [extractedSheet, extractedName] = dataArray[b][a].includes("!")
+            ? dataArray[b][a].split("!")
+            : [null, dataArray[b][a]];
+
+          if (extractedSheet && (extractedSheet.startsWith("'") || extractedSheet.endsWith("'"))) {
+            extractedSheet = extractedSheet.slice(1, -1); // ✅ Remove only leading/trailing quotes
+          }
+
+          let matchedRange = namedRangesArray.find(
+            ([sheet, name]) => name === extractedName && (sheet === extractedSheet || (!extractedSheet && sheet === "Workbook"))
+          );
+
+          if (matchedRange) {
+            let [sheetName, name, address] = matchedRange;
+            // console.log(`🔄 Mapping named range '${name}' from '${sheetName}' to address '${address}'.`);
+            dataArray[b][a] = address;
+          } else {
+            // console.error(`🚨 ERROR: Named range '${dataArray[b][a]}' NOT FOUND in namedRangesArray.`);
           }
         }
       }
@@ -116,10 +128,14 @@ export async function extractLevelData() {
       return outputArray;
     });
   } catch (error) {
-    console.error("Error in extractLevelData:", error);
+    // console.error("🚨 ERROR in extractLevelData:", error);
     return [];
   }
 }
+
+
+
+
 
 export async function loadWorkbookData() {
   try {
@@ -554,3 +570,63 @@ export async function generateLongFormData(region) {
     console.error("Error in generateLongFormData:", error);
   }
 }
+
+
+export async function extractNamedRanges() {
+  try {
+    return await Excel.run(async (context) => {
+      let workbook = context.workbook;
+      let namedRangesArray = [["Sheet Name", "Named Range", "Address"]];
+
+      let workbookNamedRanges = workbook.names;
+      workbookNamedRanges.load("items");
+      await context.sync();
+
+      let rangesToLoad = [];
+      workbookNamedRanges.items.forEach((nameItem) => {
+        let range = nameItem.getRangeOrNullObject();
+        range.load(["address"]);
+        namedRangesArray.push(["Workbook", nameItem.name, "Loading..."]);
+        rangesToLoad.push({ name: nameItem.name, range, index: namedRangesArray.length - 1 });
+      });
+
+      await context.sync();
+      rangesToLoad.forEach((item) => {
+        namedRangesArray[item.index][2] = item.range.address || "No Address";
+      });
+
+      let worksheets = workbook.worksheets;
+      worksheets.load("items");
+      await context.sync();
+
+      for (let sheet of worksheets.items) {
+        let sheetNamedRanges = sheet.names;
+        sheetNamedRanges.load("items");
+        await context.sync();
+
+        let sheetRangesToLoad = [];
+        sheetNamedRanges.items.forEach((nameItem) => {
+          let range = nameItem.getRangeOrNullObject();
+          range.load(["address"]);
+          let sheetName = sheet.name;
+          if (sheetName.startsWith("'") || sheetName.endsWith("'")) {
+            sheetName = sheetName.slice(1, -1);
+          }
+          namedRangesArray.push([sheetName, nameItem.name, "Loading..."]);
+          sheetRangesToLoad.push({ name: nameItem.name, range, index: namedRangesArray.length - 1 });
+        });
+
+        await context.sync();
+        sheetRangesToLoad.forEach((item) => {
+          namedRangesArray[item.index][2] = item.range.address || "No Address";
+        });
+      }
+
+      return namedRangesArray;
+    });
+  } catch (error) {
+    return [];
+  }
+}
+
+

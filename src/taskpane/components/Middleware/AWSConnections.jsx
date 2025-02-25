@@ -1,11 +1,13 @@
 import { v4 as uuidv4 } from "uuid"; // ✅ Import UUID Generator
 import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
+import Papa from 'papaparse';
 
 let cognitoURL = "https://cognito-idp.us-east-1.amazonaws.com/";
 let cognitoClientID = "57qs6udk82ombama3k7ntrflcn";
 let AuthURL = "https://278e46zxxk.execute-api.us-east-1.amazonaws.com/dev/sqldbquery";
 let AWSsecretsName = "dsivis-dev-remaining-secrets";
+
 // user login //
 export async function AwsLogin(username, password) {
   const url = cognitoURL;
@@ -50,12 +52,12 @@ export async function AwsLogin(username, password) {
 // auth of the user//
 export async function AuthorizationData(buttonname, idToken, secretName, emailId, UUID = []) {
   const url = AuthURL;
-  const idToken_new = "Bearer " + idToken;
+  let idToken_new = "Bearer " + idToken;
   const headers = {
     Authorization: idToken_new, // Add the ID token from Cognito
     "Content-Type": "application/json", // Ensure content type is JSON
   };
-  const body = {
+  let body = {
     action: buttonname,
     secret_name: secretName,
     email_id: emailId,
@@ -63,19 +65,30 @@ export async function AuthorizationData(buttonname, idToken, secretName, emailId
   };
 
   try {
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    let data = await response.json();
+
+    if (data?.message === "The incoming token has expired") {
+      console.warn("🔄 Token expired! Refreshing...");
+      await AWSrefreshtoken();
+      response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + idToken, // Refresh token logic should update idToken
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      data = await response.json();
     }
 
-    const data = await response.json();
     console.log("Fetch Metadata Response:", data);
-    return data; // Return the response data
+    return data;
   } catch (error) {
     console.error("Error fetching metadata:", error);
     throw error; // Re-throw error for handling
@@ -358,7 +371,11 @@ export async function service_orchestration(
       let DownloadS3OUTPUTFILEURL = S3downloadobject["presigned urls"]["DOWNLOAD"]["OUTPUT_FILE"][Forecast_UUID[0]];
 
       let downloadflg = await downloadAndInsertDataFromExcel(DownloadS3SaveForecastURL,"Flat File");
+      let downloadflg1 = await downloadAndInsertDataFromExcel(DownloadS3INPUTFILEURL,"Flat File");
       console.log(downloadflg);
+      if (downloadflg.success===true){
+        return { status: "Scenario Imported" };
+      }
 
 
     }
@@ -442,7 +459,7 @@ export async function AWSrefreshtoken() {
 
   const body = JSON.stringify({
     AuthFlow: "REFRESH_TOKEN_AUTH",
-    ClientId: AWSsecretsName,
+    ClientId: cognitoClientID,
     AuthParameters: {
       REFRESH_TOKEN: refreshToken,
     },
@@ -478,169 +495,81 @@ export async function AWSrefreshtoken() {
   }
 }
 
-
 export async function downloadAndInsertDataFromExcel(s3Url, sheetName) {
   const downloadURL = s3Url;
-  const BATCH_SIZE = 90000; // Adjust batch size
 
-  try {
-      console.log("📥 Initiating GET request:", downloadURL);
+  async function fetchData() {
+    console.log("Starting to fetch the file from S3...");
+    const response = await fetch(downloadURL);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch the file: ${response.statusText}`);
+    }
+    console.log("File fetched successfully.");
+    return response.arrayBuffer();
+  }
 
-      // Fetch file from S3
-      const response = await fetch(downloadURL);
-      if (!response.ok) {
-          throw new Error(`❌ Failed to fetch file: ${response.statusText}`);
+  async function processExcelFile(arrayBuffer, sheetName) {
+    console.log("Processing Excel file...");
+    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: "array" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    if (rows.length === 0) {
+      throw new Error("Excel sheet is empty.");
+    }
+
+    await insertParsedData(rows, sheetName);
+  }
+
+  function getColumnLetter(index) {
+    let letter = "";
+    while (index >= 0) {
+      letter = String.fromCharCode((index % 26) + 65) + letter;
+      index = Math.floor(index / 26) - 1;
+    }
+    return letter;
+  }
+
+  async function insertParsedData(rows, sheetName) {
+    await Excel.run(async (context) => {
+      const sheet = context.workbook.worksheets.getItemOrNullObject(sheetName);
+      await context.sync();
+
+      if (sheet.isNullObject) {
+        throw new Error(`Sheet "${sheetName}" does not exist.`);
       }
 
-      console.log("✅ File fetched successfully. Processing data...");
-      const blob = await response.blob();
+      // Clear the sheet before inserting new data
+      sheet.getUsedRange().clear();
+      await context.sync();
 
-      // Process Excel file and insert into sheet
-      const rowCount = await processExcelFile(blob, sheetName, BATCH_SIZE);
-      console.log(`✅ Successfully inserted ${rowCount} rows into '${sheetName}'`);
-      return { success: true, rowCount };
-  } catch (error) {
-      console.error("❌ Error:", error);
-      return { success: false, error: error.message };
-  }
-}
-
-
-// ✅ Function to Process Excel File and Write Data at Original Positions
-async function processExcelFile(blob, sheetName, batchSize) {
-  console.log("🚀 Starting processExcelFile function...");
-
-  let reader = new FileReader();
-
-  return new Promise((resolve, reject) => {
-      reader.readAsArrayBuffer(blob);
-
-      reader.onload = async function (event) {
-          console.log("📥 File successfully loaded into memory.");
-
-          let arrayBuffer = event.target.result;
-          let workbook = new ExcelJS.Workbook();
-          await workbook.xlsx.load(arrayBuffer);
-          console.log("📚 ExcelJS Workbook loaded successfully.");
-
-          let worksheet = workbook.worksheets[0];
-          console.log("📑 Extracted Sheet Name:", worksheet.name);
-
-          // ✅ Extract Excel Data with Original Cell Locations
-          let excelData = [];
-          worksheet.eachRow({ includeEmpty: true }, (row, rowIndex) => {
-              let rowData = [];
-              row.eachCell({ includeEmpty: true }, (cell, colIndex) => {
-                  rowData[colIndex - 1] = cell.value ?? ""; // Store value
-              });
-              excelData[rowIndex - 1] = rowData; // Maintain original row index
-          });
-
-          console.log(`📊 Extracted ${excelData.length} rows from file`);
-
-          if (excelData.length === 0) {
-              console.warn("⚠️ No data found in the Excel file.");
-              reject("No valid data found");
-              return;
-          }
-
-          console.log("🔹 Preparing to insert data into Excel...");
-
-          await Excel.run(async (context) => {
-              console.log("📌 Fetching worksheet list...");
-              let sheets = context.workbook.worksheets;
-              sheets.load("items/name");
-              await context.sync();
-
-              let availableSheets = sheets.items.map(sheet => sheet.name);
-              console.log("📃 Available Sheets:", availableSheets);
-
-              if (!availableSheets.includes(sheetName)) {
-                  console.error(`❌ Sheet "${sheetName}" not found.`);
-                  reject(`Sheet "${sheetName}" does not exist.`);
-                  return;
-              }
-
-              console.log(`✅ Sheet "${sheetName}" found. Activating...`);
-              let sheet = context.workbook.worksheets.getItem(sheetName);
-              sheet.activate();
-              await context.sync();
-
-              // ✅ Set Calculation Mode to Manual for Performance
-              context.workbook.application.calculationMode = "Manual";
-              context.workbook.application.suspendCalculationUntilNextSync();
-
-              // ✅ Batch Insert Data to Maintain Original Positions
-              let totalBatches = Math.ceil(excelData.length / batchSize);
-              console.log(`📌 Total batches to process: ${totalBatches}`);
-
-              let startRow = 1;
-              for (let i = 0; i < excelData.length; i += batchSize) {
-                  let batch = excelData.slice(i, i + batchSize);
-                  let endRow = Math.min(i + batchSize, excelData.length);
-
-                  console.log(`🔹 Processing batch ${i + 1} to ${endRow}`);
-                  console.log("📌 First 5 rows of batch:", batch.slice(0, 5));
-
-                  try {
-                      await insertParsedData(batch, startRow, sheet);
-                      startRow += batch.length;
-                  } catch (error) {
-                      console.error("❌ Failed to insert batch:", error);
-                      reject(error);
-                      return;
-                  }
-              }
-
-              // ✅ Restore Calculation Mode
-              context.workbook.application.calculationMode = "Automatic";
-              await context.sync();
-          });
-
-          console.log("✅ Excel pasting operation completed!");
-          resolve(excelData.length);
-      };
-
-      reader.onerror = () => {
-          console.error("❌ Failed to read Excel file");
-          reject("Failed to read Excel file");
-      };
-  });
-}
-
-// ✅ Function to Insert Data at Exact Same Cells
-async function insertParsedData(rows, startRow, sheet) {
-  await Excel.run(async (context) => {
-      console.log(`📌 Inserting ${rows.length} rows starting at row ${startRow} in sheet "${sheet.name}"`);
-
-      const endRow = startRow + rows.length - 1;
-      const columnCount = rows[0].length;
-      const rangeAddress = `A${startRow}:${getColumnLetter(columnCount - 1)}${endRow}`;
-
-      console.log(`📍 Target Range: ${rangeAddress}`);
-      console.log("📌 First 5 rows being inserted:", rows.slice(0, 5));
+      const rangeAddress = `A1:${getColumnLetter(rows[0].length - 1)}${rows.length}`;
+      console.log(`Range Address: ${rangeAddress}`);
 
       try {
-          const range = sheet.getRange(rangeAddress);
-          range.load("address");
-          await context.sync();
+        const range = sheet.getRange(rangeAddress);
+        range.load("address");
+        await context.sync();
 
-          range.values = rows;
-          await context.sync();
-          console.log(`✅ Successfully inserted rows ${startRow} to ${endRow}`);
+        range.values = rows;
+        await context.sync();
+        console.log(`Inserted data into sheet "${sheetName}"`);
       } catch (error) {
-          console.error("❌ Error during Excel insertion:", error);
-          throw new Error("Invalid range or sheet. Please check the range and sheet name.");
+        console.error("Error during Excel run:", error);
+        throw new Error("Invalid range or sheet. Please check the range and sheet name.");
       }
-  });
-}
-
-// ✅ Helper Function to Convert Column Index to Letter
-function getColumnLetter(colIndex) {
-  let letter = "";
-  while (colIndex >= 0) {
-      letter = String.fromCharCode((colIndex % 26) + 65) + letter;
-      colIndex = Math.floor(colIndex / 26) - 1;
+    });
   }
-  return letter;
+
+  try {
+    console.log("Starting the download and insertion process...");
+    const arrayBuffer = await fetchData();
+    await processExcelFile(arrayBuffer, sheetName);
+    console.log(`Data has been successfully inserted into the sheet: ${sheetName}`);
+    return { success: true, newSheetName: sheetName };
+  } catch (error) {
+    console.error("Error:", error);
+    console.log("Failed to fetch data. Please try again.");
+    return { success: false, newSheetName: null };
+  }
 }

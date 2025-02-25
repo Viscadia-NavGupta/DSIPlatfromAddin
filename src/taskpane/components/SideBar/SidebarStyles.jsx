@@ -4,12 +4,14 @@ export const SidebarContainer = styled("div")({
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
-  justifyContent: "space-between",
-  height: "100%",
-  backgroundColor: "#63676B", // Sidebar background color
+  justifyContent: "flex-start", // Align buttons to the top
+  height: "100vh", // Ensure it takes full height
+  width: "60px", // Ensure fixed width
+  backgroundColor: "#63676B",
   color: "#fff",
-  position: "relative", // Relative position for tooltip alignment
+  position: "relative",
   padding: "10px 0",
+  gap: "10px", // Ensures spacing between buttons
 });
 
 export const SidebarButton = styled("button")(({ isActive }) => ({
