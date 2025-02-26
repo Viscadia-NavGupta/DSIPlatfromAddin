@@ -380,11 +380,12 @@ function convert2DTo1D(arr2D) {
 export function isValidRange(rangeStr) {
   if (!rangeStr || typeof rangeStr !== "string") return false;
 
-  // Fix: Ensure any character inside single quotes in the sheet name is allowed
-  const rangePattern = /^'([^']+)'!\s*([A-Z]+[0-9]+)(:[A-Z]+[0-9]+)?$/;
+  // Fix: Make single quotes optional for sheet names
+  const rangePattern = /^(?:'([^']+)'|([A-Za-z0-9_]+))!\s*([A-Z]+[0-9]+)(:[A-Z]+[0-9]+)?$/;
 
   return rangePattern.test(rangeStr);
 }
+
 
 export async function generateLongFormData(region) {
   try {

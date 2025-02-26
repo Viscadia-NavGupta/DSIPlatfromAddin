@@ -423,7 +423,7 @@ async function filterArrayByMultipleCriteria(sourceArray, criteria, countRow, co
       if (filteredRowCount > 0) {
           for (let a = 0; a < filteredRowCount; a++) {
               for (let b = 0; b < countCol; b++) {
-                  vntFiltered[a][b] = filteredArray[a][b + 11]; // ✅ Fixed Offset to Start from Column 11
+                  vntFiltered[a][b] = filteredArray[a][b + 16]; // ✅ Fixed Offset to Start from Column 11
               }
           }
       }
@@ -540,8 +540,8 @@ export async function exportData2() {
           console.log("✅ Named Range 'DataModel' successfully loaded!");
 
           // ✅ 7. Compute max row & max col
-          let maxrow = sumColumn(vntControl, 14);
-          let maxcol = findMaxInColumn(vntControl, 15);
+          let maxrow = sumColumn(vntControl, 19);
+          let maxcol = findMaxInColumn(vntControl, 20);
 
           maxrow = isNaN(maxrow) || maxrow <= 0 ? 1 : maxrow;
           maxcol = isNaN(maxcol) || maxcol <= 0 ? 1 : maxcol;

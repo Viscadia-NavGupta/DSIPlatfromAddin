@@ -48,8 +48,9 @@ const HomePage = ({ userName, setPageValue }) => {
   };
 
   // ✅ **Function for Risk & Analytics (Currently Disabled)**
-  const handleRiskAnalytics = () => {
+  const handleRiskAnalytics= async () => {
     console.log("⚠️ Risk & Analytics Clicked - This feature is under development.");
+    await savefucntion.exportData2();
   };
 
   // ✅ **Function for Power BI Report**
@@ -88,7 +89,7 @@ const HomePage = ({ userName, setPageValue }) => {
       name: "Risk & Analytics",
       icon: <RiskAnalytics />,
       action: handleRiskAnalytics,
-      disabled: true, // This feature is disabled
+      disabled: false, // This feature is disabled
     },
     {
       name: "Power BI Report",
