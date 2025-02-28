@@ -14,7 +14,9 @@ export async function getAllSheetUsedRangesArray() {
 
       for (let sheet of sheets.items) {
         let worksheet = sheet;
-        let usedRange = worksheet.getUsedRange();
+
+        // Ensure we start from A1 and get the surrounding used range
+        let usedRange = worksheet.getRange("A1").getSurroundingRegion();
         usedRange.load("values");
         await context.sync();
 
@@ -31,6 +33,7 @@ export async function getAllSheetUsedRangesArray() {
     console.error(error);
   }
 }
+
 
 // 
 export async function extractLevelData() {
