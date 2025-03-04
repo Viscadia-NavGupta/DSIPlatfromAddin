@@ -1,78 +1,99 @@
 import { styled } from "@mui/system";
+// Container for the user's name
+export const NameContainer = styled("div")({
+  marginTop: "0.5rem",
+});
 
-// Main container fits within MainLayout's MainContentContainer
+
+// Main container ensuring full-page scrolling when needed
 export const HomePageContainer = styled("div")({
   display: "flex",
   flexDirection: "column",
-  justifyContent: "flex-start", // Centers content properly
   alignItems: "center",
-  height: "100%", // Takes up full available space
-  width: "100%", // Prevents overflow
+  height: "100vh",
+  width: "100%",
   boxSizing: "border-box",
+  overflowY: "auto", // ✅ Enables scrolling when needed
+  overflowX: "hidden", // ✅ Prevents horizontal scrolling
+  paddingBottom: "10px",
 });
 
-// Welcome container with greeting text
+// Wrapper to keep content centered properly
+export const ContentWrapper = styled("div")({
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  width: "100%",
+  maxWidth: "100%",
+  flexGrow: 1,
+  overflowY: "auto",
+  overflowX: "hidden",
+});
+
+// Welcome container for header text
 export const WelcomeContainer = styled("div")({
   textAlign: "center",
-  marginBottom: "20px", // Reduced margin for better spacing
+  marginBottom: "5px",
   "& h1": {
-    fontSize: "1.8rem",
+    fontSize: "clamp(1.2rem, 2vw, 1.8rem)", // 🔥 Slightly reduced font size
     color: "#B4322A",
-    marginBottom: "0.5rem",
+    marginBottom: "0.3rem",
   },
   "& h2": {
-    fontSize: "1.5rem",
+    fontSize: "clamp(1rem, 1.5vw, 1.3rem)", // 🔥 Slightly reduced name font size
     color: "#B4322A",
     fontWeight: "bold",
     margin: 0,
   },
 });
 
-// Container for the user's name
-export const NameContainer = styled("div")({
-  marginTop: "0.5rem",
-});
-
-// Buttons container for feature buttons
+// Buttons container with **reduced gaps & smaller buttons**
 export const ButtonsContainer = styled("div")({
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))",
-  gap: "10px",
+  gap: "8px", // 🔥 Reduced gap between buttons
   width: "100%",
   justifyItems: "center",
+  padding: "5px",
+  gridTemplateColumns: "repeat(auto-fit, minmax(95px, 1fr))", // 🔥 Reduced min size for smaller buttons
+  overflow: "visible",
 });
 
-// Individual button styles
+// Individual button styles ensuring text and icons fit
 export const Button = styled("button")(({ disabled }) => ({
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
-  padding: "0.4rem",
   border: "1px solid #ddd",
-  borderRadius: "10px",
+  borderRadius: "8px", // ✅ Slightly smaller corners
   backgroundColor: disabled ? "#f2f2f2" : "#fff",
-  width: "90px",
-  height: "90px",
   cursor: disabled ? "not-allowed" : "pointer",
   textAlign: "center",
   position: "relative",
-  transition: "transform 0.3s, background-color 0.3s, color 0.3s",
+  overflow: "hidden",
+  padding: "3px",
+  width: "100%", // ✅ Ensures buttons take full available space
+  height: "75px", // 🔥 Reduced height
   "& svg": {
-    width: "28px",
-    height: "28px",
-    marginBottom: "0.4rem",
+    width: "35%", // ✅ Keeps icon proportional
+    height: "35%",
+    marginBottom: "0.2rem",
     fill: disabled ? "#d3d3d3" : "#63666A",
   },
   "& p": {
-    fontSize: "0.75rem",
+    fontSize: "clamp(0.6rem, 0.8vw, 0.9rem)", // 🔥 Reduced text size
     color: disabled ? "#d3d3d3" : "#63666A",
     margin: 0,
+    textAlign: "center",
+    whiteSpace: "normal",
+    wordBreak: "break-word",
+    overflow: "hidden",
+    maxWidth: "90%",
   },
   "&:hover": {
     transform: disabled ? "none" : "scale(1.05)",
     backgroundColor: disabled ? "#f2f2f2" : "#B4322A",
-    color: disabled ? "#d3d3d3" : "#fff",
+    color: "#fff",
     "& p": {
       color: "#fff",
     },
@@ -81,6 +102,7 @@ export const Button = styled("button")(({ disabled }) => ({
     },
   },
 }));
+
 
 // Disabled overlay with tooltip wrapper
 export const DisabledOverlay = styled("div")({
@@ -121,11 +143,11 @@ export const Tooltip = styled("div")({
   transform: "translateX(-50%)",
   backgroundColor: "#B4322A",
   color: "#fff",
-  padding: "8px",
-  fontSize: "0.6rem",
+  padding: "4px",
+  fontSize: "0.5rem",
   borderRadius: "4px",
   whiteSpace: "normal",
-  maxWidth: "250px",
+  maxWidth: "300px",
   textAlign: "center",
   zIndex: 10,
   boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",

@@ -11,7 +11,7 @@ const Header = () => {
         />
       </LogoContainer>
       <HeadingContainer>
-        <h1>Viscadia Forecasting Solution</h1>
+        <h1>Viscadia Forecast Solution</h1>
       </HeadingContainer>
     </HeaderContainer>
   );

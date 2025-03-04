@@ -1,12 +1,6 @@
-import React from "react";
-import {
-  SidebarContainer,
-  SidebarButton,
-  LogoutButton,
-  Tooltip,
-} from "./SidebarStyles";
-
-// Importing Icon Components
+import React, { useState, useEffect } from "react";
+import { SidebarContainer, SidebarButtonWrapper, SidebarButton, LogoutButton, TooltipContainer } from "./SidebarStyles";
+import { FaHome, FaSignOutAlt } from "react-icons/fa";
 import ModelBuilder from "../Icons/Modelbuilder";
 import ForecastManagement from "../Icons/ForecastManagement";
 import AssumptionsCatalogue from "../Icons/AssumptionsCatalogue";
@@ -14,40 +8,76 @@ import RiskAnalytics from "../Icons/Risk&Analytics";
 import PowerBi from "../Icons/PowerBi";
 import ReportGenie from "../Icons/ReportGenie";
 
-import { FaHome, FaSignOutAlt } from "react-icons/fa";
-
 const Sidebar = ({ setPageValue, currentPage, handleLogout }) => {
-  const iconColor = "#FFFFFF"; // Universal icon color
+  const [activePage, setActivePage] = useState(currentPage);
+  const [tooltip, setTooltip] = useState({ text: "", visible: false, top: 0 });
+
+  useEffect(() => {
+    setActivePage(currentPage);
+  }, [currentPage]);
 
   const sidebarButtons = [
-    { name: "Home", icon: <FaHome color={iconColor} />, action: () => setPageValue("Home") },
-    { name: "Model Management", icon: <ModelBuilder fill={iconColor} />, action: () => setPageValue("SaveForecastPage") },
-    { name: "Forecast Management", icon: <ForecastManagement fill={iconColor} />, action: () => setPageValue("ForecastManagement") },
-    { name: "Assumptions Catalogue", icon: <AssumptionsCatalogue fill={iconColor} />, action: () => setPageValue("AssumptionsCatalogue") },
-    { name: "Risk & Analytics", icon: <RiskAnalytics fill={iconColor} />, action: () => setPageValue("InactiveFeature") },
-    { name: "Power BI Report", icon: <PowerBi fill={iconColor} />, action: () => setPageValue("PowerBi") },
-    { name: "Report Genie", icon: <ReportGenie fill={iconColor} />, action: () => setPageValue("ReportGenie") },
+    { name: "Home", icon: <FaHome size={20} />, action: "Home" },
+    { name: "Model Management", icon: <ModelBuilder width={24} height={24} />, action: "ModelManagement" },
+    { name: "Forecast Management", icon: <ForecastManagement width={24} height={24} />, action: "ForecastManagement" },
+    {
+      name: "Assumptions Catalogue",
+      icon: <AssumptionsCatalogue width={24} height={24} />,
+      action: "AssumptionsCatalogue",
+    },
+    { name: "Risk & Analytics", icon: <RiskAnalytics width={24} height={24} />, action: "RiskAnalytics" },
+    { name: "Power BI Report", icon: <PowerBi width={24} height={24} />, action: "PowerBI" },
+    { name: "Report Genie", icon: <ReportGenie width={24} height={24} />, action: "ReportGenie" },
   ];
+
+  const handleMouseEnter = (text, event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setTooltip({
+      text,
+      visible: true,
+      top: rect.top + rect.height / 2 - 10 + window.scrollY, // Center vertically
+      left: rect.left + rect.width + 10, // Position to right of the button
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setTooltip({ text: "", visible: false, top: 0 });
+  };
 
   return (
     <SidebarContainer>
-      {/* Sidebar Buttons */}
-      {sidebarButtons.map((button, index) => (
-        <SidebarButton
-          key={index}
-          onClick={button.action}
-          isActive={currentPage === button.name}
+      <div style={{ width: "100%" }}>
+        {sidebarButtons.map((button, index) => (
+          <SidebarButtonWrapper key={index}>
+            <SidebarButton
+              onClick={() => {
+                setPageValue(button.action);
+                setActivePage(button.action);
+              }}
+              isActive={activePage === button.action}
+              onMouseEnter={(e) => handleMouseEnter(button.name, e)}
+              onMouseLeave={handleMouseLeave}
+            >
+              {button.icon}
+            </SidebarButton>
+          </SidebarButtonWrapper>
+        ))}
+      </div>
+      <SidebarButtonWrapper>
+        <LogoutButton
+          onClick={handleLogout}
+          onMouseEnter={(e) => handleMouseEnter("Logout", e)}
+          onMouseLeave={handleMouseLeave}
         >
-          {button.icon}
-          <Tooltip className="tooltip">{button.name}</Tooltip>
-        </SidebarButton>
-      ))}
+          <FaSignOutAlt size={20} />
+        </LogoutButton>
+      </SidebarButtonWrapper>
 
-      {/* Logout Button */}
-      <LogoutButton onClick={handleLogout}>
-        <FaSignOutAlt color={iconColor} />
-        <Tooltip className="tooltip">Logout</Tooltip>
-      </LogoutButton>
+      {tooltip.visible && (
+        <TooltipContainer visible={tooltip.visible} style={{ top: tooltip.top }}>
+          {tooltip.text}
+        </TooltipContainer>
+      )}
     </SidebarContainer>
   );
 };

@@ -22,7 +22,7 @@ const ForecastManagementPage = ({ setPageValue, onBack }) => {
   };
 
   const buttons = [
-    { name: "Load", icon: <FaDownload />, action: () => handleButtonClick("LoadPage"), active: true },
+    { name: "Load", icon: <FaDownload />, action: () => handleButtonClick("LoadScenario"), active: true },
     { name: "Compute", icon: <FaCog />, action: () => handleButtonClick("ComputePage") },
     { name: "Outputs", icon: <FaCloud />, action: () => handleButtonClick("OutputsPage") },
     { name: "Save", icon: <FaSave />, action: () => handleButtonClick("SaveForecastPage") },

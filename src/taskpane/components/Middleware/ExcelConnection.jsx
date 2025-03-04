@@ -151,14 +151,34 @@ export async function loadWorkbookData() {
       sheetNames = [];
 
       for (let sheet of sheets.items) {
-        let sheetName = sheet.name.trim(); // Normalize sheet name
+        let sheetName = sheet.name.trim();
         sheetNames.push(sheetName);
 
-        let usedRange = sheet.getUsedRange();
-        usedRange.load(["values", "address"]);
-        await context.sync();
+        let usedRange;
+        try {
+          // Get the actual used range in the sheet
+          usedRange = sheet.getUsedRange();
+          usedRange.load(["values", "address"]);
+          await context.sync();
 
-        workbookData[sheetName] = usedRange.values;
+          // Get used range address (e.g., "B3:F20")
+          let usedAddress = usedRange.address.split("!")[1]; // Extract address after the sheet name
+          let lastCell = usedAddress.split(":")[1]; // Extract last cell reference
+
+          // Define the new range starting from A1 to the last used cell
+          let expandedRange = sheet.getRange(`A1:${lastCell}`);
+          expandedRange.load("values");
+          await context.sync();
+
+          workbookData[sheetName] = expandedRange.values;
+        } catch (error) {
+          console.warn(`Sheet ${sheetName} has no used range. Defaulting to A1.`);
+          let defaultRange = sheet.getRange("A1");
+          defaultRange.load("values");
+          await context.sync();
+
+          workbookData[sheetName] = defaultRange.values;
+        }
       }
 
       console.log("Workbook Data Loaded", workbookData);
@@ -168,6 +188,9 @@ export async function loadWorkbookData() {
     console.error("Error loading workbook data:", error);
   }
 }
+
+
+
 
 export function parseRangeString(rangeStr) {
   let match = rangeStr.match(/^(.*?)!\s*([A-Z]+\d+)(?::([A-Z]+\d+))?$/);
@@ -568,7 +591,7 @@ export async function generateLongFormData(region) {
       await context.sync();
 
       console.log(`Data processed successfully. Final row count: ${currentRow - 1}`);
-      workbook.application.calculationMode = Excel.CalculationMode.automatic;
+      // workbook.application.calculationMode = Excel.CalculationMode.automatic;
     });
   } catch (error) {
     console.error("Error in generateLongFormData:", error);
@@ -634,3 +657,24 @@ export async function extractNamedRanges() {
 }
 
 
+export async function setCalculationMode(mode) {
+  try {
+    await Excel.run(async (context) => {
+      let workbook = context.workbook;
+      
+      // Set calculation mode based on user input
+      if (mode.toLowerCase() === "manual") {
+        workbook.application.calculationMode = Excel.CalculationMode.manual;
+      } else if (mode.toLowerCase() === "automatic") {
+        workbook.application.calculationMode = Excel.CalculationMode.automatic;
+      } else {
+        throw new Error("Invalid mode. Use 'manual' or 'automatic'.");
+      }
+
+      await context.sync();
+      console.log(`Calculation mode set to: ${mode}`);
+    });
+  } catch (error) {
+    console.error("Error setting calculation mode:", error);
+  }
+}

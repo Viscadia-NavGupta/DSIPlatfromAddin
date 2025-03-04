@@ -11,7 +11,7 @@ import {
 import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
 import * as excelfucntions from "../../Middleware/ExcelConnection";
-
+import * as inputfiles from "../../Middleware/inputfile";
 const SaveScenario = ({ setPageValue }) => {
   const [selectedCycle, setSelectedCycle] = useState("");
   const [scenarioName, setScenarioName] = useState("");
@@ -124,6 +124,11 @@ const SaveScenario = ({ setPageValue }) => {
     console.log("📤 Saving Forecast:", { cycle_name: selectedCycle, scenario_name: scenarioName });
     console.log("🔹 Using Model ID:", modelIDValue); // ✅ Now accessible
 
+    await excelfucntions.setCalculationMode("manual");
+    await excelfucntions.generateLongFormData("US");
+    await excelfucntions.setCalculationMode("manual");
+    await inputfiles.saveData();
+    await excelfucntions.setCalculationMode("manual");
     let SaveFlag = await AWSconnections.service_orchestration(
       "SAVE_FORECAST",
       "",
@@ -134,11 +139,11 @@ const SaveScenario = ({ setPageValue }) => {
       "",
       ""
     );
-    const successMessage = SaveFlag;
-    console.log(successMessage);
-    if (successMessage==="Saved Forecast"){
+    // const successMessage = SaveFlag;
+    // console.log(successMessage);
+    // if (successMessage==="Saved Forecast"){
       setPageValue("SaveForecastPageinterim");
-    };
+    // };
 
     // if (typeof setPageValue === "function") {
     //   setPageValue("SaveForecastPage");

@@ -20,15 +20,17 @@ export const SidebarContainer = styled("aside")({
   backgroundColor: "#63676B",
   display: "flex",
   flexDirection: "column",
-  justifyContent: "space-between",
   alignItems: "center",
+  justifyContent: "space-between",
   color: "#fff",
-  minWidth: "60px", // Ensures a minimal sidebar width
-  maxWidth: "8vw", // Restricts sidebar width to 8% of screen width
-  height: "100%", // Matches full height
-  overflow: "hidden", // Prevents horizontal scrollbar
+  width: "60px", 
+  height: "100%",
+  overflowY: "auto", // ✅ Allows scrolling inside sidebar
+  overflowX: "visible", // ✅ Prevents tooltip from getting cut off
+  padding: "10px 0",
+  position: "relative", // ✅ Allows absolute positioning inside
+  zIndex: 999, // ✅ Ensures sidebar is layered correctly
 });
-
 export const MainContentContainer = styled("main")({
   gridArea: "main",
   display: "flex",

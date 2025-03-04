@@ -1,68 +1,77 @@
 import { styled } from "@mui/system";
 
+// ✅ Sidebar Container - Tooltip is positioned here to avoid clipping
 export const SidebarContainer = styled("div")({
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
-  justifyContent: "flex-start", // Align buttons to the top
-  height: "100vh", // Ensure it takes full height
-  width: "60px", // Ensure fixed width
+  justifyContent: "space-between",
+  height: "100vh",
+  width: "60px",
   backgroundColor: "#63676B",
-  color: "#fff",
-  position: "relative",
+  position: "relative", // ✅ Tooltip is positioned relative to this
   padding: "10px 0",
-  gap: "10px", // Ensures spacing between buttons
+  overflow: "visible",
 });
 
+// ✅ Sidebar Button Wrapper - Only holds button, tooltip is outside
+export const SidebarButtonWrapper = styled("div")({
+  position: "relative",
+  width: "60px",
+  display: "flex",
+  justifyContent: "center",
+  marginBottom: "5px",
+});
+
+// ✅ Sidebar Button - Turns red on hover & when active
 export const SidebarButton = styled("button")(({ isActive }) => ({
+  width: "50px",
+  height: "50px",
+  borderRadius: "6px",
+  border: "none",
+  backgroundColor: isActive ? "#B4322A" : "transparent",
+  color: isActive ? "#fff" : "#ccc",
+  cursor: "pointer",
+  transition: "background-color 0.3s, color 0.3s",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  width: "50px",
-  height: "50px",
-  border: "none",
-  borderRadius: "8px", // Rounded corners
-  backgroundColor: isActive ? "#b71c1c" : "transparent", // Active state background
-  color: isActive ? "#fff" : "#ccc",
-  marginBottom: "10px",
-  cursor: "pointer",
-  position: "relative", // Tooltip positioning
-  transition: "background-color 0.3s, color 0.3s",
-
-  "&:hover": {
-    backgroundColor: "#b71c1c",
-    color: "#fff",
-
-    "& .tooltip": {
-      opacity: 1,
-      visibility: "visible",
-    },
-  },
+  position: "relative",
 
   "& svg": {
-    fontSize: "1.2rem",
+    fontSize: "1.4rem",
+    fill: isActive ? "#fff" : "#ccc",
+    transition: "fill 0.3s ease",
+  },
+
+  "&:hover": {
+    backgroundColor: "#B4322A",
+    color: "#fff",
+
+    "& svg": {
+      fill: "#fff",
+    },
   },
 }));
 
-export const LogoutButton = styled(SidebarButton)({
-  marginTop: "auto", // Push logout to the bottom
-});
-
-export const Tooltip = styled("div")({
-  position: "absolute",
-  left: "60px", // Align tooltip to the right of the button
-  top: "50%",
-  transform: "translateY(-50%)", // Vertically center the tooltip
+// ✅ Tooltip Styling - Now properly outside the sidebar buttons
+export const TooltipContainer = styled("div")(({ visible }) => ({
+  position: "fixed", // Ensure tooltip is always in view
+  left: "70px", // Ensures it appears outside the sidebar
   backgroundColor: "#333",
   color: "#fff",
-  padding: "5px 10px",
-  borderRadius: "4px",
+  padding: "6px 10px",
+  borderRadius: "5px",
   fontSize: "0.8rem",
   whiteSpace: "nowrap",
-  zIndex: 10, // Ensure it displays above other elements
+  zIndex: 1000, // Ensures tooltip is above other elements
   boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",
-  opacity: 0, // Initially hidden
-  visibility: "hidden", // Hide tooltip initially
-  transition: "opacity 0.3s ease, visibility 0.3s ease",
-  pointerEvents: "none", // Prevent tooltip from interfering with hover
+  opacity: visible ? 1 : 0, // Toggle visibility dynamically
+  visibility: visible ? "visible" : "hidden",
+  transition: "opacity 0.2s ease, visibility 0.2s ease",
+}));
+
+// Logout button uses the same style as a sidebar button.
+export const LogoutButton = styled(SidebarButton)({
+  marginTop: "auto",
 });

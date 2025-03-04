@@ -1,7 +1,8 @@
 import { v4 as uuidv4 } from "uuid"; // ✅ Import UUID Generator
 import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
-import Papa from 'papaparse';
+import Papa from "papaparse";
+
 
 let cognitoURL = "https://cognito-idp.us-east-1.amazonaws.com/";
 let cognitoClientID = "57qs6udk82ombama3k7ntrflcn";
@@ -165,6 +166,8 @@ export async function FetchMetaData(buttonName, idToken, secretName, userId, ema
 }
 
 // file upload to s3//
+
+
 export async function uploadFileToS3(sheetName, uploadURL) {
   try {
     return await Excel.run(async (context) => {
@@ -179,20 +182,28 @@ export async function uploadFileToS3(sheetName, uploadURL) {
         return false;
       }
 
-      // Create a new Excel workbook and add a worksheet
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet(sheetName);
+      // Convert worksheet data to a sheet using xlsx
+      const worksheet = XLSX.utils.aoa_to_sheet(range.values);
 
-      // Append data to the worksheet
-      range.values.forEach((row) => {
-        worksheet.addRow(row);
-      });
+      // Apply number formats (if available)
+      for (let R = 0; R < range.values.length; R++) {
+        for (let C = 0; C < range.values[R].length; C++) {
+          const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+          if (worksheet[cellRef]) {
+            worksheet[cellRef].z = range.numberFormat[R][C];
+          }
+        }
+      }
 
-      // Convert workbook to a buffer
-      const buffer = await workbook.xlsx.writeBuffer();
+      // Create a new workbook and append the sheet
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
 
-      // Convert buffer to a Blob
-      const blob = new Blob([buffer], {
+      // Convert workbook to binary
+      const workbookBinary = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+
+      // Convert binary to Blob
+      const blob = new Blob([workbookBinary], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
 
@@ -227,6 +238,7 @@ export async function uploadFileToS3(sheetName, uploadURL) {
     return false; // Failure
   }
 }
+
 
 export async function servicerequest(
   serviceURL = "",
@@ -324,13 +336,12 @@ export async function service_orchestration(
 
     // ✅ Creating S3 Upload Links
 
-
     if (buttonname === "SAVE_FORECAST") {
       console.log("📤 Uploading forecast files...");
 
       let S3Uploadobejct = await AuthorizationData("SAVE_FORECAST", idToken, AWSsecretsName, username, UUID_Generated);
       console.log(S3Uploadobejct);
-  
+
       // ✅ Extract S3 Upload URLs
       let UploadS3SaveForecastURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["SAVE_FORECAST"][UUID_Generated[0]];
       let UploadS3INPUTFILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["INPUT_FILE"][UUID_Generated[0]];
@@ -354,35 +365,47 @@ export async function service_orchestration(
           cycleName,
           scenarioname
         );
-        
+
         console.log("✅ Service Request Status:", servicestatus);
 
+        if (servicestatus === "Error: ❌ HTTP error! Status: 504 - " || servicestatus.status === "Poll") {
+          // Poll for completion -> make an API call to polling lambda
+          console.log("Polling for completion");
+          return poll(
+            UUID_Generated[0],
+            (secret_name = "dsivis-dev-remaining-secrets"),
+            (pollingUrl = "https://4hfdu2q9z6.execute-api.us-east-1.amazonaws.com/dev/polling")
+          );
+        } else {
+          return servicestatus;
+        }
         // ✅ Return service status
-        return servicestatus;
       }
-    } else if (buttonname === "IMPORT_ASSUMPTIONS"){
-
-      let S3downloadobject = await AuthorizationData("IMPORT_ASSUMPTIONS", idToken, AWSsecretsName, username, Forecast_UUID);
+    } else if (buttonname === "IMPORT_ASSUMPTIONS") {
+      let S3downloadobject = await AuthorizationData(
+        "IMPORT_ASSUMPTIONS",
+        idToken,
+        AWSsecretsName,
+        username,
+        Forecast_UUID
+      );
       console.log(S3downloadobject);
-  
+
       // ✅ Extract S3 Upload URLs
       let DownloadS3SaveForecastURL = S3downloadobject["presigned urls"]["DOWNLOAD"]["SAVE_FORECAST"][Forecast_UUID[0]];
       let DownloadS3INPUTFILEURL = S3downloadobject["presigned urls"]["DOWNLOAD"]["INPUT_FILE"][Forecast_UUID[0]];
       let DownloadS3OUTPUTFILEURL = S3downloadobject["presigned urls"]["DOWNLOAD"]["OUTPUT_FILE"][Forecast_UUID[0]];
 
-      let downloadflg = await downloadAndInsertDataFromExcel(DownloadS3SaveForecastURL,"Flat File");
-      let downloadflg1 = await downloadAndInsertDataFromExcel(DownloadS3INPUTFILEURL,"Flat File");
+      let downloadflg = await downloadAndInsertDataFromExcel(DownloadS3SaveForecastURL, "Flat File");
+      let downloadflg1 = await downloadAndInsertDataFromExcel(DownloadS3INPUTFILEURL, "Flat File");
       console.log(downloadflg);
-      if (downloadflg.success===true){
+      if (downloadflg.success === true) {
         return { status: "Scenario Imported" };
       }
-
-
     }
 
     // ✅ If no action was taken, return a default status
     return { status: "No operation performed" };
-
   } catch (error) {
     console.error("🚨 Error in service_orchestration:", error);
 
@@ -390,7 +413,6 @@ export async function service_orchestration(
     return { status: "error", message: error.message };
   }
 }
-
 
 export async function postToServiceOrchestration(buttonName, secretName, userId, idToken) {
   try {
@@ -436,9 +458,6 @@ export async function postToServiceOrchestration(buttonName, secretName, userId,
   }
 }
 
-function trimLink(url) {
-  return url.replace(/\/[^/]+$/, "/");
-}
 
 // refresh token fucntion
 export async function AWSrefreshtoken() {
@@ -572,4 +591,62 @@ export async function downloadAndInsertDataFromExcel(s3Url, sheetName) {
     console.log("Failed to fetch data. Please try again.");
     return { success: false, newSheetName: null };
   }
+}
+
+export async function poll(
+  request_id,
+  secret_name = "dsivis-dev-remaining-secrets",
+  pollingUrl = "https://4hfdu2q9z6.execute-api.us-east-1.amazonaws.com/dev/polling"
+) {
+  if (!request_id || !secret_name) {
+    console.error("❌ request_id and secret_name are required.");
+    return { request_id, result: false };
+  }
+
+  const maxAttempts = 100;
+  const delay = 5000; // 5 seconds
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    try {
+      const response = await fetch(pollingUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer YOUR_ACCESS_TOKEN_HERE`, // Add your token if required
+          Accept: "*/*",
+          "User-Agent": "PostmanRuntime/7.43.0",
+          "Accept-Encoding": "gzip, deflate, br",
+          Connection: "keep-alive",
+        },
+        body: JSON.stringify({ request_id, secret_name }), // ✅ Send request_id & secret_name
+      });
+
+      if (!response.ok) {
+        console.error(`HTTP Error: ${response.status} ${response.statusText}`);
+        return { request_id, result: false };
+      }
+
+      const responseBody = await response.json();
+      console.log(`Attempt ${attempts + 1}:`, responseBody);
+
+      if (responseBody.status === "DONE") {
+        console.log("✅ Polling complete!");
+        return { request_id, result: true };
+      } else if (responseBody.status === "PENDING") {
+        console.log("⏳ Still processing... waiting for 5 seconds.");
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        attempts++;
+      } else {
+        console.error("❌ Unexpected status:", responseBody.status);
+        return { request_id, result: false };
+      }
+    } catch (error) {
+      console.error("⚠️ Polling error:", error);
+      return { request_id, result: false };
+    }
+  }
+
+  console.error("⏳ Polling timed out after 100 attempts.");
+  return { request_id, result: false };
 }
