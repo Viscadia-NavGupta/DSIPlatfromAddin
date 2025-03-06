@@ -17,9 +17,11 @@ export const LogoContainer = styled("div")({
   alignItems: "center",
   "& img": {
     width: "70%", // Logo takes 70% of the container's width
-    height: "auto",
+    height: "2.2rem",
+    margin: "5px", // Additional spacing inside the container
   },
 });
+
 
 export const HeadingContainer = styled("div")({
   flex: "1", // Remaining space for the heading

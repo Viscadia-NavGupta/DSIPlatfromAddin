@@ -1,32 +1,29 @@
 import { styled } from "@mui/system";
 
 export const FooterContainer = styled("footer")({
-  gridArea: "footer",
   display: "flex",
   alignItems: "center",
-  justifyContent: "center", // Center content if text is breaking into multiple lines
-  backgroundColor: "#f9f9f9", // Light background color
+  justifyContent: "space-between",
+  backgroundColor: "#f9f9f9",
   borderTop: "1px solid #ddd",
-  padding: "0 1rem", // Adjust padding to prevent overflow
-  height: "auto", // Adjust height dynamically instead of fixed 50px
+  padding: "0 1rem",
+  height: "50px",
+});
 
-  "& p": {
-    margin: "0.25rem 0", // Reduce margin
-    fontSize: "0.65rem", // Slightly reduce font size for better fit
-    color: "#939393",
-    textAlign: "center", // Ensures text is properly aligned
-    whiteSpace: "normal", // Allows text to wrap properly
-  },
+export const FooterLeft = styled("div")({
+  color: "#939393",
+  fontSize: "0.45rem",
+});
 
+export const FooterRight = styled("div")({
+  display: "flex",
+  gap: "1.5rem", // space between links
   "& a": {
-    color: "#B4322A", // Updated red color
+    color: "#939393",
     textDecoration: "none",
-    margin: "0 0.5rem", // Keep spacing balanced
-    fontSize: "0.7rem", // Match font size with paragraph text
-    wordBreak: "break-word", // Ensures links don’t overflow
+    fontSize: "0.45rem",
   },
-
-  "& img": {
-    height: "20px", // Reduce icon size for better alignment
+  "& a:hover": {
+    textDecoration: "underline",
   },
 });

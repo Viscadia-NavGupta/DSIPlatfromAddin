@@ -20,6 +20,7 @@ import PowerBi from "../Icons/PowerBi";
 import ReportGenie from "../Icons/ReportGenie";
 import RiskAnalytics from "../Icons/Risk&Analytics";
 
+
 const HomePage = ({ userName, setPageValue }) => {
   const [buttonSize, setButtonSize] = useState({ width: 90, height: 75, fontSize: "0.7rem", iconSize: 25 });
 

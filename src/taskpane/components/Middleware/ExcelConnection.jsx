@@ -34,8 +34,7 @@ export async function getAllSheetUsedRangesArray() {
   }
 }
 
-
-// 
+//
 export async function extractLevelData() {
   try {
     return await Excel.run(async (context) => {
@@ -83,7 +82,8 @@ export async function extractLevelData() {
           }
 
           let matchedRange = namedRangesArray.find(
-            ([sheet, name]) => name === extractedName && (sheet === extractedSheet || (!extractedSheet && sheet === "Workbook"))
+            ([sheet, name]) =>
+              name === extractedName && (sheet === extractedSheet || (!extractedSheet && sheet === "Workbook"))
           );
 
           if (matchedRange) {
@@ -136,10 +136,6 @@ export async function extractLevelData() {
   }
 }
 
-
-
-
-
 export async function loadWorkbookData() {
   try {
     await Excel.run(async (context) => {
@@ -188,9 +184,6 @@ export async function loadWorkbookData() {
     console.error("Error loading workbook data:", error);
   }
 }
-
-
-
 
 export function parseRangeString(rangeStr) {
   let match = rangeStr.match(/^(.*?)!\s*([A-Z]+\d+)(?::([A-Z]+\d+))?$/);
@@ -412,7 +405,6 @@ export function isValidRange(rangeStr) {
   return rangePattern.test(rangeStr);
 }
 
-
 export async function generateLongFormData(region) {
   try {
     await Excel.run(async (context) => {
@@ -496,9 +488,9 @@ export async function generateLongFormData(region) {
         let Llevelsize = 0;
         let Ulevelsize = is2D ? levelData.length - 1 : levelData.length > 0 ? levelData.length - 1 : 0;
 
-        if (SingleCell_flag=== true && is2D=== true){
-          for (let b = Llevelsize; b <= Ulevelsize; b++){
-            levelData[b][0]=levelData[0][0];
+        if (SingleCell_flag === true && is2D === true) {
+          for (let b = Llevelsize; b <= Ulevelsize; b++) {
+            levelData[b][0] = levelData[0][0];
           }
         }
 
@@ -559,8 +551,18 @@ export async function generateLongFormData(region) {
           for (let k = 0; k < rangeArray[y].length - 15; k++) {
             let timelineValue = "Missing Value";
             if (Array.isArray(timelineArray) && Array.isArray(timelineArray[0])) {
-              timelineValue = timelineArray[0][y] !== undefined ? timelineArray[0][y] : timelineArray[0][0];
+              timelineValue = timelineArray[0][k] !== undefined ? timelineArray[0][k] : timelineArray[0][0];
             }
+
+            // if (extractedData[i][0][5] !== "") {
+            //   if (transformFlag === true) {
+            //     timelineValue = timelineArray[0][y] !== undefined ? timelineArray[0][y] : "Missing Value";
+            //   } else {
+            //     timelineValue = timelineArray[0][k] !== undefined ? timelineArray[0][k] : "Missing Value";
+            //   }
+            // } else {
+            //   timelineValue = "";
+            // }
 
             let row = [
               flow_name,
@@ -580,8 +582,8 @@ export async function generateLongFormData(region) {
 
       console.log("Writing long form data to Flat File sheet...");
 
-    flatFileSheet.getUsedRange().clear(); // Clears contents, formats, and hyperlinks
-    await context.sync();
+      flatFileSheet.getUsedRange().clear(); // Clears contents, formats, and hyperlinks
+      await context.sync();
       let outputRange = flatFileSheet
         .getRange("A1")
         .getResizedRange(longFormData.length - 1, longFormData[0].length - 1);
@@ -597,7 +599,6 @@ export async function generateLongFormData(region) {
     console.error("Error in generateLongFormData:", error);
   }
 }
-
 
 export async function extractNamedRanges() {
   try {
@@ -656,12 +657,11 @@ export async function extractNamedRanges() {
   }
 }
 
-
 export async function setCalculationMode(mode) {
   try {
     await Excel.run(async (context) => {
       let workbook = context.workbook;
-      
+
       // Set calculation mode based on user input
       if (mode.toLowerCase() === "manual") {
         workbook.application.calculationMode = Excel.CalculationMode.manual;

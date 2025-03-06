@@ -3,32 +3,52 @@ let workbookData = {};  // To store sheet data
 let sheetNames = [];    // To store sheet names
 
 export async function loadWorkbookData() {
-    try {
-        await Excel.run(async (context) => {
-            let sheets = context.workbook.worksheets;
-            sheets.load("items/name");
-            await context.sync();
+  try {
+    await Excel.run(async (context) => {
+      let sheets = context.workbook.worksheets;
+      sheets.load("items/name");
+      await context.sync();
 
-            workbookData = {};
-            sheetNames = [];
+      workbookData = {};
+      sheetNames = [];
 
-            for (let sheet of sheets.items) {
-                let sheetName = sheet.name.trim(); // Normalize sheet name
-                sheetNames.push(sheetName);
+      for (let sheet of sheets.items) {
+        let sheetName = sheet.name.trim();
+        sheetNames.push(sheetName);
 
-                let usedRange = sheet.getUsedRange();
-                usedRange.load(["values", "address"]);
-                await context.sync();
+        let usedRange;
+        try {
+          // Get the actual used range in the sheet
+          usedRange = sheet.getUsedRange();
+          usedRange.load(["values", "address"]);
+          await context.sync();
 
-                workbookData[sheetName] = usedRange.values;
-            }
+          // Get used range address (e.g., "B3:F20")
+          let usedAddress = usedRange.address.split("!")[1]; // Extract address after the sheet name
+          let lastCell = usedAddress.split(":")[1]; // Extract last cell reference
 
-            console.log("Workbook Data Loaded", workbookData);
-            console.log("Sheet Names:", sheetNames);
-        });
-    } catch (error) {
-        console.error("Error loading workbook data:", error);
-    }
+          // Define the new range starting from A1 to the last used cell
+          let expandedRange = sheet.getRange(`A1:${lastCell}`);
+          expandedRange.load("values");
+          await context.sync();
+
+          workbookData[sheetName] = expandedRange.values;
+        } catch (error) {
+          console.warn(`Sheet ${sheetName} has no used range. Defaulting to A1.`);
+          let defaultRange = sheet.getRange("A1");
+          defaultRange.load("values");
+          await context.sync();
+
+          workbookData[sheetName] = defaultRange.values;
+        }
+      }
+
+      console.log("Workbook Data Loaded", workbookData);
+      console.log("Sheet Names:", sheetNames);
+    });
+  } catch (error) {
+    console.error("Error loading workbook data:", error);
+  }
 }
 
 async function appendColumns(arr, numNewCols) {
@@ -609,6 +629,7 @@ export async function exportData2() {
 
                       // ✅ 13. Write Filtered Data to Excel
                       // targetRange = targetRange.getResizedRange(vntControl[i][14], vntControl[i][15]);
+                    //   await validateAndWriteData(sheetName, rangeAddress, vnt_filtereddata);
                       targetRange.values = vnt_filtereddata;
                       await context.sync();
                   } catch (error) {
@@ -664,6 +685,47 @@ export async function protectAllSheets(password) {
         });
     } catch (error) {
         console.error("Error protecting sheets:", error);
+    }
+}
+
+async function validateAndWriteData(sheetName, rangeAddress, vnt_filtereddata) {
+    try {
+        await Excel.run(async (context) => {
+            let sheet = context.workbook.worksheets.getItem(sheetName);
+            let targetRange = sheet.getRange(rangeAddress);
+
+            // ✅ Load rowCount and columnCount explicitly before using them
+            targetRange.load(["rowCount", "columnCount"]);
+            await context.sync(); // Ensure the properties are loaded
+
+            // Get target range dimensions
+            let rowCount = targetRange.rowCount;
+            let colCount = targetRange.columnCount;
+            let rangeCellCount = rowCount * colCount;
+
+            // Get vnt_filtereddata dimensions
+            let dataRowCount = vnt_filtereddata.length;
+            let dataColCount = vnt_filtereddata[0]?.length || 0; // Handle potential empty arrays
+            let dataCellCount = dataRowCount * dataColCount;
+
+            console.log(`📌 Target Range: ${rowCount} rows x ${colCount} cols = ${rangeCellCount} cells`);
+            console.log(`📌 Data Size: ${dataRowCount} rows x ${dataColCount} cols = ${dataCellCount} cells`);
+
+            // ✅ Validation check
+            if (rangeCellCount !== dataCellCount) {
+                console.error(`❌ Mismatch! Target range has ${rangeCellCount} cells, but data has ${dataCellCount} cells.`);
+                return false;
+            }
+
+            // ✅ If validation passes, write data to Excel
+            targetRange.values = vnt_filtereddata;
+            await context.sync();
+            console.log("✅ Data written successfully.");
+        });
+        return true;
+    } catch (error) {
+        console.error(`❌ Error in validateAndWriteData:`, error);
+        return false;
     }
 }
 

@@ -7,6 +7,8 @@ import AssumptionsCatalogue from "../Icons/AssumptionsCatalogue";
 import RiskAnalytics from "../Icons/Risk&Analytics";
 import PowerBi from "../Icons/PowerBi";
 import ReportGenie from "../Icons/ReportGenie";
+import { AiOutlineHome } from "react-icons/ai";
+
 
 const Sidebar = ({ setPageValue, currentPage, handleLogout }) => {
   const [activePage, setActivePage] = useState(currentPage);
@@ -17,8 +19,8 @@ const Sidebar = ({ setPageValue, currentPage, handleLogout }) => {
   }, [currentPage]);
 
   const sidebarButtons = [
-    { name: "Home", icon: <FaHome size={20} />, action: "Home" },
-    { name: "Model Management", icon: <ModelBuilder width={24} height={24} />, action: "ModelManagement" },
+    { name: "Home", icon: <AiOutlineHome size={20} />, action: "Home" },
+    { name: "Model Management", icon: <ModelBuilder width={26} height={26} />, action: "ModelManagement" },
     { name: "Forecast Management", icon: <ForecastManagement width={24} height={24} />, action: "ForecastManagement" },
     {
       name: "Assumptions Catalogue",
