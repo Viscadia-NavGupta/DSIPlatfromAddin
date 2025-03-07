@@ -511,10 +511,10 @@ export async function service_orchestration(
       let DownloadS3INPUTFILEURL = S3downloadobject["presigned urls"]["DOWNLOAD"]["INPUT_FILE"][Forecast_UUID[0]];
       let DownloadS3OUTPUTFILEURL = S3downloadobject["presigned urls"]["DOWNLOAD"]["OUTPUT_FILE"][Forecast_UUID[0]];
 
-      let downloadflg = await downloadAndInsertDataFromExcel(DownloadS3SaveForecastURL, "Flat File");
+      // let downloadflg = await downloadAndInsertDataFromExcel(DownloadS3SaveForecastURL, "Flat File");
       let downloadflg1 = await downloadAndInsertDataFromExcel(DownloadS3INPUTFILEURL, "Input File");
-      console.log(downloadflg);
-      if (downloadflg.success === true) {
+      console.log(downloadflg1);
+      if (downloadflg1.success === true) {
         return { status: "Scenario Imported" };
       }
     }
