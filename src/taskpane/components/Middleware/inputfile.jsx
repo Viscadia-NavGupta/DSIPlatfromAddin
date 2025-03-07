@@ -229,7 +229,7 @@ export async function saveData() {
     const intRowOffsetRange = 3;
     const intRowOffsetRSize = 4;
     const intRowOffsetCSize = 5;
-    const intTableRowOffset = 1;
+    const intTableRowOffset = 0;
 
     // Ensure maxrow and maxcol are valid numbers
     let maxrow = sumColumn(vntControl, 19);
@@ -573,7 +573,7 @@ export async function exportData2() {
           usedRange.load(["rowCount", "columnCount"]);
           await context.sync();
 
-          let inputDataRange = inputSheet.getRange("A2").getResizedRange(usedRange.rowCount - 1, usedRange.columnCount - 1);
+          let inputDataRange = inputSheet.getRange("A1").getResizedRange(usedRange.rowCount - 1, usedRange.columnCount - 1);
           inputDataRange.load("values");
           await context.sync();
 

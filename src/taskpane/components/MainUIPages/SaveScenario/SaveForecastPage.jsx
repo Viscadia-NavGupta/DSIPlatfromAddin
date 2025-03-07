@@ -119,16 +119,23 @@ const SaveScenario = ({ setPageValue }) => {
   };
 
   const handleSaveClick = async () => {
-    setPageValue("LoadingCircleComponent", "Saving your forecast...");
+    console.time("Total save time");
+    setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
 
     console.log("📤 Saving Forecast:", { cycle_name: selectedCycle, scenario_name: scenarioName });
     console.log("🔹 Using Model ID:", modelIDValue); // ✅ Now accessible
-
+    console.time("Flatfile Genration");
     await excelfucntions.setCalculationMode("manual");
     await excelfucntions.generateLongFormData("US");
+    console.timeEnd("Flatfile Genration");
+    setPageValue("LoadingCircleComponent", "33% | Saving your forecast...");
+    console.time("input file Genration");
     await excelfucntions.setCalculationMode("manual");
     await inputfiles.saveData();
+    console.timeEnd("input file Genration");
+    setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
     await excelfucntions.setCalculationMode("manual");
+    console.time("save forecast");
     let SaveFlag = await AWSconnections.service_orchestration(
       "SAVE_FORECAST",
       "",
@@ -139,12 +146,18 @@ const SaveScenario = ({ setPageValue }) => {
       "",
       ""
     );
-    // const successMessage = SaveFlag;
-    // console.log(successMessage);
-    // if (successMessage==="Saved Forecast"){
-      setPageValue("SaveForecastPageinterim");
-    // };
-
+    console.timeEnd("save forecast");
+    const successMessage = SaveFlag;
+    console.log(successMessage);
+    setPageValue("LoadingCircleComponent", "100% | Saving your forecast...");
+    if (successMessage==="Saved Forecast" || successMessage.result==="DONE"){
+      setPageValue("SaveForecastPageinterim", "Scenario saved");
+    } else if (successMessage==="A scenario of this name for the provided model and cycle details already exists, try with another one."){
+      setPageValue("SaveForecastPageinterim", "Sceario name already in use");
+    }else if (successMessage.result==="ERROR"){
+      setPageValue("SaveForecastPageinterim", "Some Error Occurred, Please try again ");
+    };
+    console.timeEnd("Total save time");
     // if (typeof setPageValue === "function") {
     //   setPageValue("SaveForecastPage");
     // } else {

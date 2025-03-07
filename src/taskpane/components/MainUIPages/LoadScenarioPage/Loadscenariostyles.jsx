@@ -41,37 +41,78 @@ export const DropdownContainer = styled("div")({
   maxWidth: "400px",
 });
 
-export const SelectDropdown = styled("select")({
+/**
+ * Custom dropdown wrapper to prevent viewport overflow.
+ */
+export const CustomDropdown = styled("div")({
+  position: "relative",
   width: "100%",
-  padding: "12px",
-  fontFamily: "Roboto, sans-serif",
-  fontWeight: 400,
-  fontSize: "14px",
-  lineHeight: "160%",
-  color: "#4F4F4F",
   border: "1px solid #E0E0E0",
   borderRadius: "8px",
-  boxSizing: "border-box",
   backgroundColor: "#F7F7F7",
   cursor: "pointer",
-  "&:focus": {
-    outline: "none",
-    borderColor: "#B4322A",
+});
+
+/**
+ * Dropdown button with an arrow
+ */
+export const DropdownButton = styled("div")({
+  padding: "12px",
+  fontSize: "14px",
+  color: "#4F4F4F",
+  backgroundColor: "#F7F7F7",
+  borderRadius: "8px",
+  border: "1px solid #E0E0E0",
+  display: "flex",
+  justifyContent: "space-between", // Pushes arrow to the right
+  alignItems: "center",
+  cursor: "pointer",
+  position: "relative",
+  "&:hover": {
+    backgroundColor: "#E0E0E0",
   },
 });
 
-export const Input = styled("input")({
+/**
+ * Arrow container to ensure proper positioning
+ */
+export const DropdownArrow = styled("span")({
+  marginLeft: "auto",
+  paddingRight: "10px",
+  color: "#A0A0A0", // Light gray arrow
+  display: "flex",
+  alignItems: "center",
+});
+
+
+/**
+ * The dropdown options list (scrollable)
+ */
+export const DropdownList = styled("div")({
+  position: "absolute",
+  top: "100%",
+  left: 0,
   width: "100%",
-  padding: "12px",
-  fontFamily: "Roboto, sans-serif",
-  fontWeight: 400,
-  fontSize: "14px",
-  lineHeight: "160%",
-  color: "#4F4F4F",
+  maxHeight: "200px", // Limits height
+  overflowY: "auto", // Enables scrolling
   border: "1px solid #E0E0E0",
   borderRadius: "8px",
-  boxSizing: "border-box",
-  backgroundColor: "#F7F7F7",
+  backgroundColor: "#FFF",
+  zIndex: 1000, // Ensures it appears above other elements
+  boxShadow: "0px 2px 10px rgba(0, 0, 0, 0.1)",
+});
+
+/**
+ * Individual dropdown item styling
+ */
+export const DropdownItem = styled("div")({
+  padding: "10px",
+  fontSize: "14px",
+  color: "#4F4F4F",
+  cursor: "pointer",
+  "&:hover": {
+    backgroundColor: "#E0E0E0",
+  },
 });
 
 export const SaveButton = styled("button")({
@@ -91,13 +132,4 @@ export const SaveButton = styled("button")({
   "&:hover": {
     backgroundColor: "#8A1F1A",
   },
-});
-
-
-export const WarningMessage = styled("p")({
-  color: "red",
-  fontSize: "14px",
-  marginTop: "5px",
-  textAlign: "left",
-  fontWeight: "bold",
 });

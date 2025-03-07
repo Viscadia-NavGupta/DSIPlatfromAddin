@@ -15,7 +15,7 @@ export const Heading = styled("h2")({
   fontFamily: "Roboto, sans-serif",
   fontWeight: 400,
   color: "#63676B",
-  fontSize: "20px",
+  fontSize: "1.25rem",
   margin: "0 0 20px 0",
   textAlign: "center",
 });

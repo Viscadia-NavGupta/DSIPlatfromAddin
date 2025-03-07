@@ -408,6 +408,7 @@ export function isValidRange(rangeStr) {
 export async function generateLongFormData(region) {
   try {
     await Excel.run(async (context) => {
+      let App = context.workbook.application;
       let workbook = context.workbook;
       let flatFileSheet = workbook.worksheets.getItem("Flat File");
       await context.sync();
@@ -584,6 +585,23 @@ export async function generateLongFormData(region) {
 
       flatFileSheet.getUsedRange().clear(); // Clears contents, formats, and hyperlinks
       await context.sync();
+      console.clear();
+      workbook= null;
+      extractedData= null;
+      const chunkSize = 50000; // Adjust based on performance testing
+      App.suspendScreenUpdatingUntilNextSync();
+
+
+      // for (let row = 0; row < longFormData.length; row += chunkSize) {
+      //   let endRow = Math.min(row + chunkSize, longFormData.length);
+      //   let chunkRange = flatFileSheet
+      //     .getRange(`A${row + 1}`)
+      //     .getResizedRange(endRow - row - 1, longFormData[0].length - 1);
+
+      //   chunkRange.values = longFormData.slice(row, endRow);
+      //   await context.sync(); // Sync per chunk
+      // }
+
       let outputRange = flatFileSheet
         .getRange("A1")
         .getResizedRange(longFormData.length - 1, longFormData[0].length - 1);
