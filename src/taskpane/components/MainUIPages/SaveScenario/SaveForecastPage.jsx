@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Container,
   Heading,
@@ -12,7 +12,11 @@ import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
 import * as excelfucntions from "../../Middleware/ExcelConnection";
 import * as inputfiles from "../../Middleware/inputfile";
+
 const SaveScenario = ({ setPageValue }) => {
+  // =============================================================================
+  //                              STATE VARIABLES
+  // =============================================================================
   const [selectedCycle, setSelectedCycle] = useState("");
   const [scenarioName, setScenarioName] = useState("");
   const [heading, setHeading] = useState("Active Sheet Name");
@@ -20,23 +24,89 @@ const SaveScenario = ({ setPageValue }) => {
   const storedUsername = useMemo(() => sessionStorage.getItem("username"), []);
   const [cycleItems, setCycleItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modelIDValue, setModelIDValue] = useState(""); // ✅ Global state for ModelIDValue
+  const [modelIDValue, setModelIDValue] = useState("");
+  // New state: modelType read from Excel cell B8
+  const [modelType, setModelType] = useState("");
 
-  useEffect(() => {
-    const initializePage = async () => {
-      try {
-        await checkofCloudBackendSheet();
-        await fetchDataFromLambda();
-      } catch (error) {
-        console.error("🚨 Initialization failed:", error);
-      } finally {
-        setLoading(false);
+  // DataFrames state from Lambda fetch
+  const [dataFrames, setDataFrames] = useState({
+    dfResult1: null,
+    dfResult2: null,
+    dfResult3: null,
+  });
+
+  // =============================================================================
+  //                       HELPER FUNCTIONS & CALLBACKS
+  // =============================================================================
+
+  // Checks if the provided combination already exists in the primary result set.
+  const checkScenarioExists = useCallback((modelId, cycleName, scenarioName) => {
+    const { dfResult1 } = dataFrames;
+    if (!dfResult1) {
+      console.warn("Result1 DataFrame is not loaded yet.");
+      return false;
+    }
+    const records = dfResult1.toCollection();
+    return records.some(
+      (record) =>
+        record.model_id === modelId &&
+        record.cycle_name === cycleName &&
+        record.scenario_name === scenarioName
+    );
+  }, [dataFrames]);
+
+  // Reads Excel cell values from the "cloud_backend_md" sheet. Now also reads cell B8 for modelType.
+  const checkofCloudBackendSheet = useCallback(async () => {
+    try {
+      console.log("📊 Checking for Output Sheet...");
+      if (typeof window.Excel === "undefined") {
+        console.error("🚨 Excel API is not available.");
+        return;
       }
-    };
-    initializePage();
+      await Excel.run(async (context) => {
+        const sheets = context.workbook.worksheets;
+        sheets.load("items/name");
+        await context.sync();
+
+        const MetaDataSheet = sheets.items.find(
+          (sheet) => sheet.name.toLowerCase() === "cloud_backend_md"
+        );
+
+        if (MetaDataSheet) {
+          const sheet = MetaDataSheet;
+          const ranges = {
+            ModelName: sheet.getRange("B5"),
+            ModelID: sheet.getRange("B7"),
+            ModelType: sheet.getRange("B8"),
+          };
+
+          // Load all ranges together.
+          Object.values(ranges).forEach(range => range.load("values"));
+          await context.sync();
+
+          const ModelNameValue = ranges.ModelName.values[0][0] || "";
+          const ModelIDValue = ranges.ModelID.values[0][0] || "";
+          const ModelTypeValue = ranges.ModelType.values[0][0] || "";
+
+          setHeading(`Save Scenario for: ${ModelNameValue}`);
+          setIsOutputSheet(true);
+          setModelIDValue(ModelIDValue);
+          setModelType(ModelTypeValue);
+
+          console.log("✅ Output Sheet Found:", ModelNameValue, ModelIDValue, ModelTypeValue);
+        } else {
+          console.log("⚠️ No Output Sheet Found.");
+          setIsOutputSheet(false);
+        }
+      });
+    } catch (error) {
+      console.error("🚨 Error checking for Outputs sheet:", error);
+      setIsOutputSheet(false);
+    }
   }, []);
 
-  const fetchDataFromLambda = async () => {
+  // Fetch metadata from Lambda and create DataFrames for further processing.
+  const fetchDataFromLambda = useCallback(async () => {
     try {
       console.log("📤 Fetching Data from Lambda...");
       const responseBody = await AWSconnections.FetchMetaData(
@@ -47,123 +117,143 @@ const SaveScenario = ({ setPageValue }) => {
         localStorage.getItem("username")
       );
 
-      if (!responseBody || !responseBody.results2) {
-        throw new Error("❌ No results2 found in Lambda response.");
+      if (!responseBody || !responseBody.results1 || !responseBody.results2 || !responseBody.result3) {
+        throw new Error("❌ Missing one or more required results in Lambda response.");
       }
 
-      const results = responseBody.results2;
-      console.log("✅ Lambda Response:", results);
+      // Create DataFrames for each result.
+      const df1 = new DataFrame(responseBody.results1);
+      const df2 = new DataFrame(responseBody.results2);
+      const df3 = new DataFrame(responseBody.result3);
 
-      const df = new DataFrame(results);
-      const items = df
+      setDataFrames({
+        dfResult1: df1,
+        dfResult2: df2,
+        dfResult3: df3,
+      });
+
+      // Extract distinct cycle names from df2.
+      const cycleItemsArray = df2
         .distinct("cycle_name")
         .toArray()
         .map((row) => row[0]);
 
-      console.log("Cycle Items:", items);
-      setCycleItems(items);
+      console.log("Cycle Items:", cycleItemsArray);
+      setCycleItems(cycleItemsArray);
     } catch (error) {
       console.error("🚨 Error fetching data from Lambda:", error);
     }
-  };
+  }, []);
 
-  const checkofCloudBackendSheet = async () => {
-    try {
-      console.log("📊 Checking for Output Sheet...");
+  // =============================================================================
+  //                      AUTHORIZATION CHECK (MODEL ID MATCH)
+  // =============================================================================
 
-      if (typeof window.Excel === "undefined") {
-        console.error("🚨 Excel API is not available.");
-        return;
+  // Once loading is complete and we have the metadata and the Excel model ID,
+  // check if the modelID from Excel (modelIDValue) is present in result3.
+  useEffect(() => {
+    if (!loading && modelIDValue && dataFrames.dfResult3) {
+      const models = dataFrames.dfResult3.toCollection(); // Array of objects from result3.
+      const authorized = models.some((model) => model.model_id === modelIDValue);
+      if (!authorized) {
+        console.warn("🚨 No authorized model detected");
+        setIsOutputSheet(false);
+      } else {
+        console.log("✅ Authorized model detected");
       }
-
-      await Excel.run(async (context) => {
-        const sheets = context.workbook.worksheets;
-        sheets.load("items/name");
-        await context.sync();
-
-        const MetaDataSheet = sheets.items.find((sheet) => sheet.name.toLowerCase() === "cloud_backend_md");
-
-        if (MetaDataSheet) {
-          const sheet = MetaDataSheet;
-          var ModelName = sheet.getRange("B5");
-          var ModelID = sheet.getRange("B7");
-          ModelName.load("values");
-          ModelID.load("values");
-          await context.sync();
-
-          let ModelNameValue = ModelName.values[0][0] || "";
-          let ModelIDValue = ModelID.values[0][0] || "";
-
-          setHeading(`Save Scenario for: ${ModelNameValue}`);
-          setIsOutputSheet(true);
-          setModelIDValue(ModelIDValue); // ✅ Update global state for ModelIDValue
-
-          console.log("✅ Output Sheet Found:", ModelNameValue, ModelIDValue);
-        } else {
-          console.log("⚠️ No Output Sheet Found.");
-          setIsOutputSheet(false);
-        }
-      });
-    } catch (error) {
-      console.error("🚨 Error checking for Outputs sheet:", error);
-      setIsOutputSheet(false);
     }
-  };
+  }, [loading, modelIDValue, dataFrames.dfResult3]);
 
-  const handleCycleChange = (e) => {
-    setSelectedCycle(e.target.value);
-  };
+  // =============================================================================
+  //                               USE EFFECTS
+  // =============================================================================
 
-  const handleScenarioChange = (e) => {
-    setScenarioName(e.target.value);
-  };
+  useEffect(() => {
+    const initializePage = async () => {
+      try {
+        // Run initialization tasks concurrently.
+        await Promise.all([checkofCloudBackendSheet(), fetchDataFromLambda()]);
+      } catch (error) {
+        console.error("🚨 Initialization failed:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const handleSaveClick = async () => {
-    console.time("Total save time");
+    initializePage();
+  }, [checkofCloudBackendSheet, fetchDataFromLambda]);
+
+  // =============================================================================
+  //                                EVENT HANDLERS
+  // =============================================================================
+
+  const handleSaveClick = useCallback(async () => {
+    console.time("Total save time request");
     setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
 
-    console.log("📤 Saving Forecast:", { cycle_name: selectedCycle, scenario_name: scenarioName });
-    console.log("🔹 Using Model ID:", modelIDValue); // ✅ Now accessible
-    console.time("Flatfile Genration");
-    await excelfucntions.setCalculationMode("manual");
-    await excelfucntions.generateLongFormData("US");
-    console.timeEnd("Flatfile Genration");
-    setPageValue("LoadingCircleComponent", "33% | Saving your forecast...");
-    console.time("input file Genration");
-    await excelfucntions.setCalculationMode("manual");
-    await inputfiles.saveData();
-    console.timeEnd("input file Genration");
-    setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
-    await excelfucntions.setCalculationMode("manual");
-    console.time("save forecast");
-    let SaveFlag = await AWSconnections.service_orchestration(
-      "SAVE_FORECAST",
-      "",
-      modelIDValue, // ✅ Now accessible everywhere
-      scenarioName,
-      selectedCycle,
-      "",
-      "",
-      ""
-    );
-    console.timeEnd("save forecast");
-    const successMessage = SaveFlag;
-    console.log(successMessage);
-    setPageValue("LoadingCircleComponent", "100% | Saving your forecast...");
-    if (successMessage==="Saved Forecast" || successMessage.result==="DONE"){
-      setPageValue("SaveForecastPageinterim", "Scenario saved");
-    } else if (successMessage==="A scenario of this name for the provided model and cycle details already exists, try with another one."){
-      setPageValue("SaveForecastPageinterim", "Sceario name already in use");
-    }else if (successMessage.result==="ERROR"){
-      setPageValue("SaveForecastPageinterim", "Some Error Occurred, Please try again ");
-    };
-    console.timeEnd("Total save time");
-    // if (typeof setPageValue === "function") {
-    //   setPageValue("SaveForecastPage");
-    // } else {
-    //   console.error("🚨 setPageValue is not a function!");
-    // }
-  };
+    console.log("📤 Saving Forecast:", {
+      cycle_name: selectedCycle,
+      scenario_name: scenarioName,
+    });
+    console.log("🔹 Using Model ID:", modelIDValue);
+    console.log("🔹 Using Model Type:", modelType);
+
+    if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
+      console.log("This scenario combination already exists.");
+      setPageValue("SaveForecastPageinterim", "Scenario name already in use");
+      return;
+    }
+
+    try {
+      await excelfucntions.setCalculationMode("manual");
+      console.time("Parallel processes");
+
+      const [longformData, _] = await Promise.all([
+        excelfucntions.generateLongFormData("US"),
+        inputfiles.saveData(),
+      ]);
+
+      console.timeEnd("Parallel processes");
+      setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
+
+      console.time("save forecast");
+      const saveFlag = await AWSconnections.service_orchestration(
+        "SAVE_FORECAST",
+        "",
+        modelIDValue,
+        scenarioName,
+        selectedCycle,
+        "",
+        "",
+        "",
+        longformData
+      );
+      console.timeEnd("save forecast");
+
+      console.log("Save response:", saveFlag);
+      setPageValue("LoadingCircleComponent", "100% | Saving your forecast...");
+
+      if (saveFlag === "Saved Forecast" || (saveFlag && saveFlag.result === "DONE")) {
+        setPageValue("SaveForecastPageinterim", "Scenario saved");
+      } else if (
+        saveFlag ===
+        "A scenario of this name for the provided model and cycle details already exists, try with another one."
+      ) {
+        setPageValue("SaveForecastPageinterim", "Scenario name already in use");
+      } else if (saveFlag && saveFlag.result === "ERROR") {
+        setPageValue("SaveForecastPageinterim", "Some Error Occurred, Please try again");
+      }
+    } catch (error) {
+      console.error("Error during save process:", error);
+      setPageValue("SaveForecastPageinterim", "An error occurred during save");
+    }
+
+    console.timeEnd("Total save time request");
+  }, [selectedCycle, scenarioName, modelIDValue, modelType, checkScenarioExists, setPageValue]);
+
+  // =============================================================================
+  //                                 RENDER
+  // =============================================================================
 
   return (
     <Container>
@@ -173,7 +263,10 @@ const SaveScenario = ({ setPageValue }) => {
         <>
           <Heading>{heading}</Heading>
           <DropdownContainer>
-            <SelectDropdown value={selectedCycle} onChange={handleCycleChange}>
+            <SelectDropdown
+              value={selectedCycle}
+              onChange={(e) => setSelectedCycle(e.target.value)}
+            >
               <option value="" disabled>
                 Select Cycle
               </option>
@@ -187,13 +280,24 @@ const SaveScenario = ({ setPageValue }) => {
                 <option disabled>No Cycles Available</option>
               )}
             </SelectDropdown>
-
-            <Input type="text" placeholder="Enter Scenario Name" value={scenarioName} onChange={handleScenarioChange} />
+            <Input
+              type="text"
+              placeholder="Enter Scenario Name"
+              value={scenarioName}
+              onChange={(e) => setScenarioName(e.target.value)}
+            />
           </DropdownContainer>
-          <SaveButton onClick={handleSaveClick}>Save</SaveButton>
+          <SaveButton
+            onClick={handleSaveClick}
+            disabled={!selectedCycle || !scenarioName}
+          >
+            Save
+          </SaveButton>
         </>
       ) : (
-        <MessageBox>No Authorised model detected, please refresh the addin</MessageBox>
+        <MessageBox>
+          No Authorised model detected, please refresh the addin
+        </MessageBox>
       )}
     </Container>
   );

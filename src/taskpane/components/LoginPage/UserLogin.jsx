@@ -100,7 +100,7 @@ const LoginPage = ({ setPageValue, handleLogin }) => {
       <FooterContainer>
         {/* Footer Text */}
         <FooterTextContainer>
-          <span>© 2024 Viscadia. All rights reserved.</span>
+          <span>© 2025 Viscadia. All rights reserved.</span>
         </FooterTextContainer>
 
         {/* Footer Image */}

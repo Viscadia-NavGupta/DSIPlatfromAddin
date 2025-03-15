@@ -523,6 +523,7 @@ export function isValidRange(rangeStr) {
 export async function generateLongFormData(region) {
   try {
     await Excel.run(async (context) => {
+      console.time("total Time");
       // Disable screenupdating and set calculation to manual
       context.application.suspendScreenUpdatingUntilNextSync();
       const workbook = context.workbook;
@@ -744,6 +745,7 @@ export async function generateLongFormData(region) {
       await context.sync();
       
       console.log(`Data processed successfully. Final row count: ${currentRow - 1}`);
+      console.timeEnd("total Time");
       
       // Restore calculation mode
       workbook.application.calculationMode = Excel.CalculationMode.automatic;
