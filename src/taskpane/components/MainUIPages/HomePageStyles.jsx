@@ -1,11 +1,5 @@
 import { styled } from "@mui/system";
-// Container for the user's name
-export const NameContainer = styled("div")({
-  marginTop: "0.5rem",
-});
 
-
-// Main container ensuring full-page scrolling when needed
 export const HomePageContainer = styled("div")({
   display: "flex",
   flexDirection: "column",
@@ -13,12 +7,11 @@ export const HomePageContainer = styled("div")({
   height: "100vh",
   width: "100%",
   boxSizing: "border-box",
-  overflowY: "auto", // ✅ Enables scrolling when needed
-  overflowX: "hidden", // ✅ Prevents horizontal scrolling
+  overflowY: "auto",
+  overflowX: "hidden",
   paddingBottom: "10px",
 });
 
-// Wrapper to keep content centered properly
 export const ContentWrapper = styled("div")({
   display: "flex",
   flexDirection: "column",
@@ -29,126 +22,114 @@ export const ContentWrapper = styled("div")({
   overflowY: "auto",
   overflowX: "hidden",
 });
+export const NameContainer = styled("div")({
+  marginTop: "0.5rem",
+});
 
-// Welcome container for header text
+
 export const WelcomeContainer = styled("div")({
   textAlign: "center",
   marginBottom: "5px",
   "& h1": {
-    fontSize: "clamp(1.2rem, 2vw, 1.8rem)", // 🔥 Slightly reduced font size
+    fontSize: "clamp(1.2rem, 2vw, 1.8rem)",
     color: "#B4322A",
     marginBottom: "0.3rem",
   },
   "& h2": {
-    fontSize: "clamp(1rem, 1.5vw, 1.3rem)", // 🔥 Slightly reduced name font size
+    fontSize: "clamp(1rem, 1.5vw, 1.3rem)",
     color: "#B4322A",
     fontWeight: "bold",
     margin: 0,
   },
 });
 
-// Buttons container with **reduced gaps & smaller buttons**
 export const ButtonsContainer = styled("div")({
   display: "grid",
-  gap: "8px", // 🔥 Reduced gap between buttons
+  gap: "8px",
   width: "100%",
   justifyItems: "center",
   padding: "5px",
-  gridTemplateColumns: "repeat(auto-fit, minmax(95px, 1fr))", // 🔥 Reduced min size for smaller buttons
+  gridTemplateColumns: "repeat(auto-fit, minmax(95px, 1fr))",
   overflow: "visible",
 });
 
-// Individual button styles ensuring text and icons fit
 export const Button = styled("button")(({ disabled }) => ({
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
   border: "1px solid #ddd",
-  borderRadius: "8px", // ✅ Slightly smaller corners
+  borderRadius: "8px",
   backgroundColor: disabled ? "#f2f2f2" : "#fff",
   cursor: disabled ? "not-allowed" : "pointer",
   textAlign: "center",
   position: "relative",
   overflow: "hidden",
   padding: "3px",
-  width: "100%", // ✅ Ensures buttons take full available space
-  height: "75px", // 🔥 Reduced height
+  width: "100%",
+  height: "75px",
+  transition: "background-color 0.3s ease, color 0.3s ease",
+
   "& svg": {
-    width: "35%", // ✅ Keeps icon proportional
+    width: "35%",
     height: "35%",
     marginBottom: "0.2rem",
     fill: disabled ? "#d3d3d3" : "#63666A",
+    transition: "fill 0.3s ease", // ✅ Smooth color transition
   },
+
   "& p": {
-    fontSize: "clamp(0.6rem, 0.8vw, 0.9rem)", // 🔥 Reduced text size
+    fontSize: "clamp(0.6rem, 0.8vw, 0.9rem)",
     color: disabled ? "#d3d3d3" : "#63666A",
     margin: 0,
     textAlign: "center",
-    whiteSpace: "normal",
     wordBreak: "break-word",
-    overflow: "hidden",
-    maxWidth: "90%",
+    transition: "color 0.3s ease", // ✅ Smooth text color transition
   },
+
   "&:hover": {
-    transform: disabled ? "none" : "scale(1.05)",
-    backgroundColor: disabled ? "#f2f2f2" : "#B4322A",
-    color: "#fff",
+    backgroundColor: disabled ? "#f2f2f2" : "#B4322A", // ✅ Changes background color for active buttons
     "& p": {
-      color: "#fff",
+      color: disabled ? "#d3d3d3" : "#fff", // ✅ Text turns white on hover
     },
     "& svg": {
-      fill: "#fff",
+      fill: disabled ? "#d3d3d3" : "#fff", // ✅ Icon color changes on hover
     },
   },
 }));
 
 
-// Disabled overlay with tooltip wrapper
-export const DisabledOverlay = styled("div")({
-  position: "absolute",
-  top: "5px",
-  right: "5px",
-  backgroundColor: "transparent",
-  color: "#B4322A",
-  borderRadius: "50%",
-  width: "18px",
-  height: "18px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: "12px",
-  fontWeight: "bold",
-  cursor: "default",
-  "&:hover + div": {
-    display: "block",
-  },
-});
-
 export const TooltipWrapper = styled("div")({
   position: "relative",
   display: "inline-block",
   "&:hover div": {
-    display: "block", // Shows tooltip when hovering over the wrapper
+    display: "block", // ✅ Show tooltip on hover
+  },
+});
+
+export const Tooltip = styled("div")({
+  position: "absolute",
+  top: "-30px", // Moves tooltip slightly closer to the button
+  right: "-5px", // Adjust alignment
+  backgroundColor: "#2c3e50", // Dark background
+  color: "#fff",
+  padding: "4px 8px", // Reduce padding for a smaller tooltip
+  fontSize: "0.65rem", // 🔥 Smaller font size for better fit
+  borderRadius: "4px", // Rounded corners
+  whiteSpace: "nowrap", // Ensures text stays in one line
+  boxShadow: "0px 3px 5px rgba(0, 0, 0, 0.2)", // Slight shadow for visibility
+  zIndex: 10,
+  display: "none", // Initially hidden
+
+  "&::after": {
+    content: '""',
+    position: "absolute",
+    bottom: "-5px", // Arrow positioning
+    right: "10px",
+    borderWidth: "5px",
+    borderStyle: "solid",
+    borderColor: "#2c3e50 transparent transparent transparent",
   },
 });
 
 
-// Tooltip styling
-export const Tooltip = styled("div")({
-  display: "none",
-  position: "absolute",
-  bottom: "calc(0%)",
-  left: "50%",
-  transform: "translateX(-50%)",
-  backgroundColor: "#B4322A",
-  color: "#fff",
-  padding: "4px",
-  fontSize: "0.5rem",
-  borderRadius: "4px",
-  whiteSpace: "normal",
-  maxWidth: "300px",
-  textAlign: "center",
-  zIndex: 10,
-  boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",
-});

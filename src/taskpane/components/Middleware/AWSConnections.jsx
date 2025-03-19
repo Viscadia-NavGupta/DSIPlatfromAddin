@@ -18,8 +18,8 @@ const CONFIG = {
     DELAY_MS: 5000, // Fixed delay; consider exponential backoff if needed.
   },
   UPLOAD: {
-    CHUNK_SIZE: 10000,
-    COMPRESSION_LEVEL: 3,
+    CHUNK_SIZE: 50000,
+    COMPRESSION_LEVEL: 4,
   },
 };
 
@@ -230,11 +230,23 @@ async function getAWSMetadata(idToken, email) {
 export async function FetchMetaData(buttonName, idToken, secretName, userId, email_id) {
   try {
     console.log("🔍 Fetching secrets from AWS...");
-    const AWSsecrets = await getAWSMetadata(idToken, email_id);
+    
+    let AWSsecrets = await getAWSMetadata(idToken, email_id);
 
+    // 🔹 Check if secrets exist, otherwise trigger token refresh
     if (!AWSsecrets.results || !AWSsecrets.results[CONFIG.AWS_SECRETS_NAME]) {
-      throw new Error("❌ Missing secrets in AWS response");
+      console.warn("⚠️ Token may be expired. Refreshing token...");
+      await AWSrefreshtoken();
+      const refreshedToken = localStorage.getItem("idToken");
+      
+      // Retry fetching metadata with refreshed token
+      AWSsecrets = await getAWSMetadata(refreshedToken, email_id);
+
+      if (!AWSsecrets.results || !AWSsecrets.results[CONFIG.AWS_SECRETS_NAME]) {
+        throw new Error("❌ Missing secrets in AWS response after token refresh.");
+      }
     }
+
     const secretsObject = AWSsecrets.results[CONFIG.AWS_SECRETS_NAME];
     if (!secretsObject.ServOrch) {
       throw new Error("❌ Missing Service Orchestration URL");
@@ -244,7 +256,7 @@ export async function FetchMetaData(buttonName, idToken, secretName, userId, ema
 
     const UUID_Generated = uuidv4();
     const headers = {
-      Authorization: `Bearer ${idToken}`,
+      Authorization: `Bearer ${idToken}`, // Use the refreshed token if applicable
       "Content-Type": "application/json",
     };
     const body = JSON.stringify({
@@ -254,15 +266,30 @@ export async function FetchMetaData(buttonName, idToken, secretName, userId, ema
       user_id: userId,
     });
 
-    const response = await fetch(ServOrchURL, {
+    let response = await fetch(ServOrchURL, {
       method: "POST",
       headers,
       body,
     });
 
-    if (!response.ok) {
-      throw new Error(`❌ Metadata request failed: ${response.status}`);
+    // 🔹 Handle expired token case
+    if (response.status === 401 || response.status === 403) {
+      console.warn("🔄 Token expired. Refreshing and retrying...");
+      await AWSrefreshtoken();
+      const refreshedToken = localStorage.getItem("idToken");
+
+      headers.Authorization = `Bearer ${refreshedToken}`;
+      response = await fetch(ServOrchURL, {
+        method: "POST",
+        headers,
+        body,
+      });
+
+      if (!response.ok) {
+        throw new Error(`❌ Metadata request failed after refresh: ${response.status}`);
+      }
     }
+
     const data = await response.json();
     console.log("✅ Metadata retrieved successfully");
     return data;
@@ -271,6 +298,7 @@ export async function FetchMetaData(buttonName, idToken, secretName, userId, ema
     throw error;
   }
 }
+
 
 // =============================================================================
 //                     SERVICE REQUEST FUNCTIONS
@@ -390,7 +418,7 @@ export async function service_orchestration(
     const serviceorg_URL = secretsObject.ServOrch;
     const pollingUrl = secretsObject.Polling;
 
-    if (buttonname === "SAVE_FORECAST") {
+    if (buttonname === "SAVE_FORECAST" ||buttonname === "SAVE_LOCKED_FORECAST" ) {
       console.log("📤 Preparing forecast upload");
       const S3Uploadobejct = await AuthorizationData(
         "SAVE_FORECAST",
@@ -431,7 +459,7 @@ export async function service_orchestration(
       }
     } else if (buttonname === "IMPORT_ASSUMPTIONS") {
       const S3downloadobject = await AuthorizationData(
-        "IMPORT_ASSUMPTIONS",
+        buttonname,
         idToken,
         CONFIG.AWS_SECRETS_NAME,
         username,
@@ -588,10 +616,21 @@ export async function downloadAndInsertDataFromExcel(s3Url, sheetName) {
     console.log("⚙️ Processing Excel file");
     const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: "array" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    let rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
     if (rows.length === 0) {
       throw new Error("❌ Excel sheet is empty");
     }
+
+    // Normalize rows to ensure each row has the same number of columns
+    const maxCols = rows.reduce((max, row) => Math.max(max, row.length), 0);
+    rows = rows.map(row => {
+      if (row.length < maxCols) {
+        // Append empty strings until row length equals maxCols
+        return [...row, ...Array(maxCols - row.length).fill("")];
+      }
+      return row;
+    });
+
     await insertParsedData(rows, sheetName);
   }
 
@@ -614,7 +653,9 @@ export async function downloadAndInsertDataFromExcel(s3Url, sheetName) {
       }
       sheet.getUsedRange().clear();
       await context.sync();
-      const rangeAddress = `A1:${getColumnLetter(rows[0].length - 1)}${rows.length}`;
+      // Recalculate max columns in case normalization adjusted the row lengths
+      const maxCols = rows[0].length;
+      const rangeAddress = `A1:${getColumnLetter(maxCols - 1)}${rows.length}`;
       console.log(`📊 Target range: ${rangeAddress}`);
       try {
         const range = sheet.getRange(rangeAddress);
@@ -639,6 +680,7 @@ export async function downloadAndInsertDataFromExcel(s3Url, sheetName) {
     return { success: false, newSheetName: null };
   }
 }
+
 
 /**
  * Uploads array data to S3 as CSV or Excel.

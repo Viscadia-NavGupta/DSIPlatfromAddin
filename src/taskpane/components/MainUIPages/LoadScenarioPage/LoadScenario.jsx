@@ -74,6 +74,13 @@ const LoadScenario = ({ setPageValue }) => {
     }
   }, [modelIDValue]);
 
+  // Update dropdown options when selections change
+  useEffect(() => {
+    if (fullData.length > 0) {
+      updateDropdownOptions();
+    }
+  }, [saveStatus, selectedCycle, selectedScenario, fullData]);
+
   const checkofCloudBackendSheet = async () => {
     try {
       console.log("📊 Checking for Output Sheet...");
@@ -137,8 +144,9 @@ const LoadScenario = ({ setPageValue }) => {
       console.log("✅ Full Metadata Response:", responseBody.results1);
 
       const filteredData = responseBody.results1.filter((row) => row.model_id === modelIDValue);
-
       setFullData(filteredData);
+      
+      // Initialize with all available options
       setFilteredSaveStatus([...new Set(filteredData.map((row) => row.save_status).filter(Boolean))]);
       setFilteredCycles([...new Set(filteredData.map((row) => row.cycle_name).filter(Boolean))]);
       setFilteredScenarios([...new Set(filteredData.map((row) => row.scenario_name).filter(Boolean))]);
@@ -150,10 +158,73 @@ const LoadScenario = ({ setPageValue }) => {
     }
   };
 
+  const updateDropdownOptions = () => {
+    // Start with the full dataset
+    let filteredData = [...fullData];
+
+    // Apply filters based on current selections
+    if (saveStatus) {
+      filteredData = filteredData.filter((row) => row.save_status === saveStatus);
+    }
+    
+    if (selectedCycle) {
+      filteredData = filteredData.filter((row) => row.cycle_name === selectedCycle);
+    }
+    
+    if (selectedScenario) {
+      filteredData = filteredData.filter((row) => row.scenario_name === selectedScenario);
+    }
+
+    // Update dropdown options based on the filtered data
+    if (!saveStatus) {
+      setFilteredSaveStatus([...new Set(filteredData.map((row) => row.save_status).filter(Boolean))]);
+    }
+    
+    if (!selectedCycle) {
+      setFilteredCycles([...new Set(filteredData.map((row) => row.cycle_name).filter(Boolean))]);
+    }
+    
+    if (!selectedScenario) {
+      setFilteredScenarios([...new Set(filteredData.map((row) => row.scenario_name).filter(Boolean))]);
+    }
+  };
+
   const handleSelect = (key, value) => {
-    if (key === "saveStatus") setSaveStatus(value);
-    if (key === "cycle") setSelectedCycle(value);
-    if (key === "scenario") setSelectedScenario(value);
+    // Reset other selections when changing a dropdown
+    if (key === "saveStatus") {
+      setSaveStatus(value);
+      // Only reset the other values if they don't exist in the filtered data
+      const filteredBySaveStatus = fullData.filter(row => row.save_status === value);
+      const availableCycles = [...new Set(filteredBySaveStatus.map(row => row.cycle_name))];
+      const availableScenarios = [...new Set(filteredBySaveStatus.map(row => row.scenario_name))];
+      
+      if (!availableCycles.includes(selectedCycle)) {
+        setSelectedCycle(null);
+      }
+      
+      if (!availableScenarios.includes(selectedScenario)) {
+        setSelectedScenario(null);
+      }
+    } 
+    
+    if (key === "cycle") {
+      setSelectedCycle(value);
+      // Filter based on current saveStatus and new cycle
+      const filteredByCycle = fullData.filter(row => 
+        (!saveStatus || row.save_status === saveStatus) && 
+        row.cycle_name === value
+      );
+      const availableScenarios = [...new Set(filteredByCycle.map(row => row.scenario_name))];
+      
+      if (!availableScenarios.includes(selectedScenario)) {
+        setSelectedScenario(null);
+      }
+    }
+    
+    if (key === "scenario") {
+      setSelectedScenario(value);
+    }
+    
     setDropdownOpen((prev) => ({ ...prev, [key]: false }));
   };
 
@@ -240,7 +311,10 @@ const LoadScenario = ({ setPageValue }) => {
           <Heading>{heading}</Heading>
           <DropdownContainer>
             <CustomDropdown ref={dropdownRefs.saveStatus}>
-              <DropdownButton onClick={() => setDropdownOpen({ ...dropdownOpen, saveStatus: !dropdownOpen.saveStatus })}>
+              <DropdownButton 
+                onClick={() => setDropdownOpen({ ...dropdownOpen, saveStatus: !dropdownOpen.saveStatus })}
+                style={warnings.saveStatus ? { border: '1px solid red' } : {}}
+              >
                 {saveStatus || "Select Save Status"}
                 <DropdownArrow>
                   <RiArrowDropDownLine size={24} />
@@ -258,7 +332,10 @@ const LoadScenario = ({ setPageValue }) => {
             </CustomDropdown>
 
             <CustomDropdown ref={dropdownRefs.cycle}>
-              <DropdownButton onClick={() => setDropdownOpen({ ...dropdownOpen, cycle: !dropdownOpen.cycle })}>
+              <DropdownButton 
+                onClick={() => setDropdownOpen({ ...dropdownOpen, cycle: !dropdownOpen.cycle })}
+                style={warnings.cycle ? { border: '1px solid red' } : {}}
+              >
                 {selectedCycle || "Select Cycle"}
                 <DropdownArrow>
                   <RiArrowDropDownLine size={24} />
@@ -276,7 +353,10 @@ const LoadScenario = ({ setPageValue }) => {
             </CustomDropdown>
 
             <CustomDropdown ref={dropdownRefs.scenario}>
-              <DropdownButton onClick={() => setDropdownOpen({ ...dropdownOpen, scenario: !dropdownOpen.scenario })}>
+              <DropdownButton 
+                onClick={() => setDropdownOpen({ ...dropdownOpen, scenario: !dropdownOpen.scenario })}
+                style={warnings.scenario ? { border: '1px solid red' } : {}}
+              >
                 {selectedScenario || "Select Scenario"}
                 <DropdownArrow>
                   <RiArrowDropDownLine size={24} />

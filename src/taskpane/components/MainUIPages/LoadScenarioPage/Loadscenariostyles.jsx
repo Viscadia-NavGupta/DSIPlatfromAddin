@@ -6,10 +6,18 @@ export const Container = styled("div")({
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
-  justifyContent: "center",
+  justifyContent: "flex-start",
   fontFamily: "Roboto, sans-serif",
   fontWeight: 300,
-});
+
+  // Instead of minHeight, use a fixed or max height:
+  height: "100vh",
+  // or: maxHeight: "100vh",
+
+  overflowY: "auto",
+  padding: "20px 10px",
+  boxSizing: "border-box", // ensures padding is included in total height
+})
 
 export const Heading = styled("h2")({
   fontFamily: "Roboto, sans-serif",
@@ -84,7 +92,6 @@ export const DropdownArrow = styled("span")({
   alignItems: "center",
 });
 
-
 /**
  * The dropdown options list (scrollable)
  */
@@ -94,12 +101,27 @@ export const DropdownList = styled("div")({
   left: 0,
   width: "100%",
   maxHeight: "200px", // Limits height
-  overflowY: "auto", // Enables scrolling
+  overflowY: "auto",  // Enables scrolling
   border: "1px solid #E0E0E0",
   borderRadius: "8px",
   backgroundColor: "#FFF",
   zIndex: 1000, // Ensures it appears above other elements
   boxShadow: "0px 2px 10px rgba(0, 0, 0, 0.1)",
+  // Styling for scrollbar
+  "&::-webkit-scrollbar": {
+    width: "8px",
+  },
+  "&::-webkit-scrollbar-track": {
+    background: "#f1f1f1",
+    borderRadius: "8px",
+  },
+  "&::-webkit-scrollbar-thumb": {
+    background: "#c1c1c1",
+    borderRadius: "8px",
+  },
+  "&::-webkit-scrollbar-thumb:hover": {
+    background: "#a1a1a1",
+  },
 });
 
 /**
@@ -132,4 +154,5 @@ export const SaveButton = styled("button")({
   "&:hover": {
     backgroundColor: "#8A1F1A",
   },
+  marginBottom: "20px", // Add some bottom margin to ensure space at the bottom
 });

@@ -55,8 +55,8 @@ export const BackButtonIcon = styled("svg")({
 
 // General Icon formatting inside buttons
 export const IconWrapper = styled("div")(({ disabled, size }) => ({
-  width: `${size}px`,
-  height: `${size}px`,
+  width: size ? `${size}px` : "32px",
+  height: size ? `${size}px` : "32px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -71,7 +71,6 @@ export const IconWrapper = styled("div")(({ disabled, size }) => ({
     color: disabled ? "#d3d3d3" : "#fff",
   },
 }));
-
 
 // Buttons container with grid layout
 export const ButtonsContainer = styled("div")({
@@ -90,23 +89,23 @@ export const Button = styled("button")(({ disabled }) => ({
   alignItems: "center",
   justifyContent: "center",
   border: "1px solid #ddd",
-  borderRadius: "8px", // ✅ Slightly smaller corners
+  borderRadius: "8px",
   backgroundColor: disabled ? "#f2f2f2" : "#fff",
   cursor: disabled ? "not-allowed" : "pointer",
   textAlign: "center",
   position: "relative",
-  overflow: "hidden",
+  overflow: "visible", // Ensure overflow does not hide tooltip
   padding: "3px",
-  width: "100%", // ✅ Ensures buttons take full available space
-  height: "75px", // 🔥 Reduced height
+  width: "100%",
+  height: "75px",
   "& svg": {
-    width: "35%", // ✅ Keeps icon proportional
+    width: "35%",
     height: "35%",
     marginBottom: "0.2rem",
     fill: disabled ? "#d3d3d3" : "#63666A",
   },
   "& p": {
-    fontSize: "clamp(0.6rem, 0.8vw, 0.9rem)", // 🔥 Reduced text size
+    fontSize: "clamp(0.6rem, 0.8vw, 0.9rem)",
     color: disabled ? "#d3d3d3" : "#63666A",
     margin: 0,
     textAlign: "center",
@@ -120,48 +119,49 @@ export const Button = styled("button")(({ disabled }) => ({
     backgroundColor: disabled ? "#f2f2f2" : "#B4322A",
     color: "#fff",
     "& p": {
-      color: "#fff",
+      color: disabled ? "#d3d3d3" : "#fff",
     },
     "& svg": {
-      fill: "#fff",
+      fill: disabled ? "#d3d3d3" : "#fff",
+    },
+    "& .tooltip": {
+      visibility: "visible",
+      opacity: 1,
     },
   },
 }));
-// Disabled overlay with tooltip wrapper
-export const DisabledOverlay = styled("div")({
+
+// Tooltip styling for disabled buttons - updated to show on button hover
+export const Tooltip = styled("div")({
+  visibility: "hidden",
+  opacity: 0,
   position: "absolute",
-  top: "5px",
-  right: "5px",
-  backgroundColor: "transparent",
-  color: "#B4322A",
-  borderRadius: "50%",
-  width: "18px",
-  height: "18px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: "12px",
+  bottom: "100%", // Position above the button
+  left: "50%",
+  transform: "translateX(-50%)",
+  backgroundColor: "rgba(0, 0, 0, 0.85)",
+  color: "#fff",
+  padding: "4px 8px",
+  fontSize: "0.60rem",
+  borderRadius: "4px",
+  whiteSpace: "nowrap",
+  zIndex: 10,
+  boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.2)",
   fontWeight: "bold",
-  cursor: "default",
-  "&:hover + div": {
-    display: "block",
+  marginBottom: "8px", // Add some space between tooltip and button
+  transition: "visibility 0s, opacity 0.3s ease", // Smooth transition
+
+  "&::after": {
+    content: "''",
+    position: "absolute",
+    top: "100%",
+    left: "50%",
+    transform: "translateX(-50%)",
+    borderWidth: "5px",
+    borderStyle: "solid",
+    borderColor: "rgba(0, 0, 0, 0.85) transparent transparent transparent",
   },
 });
 
-export const Tooltip = styled("div")({
-  display: "none",
-  position: "absolute",
-  bottom: "calc(0%)",
-  left: "50%",
-  transform: "translateX(-50%)",
-  backgroundColor: "#B4322A",
-  color: "#fff",
-  padding: "4px",
-  fontSize: "0.5rem",
-  borderRadius: "4px",
-  whiteSpace: "normal",
-  maxWidth: "300px",
-  textAlign: "center",
-  zIndex: 10,
-  boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",
-});
+
+// Removed DisabledOverlay component since we're not using it anymore

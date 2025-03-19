@@ -14,6 +14,7 @@ import SaveForecastPage from "./MainUIPages/SaveScenario/SaveForecastPage";
 import SaveForecastPageinterim from "./MainUIPages/MiscPages/SaveForecastPage";
 import LoadingCircleComponent from "./MainUIPages/MiscPages/LoadingCircle";
 import LoadScenario from "./MainUIPages/LoadScenarioPage/LoadScenario";
+import SaveandLockScenario from "./MainUIPages/Save and Lock/SaveandLockPage";
 
 function App() {
   const [page, setPage] = useState("UserLogin"); // Default page
@@ -225,6 +226,8 @@ function App() {
         return <LoadingCircleComponent message={loadingMessage} />;
       case "LoadScenario":
         return <LoadScenario setPageValue={setPageValue} />;
+        case "SaveandLockScenario":
+          return <SaveandLockScenario setPageValue={setPageValue} />;
       default:
         return <Home userName={userName} setPageValue={setPageValue} />;
     }

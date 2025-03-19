@@ -7,13 +7,13 @@ import {
   SelectDropdown,
   Input,
   SaveButton,
-} from "./SaveForecastPageStyles";
+} from "./SaveandLockPageStyles";
 import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
 import * as excelfucntions from "../../Middleware/ExcelConnection";
 import * as inputfiles from "../../Middleware/inputfile";
 
-const SaveScenario = ({ setPageValue }) => {
+const SaveandLockScenario = ({ setPageValue }) => {
   // =============================================================================
   //                              STATE VARIABLES
   // =============================================================================
@@ -88,7 +88,7 @@ const SaveScenario = ({ setPageValue }) => {
           const ModelIDValue = ranges.ModelID.values[0][0] || "";
           const ModelTypeValue = ranges.ModelType.values[0][0] || "";
 
-          setHeading(`Save Scenario for: ${ModelNameValue}`);
+          setHeading(`Lock & Submit scenario for: ${ModelNameValue}`);
           setIsOutputSheet(true);
           setModelIDValue(ModelIDValue);
           setModelType(ModelTypeValue);
@@ -200,7 +200,7 @@ const SaveScenario = ({ setPageValue }) => {
 
     if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
       console.log("This scenario combination already exists.");
-      setPageValue("SaveForecastPageinterim", "Scenario name already in use");
+      setPageValue("SaveForecastPageinterim", "Scenario name already in use, please use a diffrent scenario name");
       return;
     }
 
@@ -218,7 +218,7 @@ const SaveScenario = ({ setPageValue }) => {
 
       console.time("save forecast");
       const saveFlag = await AWSconnections.service_orchestration(
-        "SAVE_FORECAST",
+        "SAVE_LOCKED_FORECAST",
         "",
         modelIDValue,
         scenarioName,
@@ -233,8 +233,8 @@ const SaveScenario = ({ setPageValue }) => {
       console.log("Save response:", saveFlag);
       setPageValue("LoadingCircleComponent", "100% | Saving your forecast...");
 
-      if (saveFlag === "Saved Forecast" || (saveFlag && saveFlag.result === "DONE")) {
-        setPageValue("SaveForecastPageinterim", "Forecast Scenario saved");
+      if (saveFlag === "Saved Locked Forecast" || (saveFlag && saveFlag.result === "DONE")) {
+        setPageValue("SaveForecastPageinterim", "Forecast Scenario Submitted");
       } else if (
         saveFlag ===
         "A scenario of this name for the provided model and cycle details already exists, try with another one."
@@ -303,4 +303,4 @@ const SaveScenario = ({ setPageValue }) => {
   );
 };
 
-export default SaveScenario;
+export default SaveandLockScenario;

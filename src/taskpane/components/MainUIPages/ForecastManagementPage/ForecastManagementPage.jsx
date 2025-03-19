@@ -1,14 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { FaArrowLeft, FaDownload, FaCog, FaSave, FaLock } from "react-icons/fa";
-import { MdSaveAlt ,MdOutlineSave} from "react-icons/md";
+import { FaArrowLeft } from "react-icons/fa";
+import { MdSaveAlt, MdOutlineSave } from "react-icons/md";
 import { CiLock } from "react-icons/ci";
 import { AiOutlineSetting } from "react-icons/ai";
-
-
-
-
-
-
 
 import {
   HomePageContainer,
@@ -16,7 +10,6 @@ import {
   WelcomeContainer,
   ButtonsContainer,
   Button,
-  DisabledOverlay,
   Tooltip,
   BackButtonIcon,
   IconWrapper,
@@ -46,10 +39,9 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
   }, []);
 
   const buttons = [
+    { name: "Load", icon: <MdSaveAlt size={buttonSize.iconSize} />, action: () => setPageValue("LoadScenario"), disabled: false },
     { name: "Save", icon: <MdOutlineSave size={buttonSize.iconSize} />, action: () => setPageValue("SaveForecastPage"), disabled: false },
-    {name: "Load", icon: <MdSaveAlt size={buttonSize.iconSize} />, action: () => setPageValue("LoadScenario"), disabled: false },
-    { name: "Lock/Submit", icon: <CiLock size={buttonSize.iconSize} />, action: () => setPageValue("LockPage"), disabled: true },
-    { name: "Manage Scenarios", icon: <AiOutlineSetting size={buttonSize.iconSize} />, action: () => setPageValue("ManageScenarios"), disabled: true },
+    { name: "Lock/Submit", icon: <CiLock size={buttonSize.iconSize} />, action: () => setPageValue("SaveandLockScenario"), disabled: false },
   ];
 
   return (
@@ -63,21 +55,14 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
         <ButtonsContainer>
           {buttons.map((button, index) => (
             <Button key={index} onClick={!button.disabled ? button.action : undefined} disabled={button.disabled}>
-              <IconWrapper disabled={button.disabled}>{button.icon}</IconWrapper>
+              <IconWrapper disabled={button.disabled} size={buttonSize.iconSize}>{button.icon}</IconWrapper>
               <p className="button-text">{button.name}</p>
               {button.disabled && (
-                <>
-                  <DisabledOverlay>i</DisabledOverlay>
-                  <Tooltip>Feature not activated. Please contact your admin.</Tooltip>
-                </>
+                <Tooltip className="tooltip">Feature not activated.</Tooltip>
               )}
             </Button>
           ))}
         </ButtonsContainer>
-
-        {/* <div style={{ textAlign: "center", marginTop: "20px" }}>
-          <a href="#" style={{ color: "#007bff", textDecoration: "none" }}>ACE™ Navigation</a>
-        </div> */}
       </ContentWrapper>
     </HomePageContainer>
   );
