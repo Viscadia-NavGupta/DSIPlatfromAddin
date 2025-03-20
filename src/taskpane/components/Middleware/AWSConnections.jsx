@@ -253,6 +253,8 @@ export async function FetchMetaData(buttonName, idToken, secretName, userId, ema
     }
     const ServOrchURL = secretsObject.ServOrch;
     console.log("✅ Service Orchestration URL retrieved");
+    
+    userId = AWSsecrets.user_id;
 
     const UUID_Generated = uuidv4();
     const headers = {
