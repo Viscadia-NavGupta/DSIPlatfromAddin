@@ -18,6 +18,7 @@ import PowerBi from "../Icons/PowerBi";
 import ReportGenie from "../Icons/ReportGenie";
 import RiskAnalytics from "../Icons/Risk&Analytics";
 import * as excelconnections from "../Middleware/ExcelConnection";
+import * as inputfuncitons from "../Middleware/inputfile";
 
 const HomePage = ({ userName, setPageValue }) => {
   const [buttonSize, setButtonSize] = useState({
@@ -65,7 +66,7 @@ const HomePage = ({ userName, setPageValue }) => {
     {
       name: "Forecast Management",
       icon: <ForecastManagement width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-      action: () => setPageValue("ForecastManagement"),
+      action: () => inputfuncitons.saveData(),
       disabled: false,
     },
     {
