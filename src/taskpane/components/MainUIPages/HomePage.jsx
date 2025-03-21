@@ -17,6 +17,7 @@ import ModelBuilder from "../Icons/Modelbuilder";
 import PowerBi from "../Icons/PowerBi";
 import ReportGenie from "../Icons/ReportGenie";
 import RiskAnalytics from "../Icons/Risk&Analytics";
+import * as excelconnections from "../Middleware/ExcelConnection";
 
 const HomePage = ({ userName, setPageValue }) => {
   const [buttonSize, setButtonSize] = useState({
@@ -88,7 +89,7 @@ const HomePage = ({ userName, setPageValue }) => {
     {
       name: "Report Genie",
       icon: <ReportGenie width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-      action: () => setPageValue("ReportGenie"),
+      action: () => excelconnections.generateLongFormData(),
       disabled: false,
     },
   ];
