@@ -8,7 +8,7 @@
   <Version>1.0.0.1</Version>
   <ProviderName>Viscadia</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue=" "/>
+  <DisplayName DefaultValue="Viscadia Forecasting Solution"/>
   <Description DefaultValue="Custom Forecasting Solution"/>
   <IconUrl DefaultValue="https://main.d3q39f7241n0r1.amplifyapp.com/assets/Viscadia_V_Logo.png"/>
   <HighResolutionIconUrl DefaultValue="https://main.d3q39f7241n0r1.amplifyapp.com/assets/Viscadia_V_Logo.png"/>
@@ -76,12 +76,12 @@
         <bt:Url id="Taskpane.Url" DefaultValue="https://main.d3q39f7241n0r1.amplifyapp.com/taskpane.html"/>
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="GetStarted.Title" DefaultValue="Your forecast platfrom is ready, login to see details"/>
+        <bt:String id="GetStarted.Title" DefaultValue="Your forecast platform is ready, login to see details"/>
         <bt:String id="CommandsGroup.Label" DefaultValue="Forecast Confidence"/>
         <bt:String id="TaskpaneButton.Label" DefaultValue="Viscadia Forecasting Solution"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="Your forecast platfrom is ready, login to see details"/>
+        <bt:String id="GetStarted.Description" DefaultValue="Your forecast platform is ready, login to see details"/>
         <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Login to see details"/>
       </bt:LongStrings>
     </Resources>
