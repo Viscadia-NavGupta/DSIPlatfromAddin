@@ -1,16 +1,20 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="TaskPaneApp">
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" 
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" 
+           xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" 
+           xsi:type="TaskPaneApp">
   <Id>3c8d6ba6-25cf-49db-8023-90aa68094e6a</Id>
   <Version>1.0.0.1</Version>
   <ProviderName>Viscadia</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue=" "/>
+  <DisplayName DefaultValue="Viscadia Forecasting Solution"/>
   <Description DefaultValue="Custom Forecasting Solution"/>
   <IconUrl DefaultValue="https://localhost:3000/assets/Viscadia_V_Logo.png"/>
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/Viscadia_V_Logo.png"/>
   <SupportUrl DefaultValue="https://viscadia.com/contact-us/"/>
   <AppDomains>
-    <AppDomain>https://www.contoso.com</AppDomain>
+    <AppDomain>https://localhost:3000</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Workbook"/>
@@ -72,12 +76,12 @@
         <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="GetStarted.Title" DefaultValue="Your forecast platfrom is ready, login to see details"/>
+        <bt:String id="GetStarted.Title" DefaultValue="Your forecast platform is ready, login to see details"/>
         <bt:String id="CommandsGroup.Label" DefaultValue="Forecast Confidence"/>
         <bt:String id="TaskpaneButton.Label" DefaultValue="Viscadia Forecasting Solution"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="Your forecast platfrom is ready, login to see details"/>
+        <bt:String id="GetStarted.Description" DefaultValue="Your forecast platform is ready, login to see details"/>
         <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Login to see details"/>
       </bt:LongStrings>
     </Resources>

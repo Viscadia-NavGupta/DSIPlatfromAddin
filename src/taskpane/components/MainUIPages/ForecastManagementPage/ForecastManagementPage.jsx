@@ -105,7 +105,7 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
   const buttons = [
     { name: "Load", icon: <MdSaveAlt size={buttonSize.iconSize} />, action: () => setPageValue("LoadScenario"), disabled: false },
     { name: "Save", icon: <MdOutlineSave size={buttonSize.iconSize} />, action: () => setPageValue("SaveForecastPage"), disabled: false },
-    { name: "Lock/Submit", icon: <CiLock size={buttonSize.iconSize} />, action: () => setPageValue("SaveandLockScenario"), disabled: false },
+    { name: "Save & Lock", icon: <CiLock size={buttonSize.iconSize} />, action: () => setPageValue("SaveandLockScenario"), disabled: false },
   ];
 
   return (

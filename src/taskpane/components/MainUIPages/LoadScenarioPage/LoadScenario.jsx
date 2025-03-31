@@ -132,7 +132,7 @@ const LoadScenario = ({ setPageValue }) => {
       const responseBody = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
-        "dsivis-dev-remaining-secrets",
+        "DSI-prod-remaining-secrets",
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );
@@ -293,7 +293,8 @@ const LoadScenario = ({ setPageValue }) => {
         setPageValue("LoadingCircleComponent", "75% | Importing data...");
 
         console.log("✅ Scenario Imported Successfully!");
-        setPageValue("SaveForecastPageinterim", "Scenario Imported");
+        const message = `Forecast Scenario imported for Model: ${heading.replace("Import Scenario for: ", "")} | Cycle: ${selectedCycle} | Scenario: ${selectedScenario}`;
+        setPageValue("SaveForecastPageinterim", message);
       } else {
         console.error("🚨 Scenario Import Failed:", Downloadflag);
       }

@@ -66,7 +66,7 @@ const HomePage = ({ userName, setPageValue }) => {
     {
       name: "Forecast Management",
       icon: <ForecastManagement width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-      action: () => inputfuncitons.saveData(),
+      action: () => setPageValue("ForecastManagement"),
       disabled: false,
     },
     {
@@ -91,7 +91,7 @@ const HomePage = ({ userName, setPageValue }) => {
       name: "Report Genie",
       icon: <ReportGenie width={buttonSize.iconSize} height={buttonSize.iconSize} />,
       action: () => excelconnections.generateLongFormData("US","DataModel"),
-      disabled: false,
+      disabled: true,
     },
   ];
 

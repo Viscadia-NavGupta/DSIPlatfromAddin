@@ -8,11 +8,11 @@ import Papa from "papaparse";
 // =============================================================================
 const CONFIG = {
   COGNITO: {
-    URL: "https://cognito-idp.us-east-1.amazonaws.com/",
-    CLIENT_ID: "47ht7bakkhf3k89enj23581vcd",
+    URL: "https://cognito-idp.us-east-2.amazonaws.com/",
+    CLIENT_ID: "5d9qolco5mqc2bm9o5jjpe78la",
   },
-  AUTH_URL: "https://278e46zxxk.execute-api.us-east-1.amazonaws.com/dev/sqldbquery",
-  AWS_SECRETS_NAME: "dsivis-dev-remaining-secrets",
+  AUTH_URL: "https://j58gb5s8ta.execute-api.us-east-2.amazonaws.com/prod/sqldbquery",
+  AWS_SECRETS_NAME: "DSI-prod-remaining-secrets",
   POLLING: {
     MAX_ATTEMPTS: 100,
     DELAY_MS: 5000, // Fixed delay; consider exponential backoff if needed.
@@ -79,8 +79,9 @@ export async function AwsLogin(username, password) {
  */
 export async function AWSrefreshtoken() {
   const refreshToken = localStorage.getItem("refreshToken");
+
   if (!refreshToken) {
-    console.error("❌ No refresh token found");
+    console.error("❌ No refresh token found in localStorage.");
     return;
   }
 
@@ -99,25 +100,40 @@ export async function AWSrefreshtoken() {
   });
 
   try {
-    console.log("🔄 Refreshing token");
+    console.log("🔄 Attempting to refresh tokens...");
+
     const response = await fetch(CONFIG.COGNITO.URL, {
       method: "POST",
       headers,
       body,
     });
+
     if (!response.ok) {
-      throw new Error(`❌ Token refresh failed: ${response.status}`);
+      throw new Error(`❌ Token refresh failed with status ${response.status}`);
     }
+
     const responseData = await response.json();
-    if (responseData.AuthenticationResult?.IdToken) {
-      localStorage.setItem("idToken", responseData.AuthenticationResult.IdToken);
-      console.log("✅ Token refreshed successfully");
+    const authResult = responseData?.AuthenticationResult;
+
+    if (authResult?.IdToken) {
+      // Save tokens and expiry time
+      localStorage.setItem("idToken", authResult.IdToken);
+      if (authResult.AccessToken) {
+        localStorage.setItem("accessToken", authResult.AccessToken);
+      }
+      if (authResult.ExpiresIn) {
+        const expiryTime = Date.now() + authResult.ExpiresIn * 1000;
+        localStorage.setItem("tokenExpiry", expiryTime.toString());
+      }
+
+      console.log("✅ ID token refreshed and saved to localStorage.");
     } else {
-      console.error("❌ No ID token in refresh response");
+      console.error("❌ No ID token found in the refresh response.");
     }
-    return responseData;
+
+    return authResult;
   } catch (error) {
-    console.error("🚨 Token refresh error:", error);
+    console.error("🚨 Error during token refresh:", error);
     throw error;
   }
 }
@@ -230,7 +246,7 @@ async function getAWSMetadata(idToken, email) {
 export async function FetchMetaData(buttonName, idToken, secretName, userId, email_id) {
   try {
     console.log("🔍 Fetching secrets from AWS...");
-    
+
     let AWSsecrets = await getAWSMetadata(idToken, email_id);
 
     // 🔹 Check if secrets exist, otherwise trigger token refresh
@@ -238,7 +254,7 @@ export async function FetchMetaData(buttonName, idToken, secretName, userId, ema
       console.warn("⚠️ Token may be expired. Refreshing token...");
       await AWSrefreshtoken();
       const refreshedToken = localStorage.getItem("idToken");
-      
+
       // Retry fetching metadata with refreshed token
       AWSsecrets = await getAWSMetadata(refreshedToken, email_id);
 
@@ -253,7 +269,7 @@ export async function FetchMetaData(buttonName, idToken, secretName, userId, ema
     }
     const ServOrchURL = secretsObject.ServOrch;
     console.log("✅ Service Orchestration URL retrieved");
-    
+
     userId = AWSsecrets.user_id;
 
     const UUID_Generated = uuidv4();
@@ -301,7 +317,6 @@ export async function FetchMetaData(buttonName, idToken, secretName, userId, ema
   }
 }
 
-
 // =============================================================================
 //                     SERVICE REQUEST FUNCTIONS
 // =============================================================================
@@ -329,7 +344,8 @@ export async function servicerequest(
   userId = "",
   cycleName = "",
   scenarioName = "",
-  constituent_ID=[]
+  constituent_ID = [],
+  forecast_id = ""
 ) {
   try {
     const headers = {
@@ -345,7 +361,8 @@ export async function servicerequest(
       model_id: Model_UUID,
       cycle_name: cycleName,
       scenario_name: scenarioName,
-      constituent_forecast_ids: constituent_ID
+      constituent_forecast_ids: constituent_ID,
+      forecast_id: forecast_id,
     };
 
     console.log("📤 Sending service request");
@@ -398,9 +415,11 @@ export async function service_orchestration(
   secret_name = "",
   Forecast_UUID = "",
   LongformData,
-  outputbackend_data=[],
-  sheetNames_Agg=[],
-  constituent_ID=[]
+  outputbackend_data = [],
+  sheetNames_Agg = [],
+  constituent_ID = [],
+  matchedForecasts = [],
+  setPageValue
 ) {
   console.log(`🚀 Service orchestration started: ${buttonname}`);
 
@@ -442,7 +461,7 @@ export async function service_orchestration(
       const [flag_flatfileupload, flat_inputfileupload, flag_outputbackend] = await Promise.all([
         uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL),
         uploadFileToS3("Input File", UploadS3INPUTFILEURL),
-        uploadFileToS3FromArray(outputbackend_data, "Test", UploadOUTPUT_FILEURL)
+        uploadFileToS3FromArray(outputbackend_data, "Test", UploadOUTPUT_FILEURL),
       ]);
 
       console.log(
@@ -494,7 +513,7 @@ export async function service_orchestration(
 
       const UploadS3SaveForecastURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["SAVE_FORECAST"][UUID_Generated[0]];
       const [flag_flatfileupload, flat_inputfileupload, flag_outputbackend] = await Promise.all([
-        uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL)
+        uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL),
       ]);
 
       console.log(`🟢 Uploads completed - Forecast: ${flag_flatfileupload}`);
@@ -519,7 +538,8 @@ export async function service_orchestration(
         return servicestatus;
       }
     } else if (buttonname === "Agg_Load_Models") {
-      console.log("📤 Preparing Actuals upload");
+      console.log("📤 Preparing to load Aggregated Models");
+
       const S3downloadobject = await AuthorizationData(
         "IMPORT_ASSUMPTIONS",
         idToken,
@@ -528,27 +548,50 @@ export async function service_orchestration(
         constituent_ID
       );
 
-      const Downloadconstituent_ID_URL = S3downloadobject["presigned urls"]["DOWNLOAD"]["OUTPUT_FILE"];
-      
-      for (let i = 0; i < Object.keys(Downloadconstituent_ID_URL).length; i++) {
-        const constituentID = Object.keys(Downloadconstituent_ID_URL)[i];
-        const url = Downloadconstituent_ID_URL[constituentID];
-        const sheetName = sheetNames_Agg[i];
-        
-        // Call your function here
-        await AggDownloadS3(url, sheetName);
-        console.log("File done");
+      const Downloadconstituent_ID_URL = S3downloadobject?.["presigned urls"]?.["DOWNLOAD"]?.["OUTPUT_FILE"];
+      if (!Downloadconstituent_ID_URL) {
+        console.error("❌ No download URLs received");
+        return { status: "error", message: "No download URLs received" };
       }
-      console.log(Downloadconstituent_ID_URL);
+
+      const keys = Object.keys(Downloadconstituent_ID_URL);
+      const totalFiles = keys.length;
+
+      if (totalFiles === 0) {
+        console.warn("⚠️ No models found to download.");
+        return { status: "warning", message: "No models to download." };
+      }
+
+      for (let i = 0; i < keys.length; i++) {
+        const constituentID = keys[i];
+        const url = Downloadconstituent_ID_URL[constituentID];
+        const sheetName = sheetNames_Agg[i] || `Sheet_${i + 1}`; // Fallback in case name is missing
+
+        try {
+          await AggDownloadS3(url, sheetName);
+          const progress = Math.round(((i + 1) / totalFiles) * 100);
+          setPageValue("LoadingCircleComponent", `${progress}% | Loading Models...`);
+          console.log(`✅ Downloaded: ${sheetName}`);
+        } catch (error) {
+          console.error(`❌ Error downloading ${sheetName}:`, error);
+        }
+      }
+
+      await pasteArrayToNamedRange(constituent_ID, "Imported_model_List");
+
+      console.log("✅ All downloads completed.");
+      return { status: "success", message: "Aggregated models downloaded." };
     } else if (buttonname === "SAVE_FORECAST_AGG" || buttonname === "SAVE_LOCKED_FORECAST_AGG") {
       const buttonMapping = {
-        "SAVE_FORECAST_AGG": "SAVE_FORECAST",
-        "SAVE_LOCKED_FORECAST_AGG": "SAVE_LOCKED_FORECAST"
+        SAVE_FORECAST_AGG: "SAVE_FORECAST",
+        SAVE_LOCKED_FORECAST_AGG: "SAVE_LOCKED_FORECAST",
       };
-      
-      buttonname = buttonMapping[buttonname] || buttonname;
+      // Derive the mapped button name
+      const mappedButtonName = buttonMapping[buttonname] || buttonname;
+      console.log("Forecast Aggregation Button Mapping:", buttonMapping);
+      console.log("Mapped Button Name:", mappedButtonName);
 
-      console.log("📤 Preparing forecast upload");
+      // (Assume earlier code prepares S3 upload URLs)
       const S3Uploadobejct = await AuthorizationData(
         "SAVE_FORECAST",
         idToken,
@@ -559,19 +602,19 @@ export async function service_orchestration(
 
       const UploadS3SaveForecastURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["SAVE_FORECAST"][UUID_Generated[0]];
       const UploadS3INPUTFILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["INPUT_FILE"][UUID_Generated[0]];
-      // const UploadOUTPUT_FILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["OUTPUT_FILE"][UUID_Generated[0]];
 
       const [flag_flatfileupload, flat_inputfileupload] = await Promise.all([
         uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL),
-        uploadFileToS3("Input File", UploadS3INPUTFILEURL)
+        uploadFileToS3("Input File", UploadS3INPUTFILEURL),
       ]);
 
       console.log(`🟢 Uploads completed - Forecast: ${flag_flatfileupload}, Input: ${flat_inputfileupload}`);
 
       if (flag_flatfileupload || flat_inputfileupload) {
+        // Original service request call
         const servicestatus = await servicerequest(
           serviceorg_URL,
-          buttonname,
+          mappedButtonName,
           UUID_Generated[0],
           Model_UUID,
           idToken,
@@ -581,12 +624,56 @@ export async function service_orchestration(
           scenarioname,
           constituent_ID
         );
-
+        console.log("Service status:", servicestatus);
+        let pollingResult = servicestatus;
         if (servicestatus === "Endpoint request timed out" || (servicestatus && servicestatus.status === "Poll")) {
           console.log("⏱️ Service request requires polling");
-          return poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+          pollingResult = await poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
         }
-        return servicestatus;
+
+        // Now, for each element in matchedForecasts, send a service request
+        if (buttonname === "SAVE_LOCKED_FORECAST_AGG") {
+          if (matchedForecasts && matchedForecasts.length > 0) {
+            for (const match of matchedForecasts) {
+              try {
+                // Extract new UUID from the forecast_id by removing the "forecast_" prefix.
+                const newUUID = match.forecast_id.replace("forecast_", "");
+                // Use the model_id from the matched forecast as the new Model_UUID.
+                const newModelUUID = match.model_id;
+                const UUID_Generated = [uuidv4()];
+
+                // Send the service request for this matched forecast.
+                const matchStatus = await servicerequest(
+                  serviceorg_URL,
+                  "LOCK_FORECAST",
+                  UUID_Generated[0],
+                  "",
+                  idToken,
+                  CONFIG.AWS_SECRETS_NAME,
+                  User_Id,
+                  "",
+                  "",
+                  [],
+                  newUUID
+                );
+
+                console.log(`Service status for matched forecast ${match.forecast_id}:`, matchStatus);
+
+                // Check if polling is required for this matched forecast.
+                if (matchStatus === "Endpoint request timed out" || (matchStatus && matchStatus.status === "Poll")) {
+                  console.log("⏱️ Service request requires polling");
+                  await poll(newUUID, CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+                }
+              } catch (error) {
+                console.error("Error processing matched forecast", match, error);
+              }
+            }
+          }
+        }
+
+        // If the original service request requires polling, handle that.
+
+        return pollingResult;
       }
     }
     return { status: "No operation performed" };
@@ -595,7 +682,6 @@ export async function service_orchestration(
     return { status: "error", message: error.message };
   }
 }
-
 
 /**
  * Posts a request to service orchestration.
@@ -740,7 +826,7 @@ export async function downloadAndInsertDataFromExcel(s3Url, sheetName) {
 
     // Normalize rows to ensure each row has the same number of columns
     const maxCols = rows.reduce((max, row) => Math.max(max, row.length), 0);
-    rows = rows.map(row => {
+    rows = rows.map((row) => {
       if (row.length < maxCols) {
         // Append empty strings until row length equals maxCols
         return [...row, ...Array(maxCols - row.length).fill("")];
@@ -797,7 +883,6 @@ export async function downloadAndInsertDataFromExcel(s3Url, sheetName) {
     return { success: false, newSheetName: null };
   }
 }
-
 
 /**
  * Uploads array data to S3 as CSV or Excel.
@@ -892,7 +977,9 @@ export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, fo
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         });
         // Clean up memory
-        for (let key in ws) { ws[key] = null; }
+        for (let key in ws) {
+          ws[key] = null;
+        }
         console.timeEnd("⏱️ Blob creation");
       }
       contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -979,7 +1066,7 @@ export async function poll(request_id, secret_name, pollingUrl, idToken) {
         console.log("✅ Operation completed successfully");
         return { request_id, result: responseBody.status };
       } else if (responseBody.status === "PENDING") {
-        console.log(`⏳ Operation still in progress, waiting ${delay/1000}s`);
+        console.log(`⏳ Operation still in progress, waiting ${delay / 1000}s`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         attempts++;
       } else {
@@ -1073,10 +1160,7 @@ function createExcelBlobInWorker(dataArray, sheetName) {
   });
 }
 
-
-
 /////////////////////////////////////////////////////////////section for agg load models ////////////////////////////////////
-
 
 /**
  * Downloads an Excel file from S3 and inserts its data into a target Excel sheet starting from a specific cell.
@@ -1109,7 +1193,7 @@ export async function AggDownloadS3(s3Url, sheetName, startCell = "B4") {
 
     // Normalize rows so each row has the same number of columns
     const maxCols = rows.reduce((max, row) => Math.max(max, row.length), 0);
-    rows = rows.map(row => {
+    rows = rows.map((row) => {
       if (row.length < maxCols) {
         return [...row, ...Array(maxCols - row.length).fill("")];
       }
@@ -1187,4 +1271,40 @@ export async function AggDownloadS3(s3Url, sheetName, startCell = "B4") {
     console.error("🚨 Download and insertion error:", error);
     return { success: false, newSheetName: null };
   }
+}
+
+async function pasteArrayToNamedRange(arrayData, namedRangeName) {
+  await Excel.run(async (context) => {
+    // Get the named range
+    const namedRange = context.workbook.names.getItem(namedRangeName).getRange();
+    namedRange.load(["rowCount", "columnCount"]);
+    await context.sync();
+
+    const expectedRows = namedRange.rowCount;
+    const expectedCols = namedRange.columnCount;
+
+    // Auto-convert 1D array to 2D (Nx1) if needed
+    if (!Array.isArray(arrayData[0])) {
+      arrayData = arrayData.map((item) => [item]);
+    }
+
+    const inputRows = arrayData.length;
+    const inputCols = arrayData[0]?.length || 0;
+
+    // Check if dimensions match
+    if (inputRows !== expectedRows || inputCols !== expectedCols) {
+      console.error(
+        `Input array dimensions (${inputRows}x${inputCols}) do not match named range dimensions (${expectedRows}x${expectedCols}).`
+      );
+      return;
+    }
+
+    // Paste values
+    namedRange.values = arrayData;
+    await context.sync();
+
+    console.log(`✅ Data successfully pasted into named range "${namedRangeName}".`);
+  }).catch((error) => {
+    console.error("❌ Error: " + error);
+  });
 }

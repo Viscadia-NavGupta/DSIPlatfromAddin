@@ -51,7 +51,9 @@ const AggLockScenario = ({ setPageValue }) => {
       const records = dfResult1.toCollection();
       return records.some(
         (record) =>
-          record.model_id === modelId && record.cycle_name === cycleName && record.scenario_name === scenarioName
+          record.model_id === modelId &&
+          record.cycle_name === cycleName &&
+          record.scenario_name === scenarioName
       );
     },
     [dataFrames]
@@ -71,7 +73,9 @@ const AggLockScenario = ({ setPageValue }) => {
         sheets.load("items/name");
         await context.sync();
 
-        const MetaDataSheet = sheets.items.find((sheet) => sheet.name.toLowerCase() === "cloud_backend_md");
+        const MetaDataSheet = sheets.items.find(
+          (sheet) => sheet.name.toLowerCase() === "cloud_backend_md"
+        );
 
         if (MetaDataSheet) {
           const sheet = MetaDataSheet;
@@ -97,7 +101,7 @@ const AggLockScenario = ({ setPageValue }) => {
           // The named range returns a 2D array.
           const loadedCloudLoadModelsList = cloudLoadModelsRange.values;
 
-          setHeading(`Save Aggregator Scenario for: ${ModelNameValue}`);
+          setHeading(`Save & Lock Aggregator Scenario for: ${ModelNameValue}`);
           setIsOutputSheet(true);
           setModelIDValue(ModelIDValue);
           setModelType(ModelTypeValue);
@@ -123,12 +127,17 @@ const AggLockScenario = ({ setPageValue }) => {
       const responseBody = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
-        "dsivis-dev-remaining-secrets",
+        "DSI-prod-remaining-secrets",
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );
 
-      if (!responseBody || !responseBody.results1 || !responseBody.results2 || !responseBody.result3) {
+      if (
+        !responseBody ||
+        !responseBody.results1 ||
+        !responseBody.results2 ||
+        !responseBody.result3
+      ) {
         throw new Error("❌ Missing one or more required results in Lambda response.");
       }
 
@@ -202,16 +211,60 @@ const AggLockScenario = ({ setPageValue }) => {
     console.time("Total save time request");
     setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
 
+    // Access df1 from the dataFrames state (retrieved from fetchDataFromLambda)
+    const df1 = dataFrames.dfResult1;
+    if (!df1) {
+      console.error("DataFrame df1 is not loaded yet.");
+      return;
+    }
+    // Log the DataFrame contents.
+    console.log("DataFrame df1 contents:", df1.toCollection());
+
+    // -------------------------------------------------------------------
+    // NEW LOGIC: Prefix each element from cloudLoadModelsList with "forecast_"
+    // and then match these prefixed values against the forecast_id in df1.
+    // For each match, store the model_id and forecast_id in a new array.
+    // -------------------------------------------------------------------
+    // Assume we use the first column of each row from cloudLoadModelsList for the prefix.
+    const prefixedForecastIds = cloudLoadModelsList.map((row) => `forecast_${row[6]}`);
+    console.log("Prefixed Forecast IDs:", prefixedForecastIds);
+
+    // Get the collection of df1 records.
+    const df1Records = df1.toCollection();
+
+    // Initialize an array to hold matching objects.
+    const matchedForecasts = [];
+
+    // For each prefixed forecast ID, check for a match in df1 (using the forecast_id key).
+    prefixedForecastIds.forEach((forecastId) => {
+      // In case there are multiple matches, filter all that match.
+      const matchingRecords = df1Records.filter(
+        (record) => record.forecast_id === forecastId
+      );
+      matchingRecords.forEach((record) => {
+        matchedForecasts.push({
+          model_id: record.model_id,
+          forecast_id: record.forecast_id,
+        });
+      });
+    });
+
+    console.log("Matched Forecasts:", matchedForecasts);
+    // -------------------------------------------------------------------
+    // END NEW LOGIC
+    // -------------------------------------------------------------------
+
     console.log("📤 Saving Forecast:", {
       cycle_name: selectedCycle,
       scenario_name: scenarioName,
     });
     console.log("🔹 Using Model ID:", modelIDValue);
     console.log("🔹 Using Model Type:", modelType);
+
     let concatenatedArray;
     // Concatenate column 1 and column 7 from cloudLoadModelsList with a hyphen in between.
     if (cloudLoadModelsList && cloudLoadModelsList.length > 0) {
-       concatenatedArray = cloudLoadModelsList.map((row) => {
+      concatenatedArray = cloudLoadModelsList.map((row) => {
         // Assuming the named range returns a 2D array and using 1-indexed columns:
         // Column 1 -> index 0 and Column 7 -> index 6.
         if (row.length >= 7) {
@@ -244,7 +297,7 @@ const AggLockScenario = ({ setPageValue }) => {
 
       console.time("save forecast");
       const saveFlag = await AWSconnections.service_orchestration(
-        "SAVE_FORECAST_AGG",
+        "SAVE_LOCKED_FORECAST_AGG",
         "",
         modelIDValue,
         scenarioName,
@@ -255,15 +308,17 @@ const AggLockScenario = ({ setPageValue }) => {
         longformData,
         "",
         "",
-        concatenatedArray
+        concatenatedArray,
+        matchedForecasts
       );
       console.timeEnd("save forecast");
 
       console.log("Save response:", saveFlag);
       setPageValue("LoadingCircleComponent", "100% | Saving your forecast...");
 
-      if (saveFlag === "Saved Forecast" || (saveFlag && saveFlag.result === "DONE")) {
-        setPageValue("SaveForecastPageinterim", "Forecast Scenario saved");
+      if (saveFlag === "Saved Locked Forecast" || (saveFlag && saveFlag.result === "DONE")) {
+        const message = `Forecast scenario saved & locked for Model: ${heading.replace("Save & Lock Aggregator Scenario for: ", "")} | Cycle: ${selectedCycle} | Scenario: ${scenarioName}`;
+        setPageValue("SaveForecastPageinterim", message);
       } else if (
         saveFlag ===
         "A scenario of this name for the provided model and cycle details already exists, try with another one."
@@ -278,7 +333,16 @@ const AggLockScenario = ({ setPageValue }) => {
     }
 
     console.timeEnd("Total save time request");
-  }, [selectedCycle, scenarioName, modelIDValue, modelType, cloudLoadModelsList, checkScenarioExists, setPageValue]);
+  }, [
+    selectedCycle,
+    scenarioName,
+    modelIDValue,
+    modelType,
+    cloudLoadModelsList,
+    checkScenarioExists,
+    setPageValue,
+    dataFrames,
+  ]);
 
   // =============================================================================
   //                                 RENDER
@@ -292,7 +356,10 @@ const AggLockScenario = ({ setPageValue }) => {
         <>
           <Heading>{heading}</Heading>
           <DropdownContainer>
-            <SelectDropdown value={selectedCycle} onChange={(e) => setSelectedCycle(e.target.value)}>
+            <SelectDropdown
+              value={selectedCycle}
+              onChange={(e) => setSelectedCycle(e.target.value)}
+            >
               <option value="" disabled>
                 Select Cycle
               </option>

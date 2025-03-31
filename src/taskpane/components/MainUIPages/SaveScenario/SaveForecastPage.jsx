@@ -115,7 +115,7 @@ const SaveScenario = ({ setPageValue }) => {
       const responseBody = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
-        "dsivis-dev-remaining-secrets",
+        "DSI-prod-remaining-secrets",
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );
@@ -225,7 +225,8 @@ const SaveScenario = ({ setPageValue }) => {
       setPageValue("LoadingCircleComponent", "100% | Saving your forecast...");
 
       if (saveFlag === "Saved Forecast" || (saveFlag && saveFlag.result === "DONE")) {
-        setPageValue("SaveForecastPageinterim", "Forecast Scenario saved");
+        const message = `Forecast Scenario saved for Model: ${heading.replace("Save Scenario for:", "")} | Cycle: ${selectedCycle} | Scenario: ${scenarioName}`;
+        setPageValue("SaveForecastPageinterim", message);
       } else if (
         saveFlag ===
         "A scenario of this name for the provided model and cycle details already exists, try with another one."

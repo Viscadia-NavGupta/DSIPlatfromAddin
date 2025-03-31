@@ -95,7 +95,7 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
       const responseBody = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
-        "dsivis-dev-remaining-secrets",
+        "DSI-prod-remaining-secrets",
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );
@@ -103,16 +103,18 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
       // Use the API response and send it to Excel
       await Excelconnections.apiResponseToExcel(responseBody, "cloud_backend_ds", "A1");
       console.log("Metadata synced to Excel");
-      setPageValue("SaveForecastPageinterim", "Metadata synced");
+      setPageValue("SaveForecastPageinterim", "Dropdowns synced with the latest scenario names from the data lake");
     } catch (error) {
       console.error("Error fetching metadata or syncing to Excel:", error);
     }
   };
 
   const LoadAggModels = async () => {
+    setPageValue("LoadingCircleComponent", "0% | Loading Models...");
     const Aggmodeldata = await Excelconnections.readNamedRangeToArray("Cloud_LoadModels_List");
     const Sheetnames = Aggmodeldata.map((row) => row[0]);
     const forecastIDs = Aggmodeldata.map((row) => row[6]);
+    await Excelconnections.setCalculationMode("manual");
     const saveFlag = await AWSconnections.service_orchestration(
       "Agg_Load_Models",
       "",
@@ -125,9 +127,11 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
       "",
       "",
       Sheetnames,
-      forecastIDs
+      forecastIDs,
+      [],
+      setPageValue
     );
-
+    setPageValue("SaveForecastPageinterim", "Selected scenarios loaded successfully.");
     console.log(Aggmodeldata);
     console.log(Sheetnames);
     console.log(forecastIDs);
@@ -143,13 +147,13 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
       disabled: false,
     },
     {
-      name: "Lock/Submit",
+      name: "Save & Lock",
       icon: <CiLock size={buttonSize.iconSize} />,
       action: () => setPageValue("AggLockScenario"),
       disabled: false,
     },
     {
-      name: "Save Actual's",
+      name: "Save Actuals only",
       icon: <MdOutlineSave size={buttonSize.iconSize} />,
       action: () => setPageValue("SaveScenarioActuals"),
       disabled: false,
