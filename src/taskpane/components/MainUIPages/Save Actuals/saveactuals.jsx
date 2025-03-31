@@ -4,25 +4,22 @@ import {
   Heading,
   MessageBox,
   DropdownContainer,
-  SelectDropdown,
   Input,
   SaveButton,
-} from "./SaveForecastPageStyles";
+} from "./saveactualsstyles";
 import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
 import * as excelfucntions from "../../Middleware/ExcelConnection";
 import * as inputfiles from "../../Middleware/inputfile";
 
-const SaveScenario = ({ setPageValue }) => {
+const SaveScenarioActuals = ({ setPageValue }) => {
   // =============================================================================
   //                              STATE VARIABLES
   // =============================================================================
-  const [selectedCycle, setSelectedCycle] = useState("");
   const [scenarioName, setScenarioName] = useState("");
   const [heading, setHeading] = useState("Active Sheet Name");
   const [isOutputSheet, setIsOutputSheet] = useState(false);
   const storedUsername = useMemo(() => sessionStorage.getItem("username"), []);
-  const [cycleItems, setCycleItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modelIDValue, setModelIDValue] = useState("");
   const [modelType, setModelType] = useState("");
@@ -73,9 +70,9 @@ const SaveScenario = ({ setPageValue }) => {
         if (MetaDataSheet) {
           const sheet = MetaDataSheet;
           const ranges = {
-            ModelName: sheet.getRange("B5"),
-            ModelID: sheet.getRange("B7"),
-            ModelType: sheet.getRange("B8"),
+            ModelName: sheet.getRange("B16"),
+            ModelID: sheet.getRange("B18"),
+            ModelType: sheet.getRange("B19"),
           };
 
           // Load all ranges together.
@@ -134,15 +131,6 @@ const SaveScenario = ({ setPageValue }) => {
         dfResult2: df2,
         dfResult3: df3,
       });
-
-      // Extract distinct cycle names from df2.
-      const cycleItemsArray = df2
-        .distinct("cycle_name")
-        .toArray()
-        .map((row) => row[0]);
-
-      console.log("Cycle Items:", cycleItemsArray);
-      setCycleItems(cycleItemsArray);
     } catch (error) {
       console.error("🚨 Error fetching data from Lambda:", error);
     }
@@ -181,13 +169,13 @@ const SaveScenario = ({ setPageValue }) => {
     setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
 
     console.log("📤 Saving Forecast:", {
-      cycle_name: selectedCycle,
+      cycle_name: "ACTUALS", // Fixed cycle value
       scenario_name: scenarioName,
     });
     console.log("🔹 Using Model ID:", modelIDValue);
     console.log("🔹 Using Model Type:", modelType);
 
-    if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
+    if (checkScenarioExists(modelIDValue, "ACTUALS", scenarioName)) { // Fixed cycle value
       console.log("This scenario combination already exists.");
       setPageValue("SaveForecastPageinterim", "Scenario name already in use");
       return;
@@ -198,9 +186,9 @@ const SaveScenario = ({ setPageValue }) => {
       console.time("Parallel processes");
 
       const [longformData, _, outputbackend_data] = await Promise.all([ 
-        excelfucntions.generateLongFormData("US","DataModel"), // Ensure this is a promise
-        inputfiles.saveData(), // Ensure this is a promise
-        excelfucntions.readNamedRangeToArray("aggregator_data") // Ensure correct named range without trailing space
+        excelfucntions.generateLongFormData("US","DataModel_Actuals"), // Ensure this is a promise
+        // inputfiles.saveData(), // Ensure this is a promise
+        // excelfucntions.readNamedRangeToArray("aggregator_data") // Ensure correct named range without trailing space
       ]);
 
       console.timeEnd("Parallel processes");
@@ -208,11 +196,11 @@ const SaveScenario = ({ setPageValue }) => {
 
       console.time("save forecast");
       const saveFlag = await AWSconnections.service_orchestration(
-        "SAVE_FORECAST",
+        "SAVE_ACTUALS",
         "",
         modelIDValue,
         scenarioName,
-        selectedCycle,
+        "ACTUALS", // Fixed cycle value
         "",
         "",
         "",
@@ -224,8 +212,8 @@ const SaveScenario = ({ setPageValue }) => {
       console.log("Save response:", saveFlag);
       setPageValue("LoadingCircleComponent", "100% | Saving your forecast...");
 
-      if (saveFlag === "Saved Forecast" || (saveFlag && saveFlag.result === "DONE")) {
-        setPageValue("SaveForecastPageinterim", "Forecast Scenario saved");
+      if (saveFlag === "Saved Forecast" || (saveFlag && saveFlag.result === "DONE" || saveFlag === "Saved Locked Forecast")) {
+        setPageValue("SaveForecastPageinterim", "Actual's Scenario saved");
       } else if (
         saveFlag ===
         "A scenario of this name for the provided model and cycle details already exists, try with another one."
@@ -240,7 +228,7 @@ const SaveScenario = ({ setPageValue }) => {
     }
 
     console.timeEnd("Total save time request");
-  }, [selectedCycle, scenarioName, modelIDValue, modelType, checkScenarioExists, setPageValue]);
+  }, [scenarioName, modelIDValue, modelType, checkScenarioExists, setPageValue]);
 
   return (
     <Container>
@@ -250,23 +238,6 @@ const SaveScenario = ({ setPageValue }) => {
         <>
           <Heading>{heading}</Heading>
           <DropdownContainer>
-            <SelectDropdown
-              value={selectedCycle}
-              onChange={(e) => setSelectedCycle(e.target.value)}
-            >
-              <option value="" disabled>
-                Select Cycle
-              </option>
-              {cycleItems.length > 0 ? (
-                cycleItems.map((item, idx) => (
-                  <option key={idx} value={item}>
-                    {item}
-                  </option>
-                ))
-              ) : (
-                <option disabled>No Cycles Available</option>
-              )}
-            </SelectDropdown>
             <Input
               type="text"
               placeholder="Enter Scenario Name"
@@ -276,18 +247,18 @@ const SaveScenario = ({ setPageValue }) => {
           </DropdownContainer>
           <SaveButton
             onClick={handleSaveClick}
-            disabled={!selectedCycle || !scenarioName}
+            disabled={!scenarioName}
           >
             Save
           </SaveButton>
         </>
       ) : (
         <MessageBox>
-          No Authorised model detected, please refresh the addin
+          No Authorized model detected, please refresh the addin
         </MessageBox>
       )}
     </Container>
   );
 };
 
-export default SaveScenario;
+export default SaveScenarioActuals;

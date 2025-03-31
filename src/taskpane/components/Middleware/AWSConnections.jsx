@@ -328,7 +328,8 @@ export async function servicerequest(
   secretName = "",
   userId = "",
   cycleName = "",
-  scenarioName = ""
+  scenarioName = "",
+  constituent_ID=[]
 ) {
   try {
     const headers = {
@@ -344,6 +345,7 @@ export async function servicerequest(
       model_id: Model_UUID,
       cycle_name: cycleName,
       scenario_name: scenarioName,
+      constituent_forecast_ids: constituent_ID
     };
 
     console.log("📤 Sending service request");
@@ -395,7 +397,10 @@ export async function service_orchestration(
   User_ID = "",
   secret_name = "",
   Forecast_UUID = "",
-  LongformData
+  LongformData,
+  outputbackend_data=[],
+  sheetNames_Agg=[],
+  constituent_ID=[]
 ) {
   console.log(`🚀 Service orchestration started: ${buttonname}`);
 
@@ -420,7 +425,7 @@ export async function service_orchestration(
     const serviceorg_URL = secretsObject.ServOrch;
     const pollingUrl = secretsObject.Polling;
 
-    if (buttonname === "SAVE_FORECAST" ||buttonname === "SAVE_LOCKED_FORECAST" ) {
+    if (buttonname === "SAVE_FORECAST" || buttonname === "SAVE_LOCKED_FORECAST") {
       console.log("📤 Preparing forecast upload");
       const S3Uploadobejct = await AuthorizationData(
         "SAVE_FORECAST",
@@ -432,13 +437,17 @@ export async function service_orchestration(
 
       const UploadS3SaveForecastURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["SAVE_FORECAST"][UUID_Generated[0]];
       const UploadS3INPUTFILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["INPUT_FILE"][UUID_Generated[0]];
+      const UploadOUTPUT_FILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["OUTPUT_FILE"][UUID_Generated[0]];
 
-      const [flag_flatfileupload, flat_inputfileupload] = await Promise.all([
+      const [flag_flatfileupload, flat_inputfileupload, flag_outputbackend] = await Promise.all([
         uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL),
         uploadFileToS3("Input File", UploadS3INPUTFILEURL),
+        uploadFileToS3FromArray(outputbackend_data, "Test", UploadOUTPUT_FILEURL)
       ]);
 
-      console.log(`🟢 Uploads completed - Forecast: ${flag_flatfileupload}, Input: ${flat_inputfileupload}`);
+      console.log(
+        `🟢 Uploads completed - Forecast: ${flag_flatfileupload}, Input: ${flat_inputfileupload}, output: ${flag_outputbackend}`
+      );
 
       if (flag_flatfileupload || flat_inputfileupload) {
         const servicestatus = await servicerequest(
@@ -473,14 +482,120 @@ export async function service_orchestration(
       if (downloadResult.success === true) {
         return { status: "Scenario Imported" };
       }
-    }
+    } else if (buttonname === "SAVE_ACTUALS") {
+      console.log("📤 Preparing Actuals upload");
+      const S3Uploadobejct = await AuthorizationData(
+        "SAVE_FORECAST",
+        idToken,
+        CONFIG.AWS_SECRETS_NAME,
+        username,
+        UUID_Generated
+      );
 
+      const UploadS3SaveForecastURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["SAVE_FORECAST"][UUID_Generated[0]];
+      const [flag_flatfileupload, flat_inputfileupload, flag_outputbackend] = await Promise.all([
+        uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL)
+      ]);
+
+      console.log(`🟢 Uploads completed - Forecast: ${flag_flatfileupload}`);
+
+      if (flag_flatfileupload || flat_inputfileupload) {
+        const servicestatus = await servicerequest(
+          serviceorg_URL,
+          "SAVE_LOCKED_FORECAST",
+          UUID_Generated[0],
+          Model_UUID,
+          idToken,
+          CONFIG.AWS_SECRETS_NAME,
+          User_Id,
+          cycleName,
+          scenarioname
+        );
+
+        if (servicestatus === "Endpoint request timed out" || (servicestatus && servicestatus.status === "Poll")) {
+          console.log("⏱️ Service request requires polling");
+          return poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+        }
+        return servicestatus;
+      }
+    } else if (buttonname === "Agg_Load_Models") {
+      console.log("📤 Preparing Actuals upload");
+      const S3downloadobject = await AuthorizationData(
+        "IMPORT_ASSUMPTIONS",
+        idToken,
+        CONFIG.AWS_SECRETS_NAME,
+        username,
+        constituent_ID
+      );
+
+      const Downloadconstituent_ID_URL = S3downloadobject["presigned urls"]["DOWNLOAD"]["OUTPUT_FILE"];
+      
+      for (let i = 0; i < Object.keys(Downloadconstituent_ID_URL).length; i++) {
+        const constituentID = Object.keys(Downloadconstituent_ID_URL)[i];
+        const url = Downloadconstituent_ID_URL[constituentID];
+        const sheetName = sheetNames_Agg[i];
+        
+        // Call your function here
+        await AggDownloadS3(url, sheetName);
+        console.log("File done");
+      }
+      console.log(Downloadconstituent_ID_URL);
+    } else if (buttonname === "SAVE_FORECAST_AGG" || buttonname === "SAVE_LOCKED_FORECAST_AGG") {
+      const buttonMapping = {
+        "SAVE_FORECAST_AGG": "SAVE_FORECAST",
+        "SAVE_LOCKED_FORECAST_AGG": "SAVE_LOCKED_FORECAST"
+      };
+      
+      buttonname = buttonMapping[buttonname] || buttonname;
+
+      console.log("📤 Preparing forecast upload");
+      const S3Uploadobejct = await AuthorizationData(
+        "SAVE_FORECAST",
+        idToken,
+        CONFIG.AWS_SECRETS_NAME,
+        username,
+        UUID_Generated
+      );
+
+      const UploadS3SaveForecastURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["SAVE_FORECAST"][UUID_Generated[0]];
+      const UploadS3INPUTFILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["INPUT_FILE"][UUID_Generated[0]];
+      // const UploadOUTPUT_FILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["OUTPUT_FILE"][UUID_Generated[0]];
+
+      const [flag_flatfileupload, flat_inputfileupload] = await Promise.all([
+        uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL),
+        uploadFileToS3("Input File", UploadS3INPUTFILEURL)
+      ]);
+
+      console.log(`🟢 Uploads completed - Forecast: ${flag_flatfileupload}, Input: ${flat_inputfileupload}`);
+
+      if (flag_flatfileupload || flat_inputfileupload) {
+        const servicestatus = await servicerequest(
+          serviceorg_URL,
+          buttonname,
+          UUID_Generated[0],
+          Model_UUID,
+          idToken,
+          CONFIG.AWS_SECRETS_NAME,
+          User_Id,
+          cycleName,
+          scenarioname,
+          constituent_ID
+        );
+
+        if (servicestatus === "Endpoint request timed out" || (servicestatus && servicestatus.status === "Poll")) {
+          console.log("⏱️ Service request requires polling");
+          return poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+        }
+        return servicestatus;
+      }
+    }
     return { status: "No operation performed" };
   } catch (error) {
     console.error("🚨 Service orchestration error:", error);
     return { status: "error", message: error.message };
   }
 }
+
 
 /**
  * Posts a request to service orchestration.
@@ -956,4 +1071,120 @@ function createExcelBlobInWorker(dataArray, sheetName) {
       reject(e);
     }
   });
+}
+
+
+
+/////////////////////////////////////////////////////////////section for agg load models ////////////////////////////////////
+
+
+/**
+ * Downloads an Excel file from S3 and inserts its data into a target Excel sheet starting from a specific cell.
+ * @param {string} s3Url - S3 URL of the Excel file.
+ * @param {string} sheetName - Target Excel sheet name.
+ * @param {string} startCell - The cell where the data should be pasted (e.g., 'B4').
+ * @returns {Promise<object>} - Success status and sheet name.
+ */
+export async function AggDownloadS3(s3Url, sheetName, startCell = "B4") {
+  const downloadURL = s3Url;
+
+  async function fetchData() {
+    console.log("📥 Fetching file from S3");
+    const response = await fetch(downloadURL);
+    if (!response.ok) {
+      throw new Error(`❌ File fetch failed: ${response.statusText}`);
+    }
+    console.log("✅ File fetched successfully");
+    return response.arrayBuffer();
+  }
+
+  async function processExcelFile(arrayBuffer, sheetName, startCell) {
+    console.log("⚙️ Processing Excel file");
+    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: "array" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    let rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    if (rows.length === 0) {
+      throw new Error("❌ Excel sheet is empty");
+    }
+
+    // Normalize rows so each row has the same number of columns
+    const maxCols = rows.reduce((max, row) => Math.max(max, row.length), 0);
+    rows = rows.map(row => {
+      if (row.length < maxCols) {
+        return [...row, ...Array(maxCols - row.length).fill("")];
+      }
+      return row;
+    });
+
+    await insertParsedData(rows, sheetName, startCell);
+  }
+
+  function parseCellReference(cellReference) {
+    const regex = /^([A-Za-z]+)(\d+)$/;
+    const match = regex.exec(cellReference);
+    if (!match) {
+      throw new Error(`Invalid cell reference: ${cellReference}`);
+    }
+    const columnLetter = match[1];
+    const rowNumber = parseInt(match[2], 10);
+
+    // Convert column letter to zero-indexed column index
+    let columnIndex = 0;
+    for (let i = 0; i < columnLetter.length; i++) {
+      columnIndex = columnIndex * 26 + (columnLetter.charCodeAt(i) - 65 + 1);
+    }
+
+    return { columnIndex: columnIndex - 1, rowIndex: rowNumber - 1 };
+  }
+
+  function getColumnLetter(index) {
+    let letter = "";
+    let tempIndex = index;
+    while (tempIndex >= 0) {
+      letter = String.fromCharCode((tempIndex % 26) + 65) + letter;
+      tempIndex = Math.floor(tempIndex / 26) - 1;
+    }
+    return letter;
+  }
+
+  async function insertParsedData(rows, sheetName, startCell) {
+    await Excel.run(async (context) => {
+      const sheet = context.workbook.worksheets.getItemOrNullObject(sheetName);
+      await context.sync();
+      if (sheet.isNullObject) {
+        throw new Error(`❌ Sheet "${sheetName}" not found`);
+      }
+
+      // Parse startCell (e.g., B4) into zero-indexed row and column
+      const { columnIndex, rowIndex } = parseCellReference(startCell);
+      const maxCols = rows[0].length;
+      const endColumnIndex = columnIndex + maxCols - 1;
+      const endRowIndex = rowIndex + rows.length - 1;
+
+      // Construct the target range address (Excel row numbers are 1-indexed)
+      const rangeAddress = `${startCell}:${getColumnLetter(endColumnIndex)}${endRowIndex + 1}`;
+      console.log(`📊 Target range: ${rangeAddress}`);
+
+      // Get the target range and clear only the cell contents (values)
+      const targetRange = sheet.getRange(rangeAddress);
+      targetRange.clear(Excel.ClearApplyTo.contents);
+      await context.sync();
+
+      // Now insert the data
+      targetRange.values = rows;
+      await context.sync();
+      console.log(`✅ Data inserted into "${sheetName}" starting from ${startCell}`);
+    });
+  }
+
+  try {
+    console.log("🚀 Starting download and insertion process");
+    const arrayBuffer = await fetchData();
+    await processExcelFile(arrayBuffer, sheetName, startCell);
+    console.log("✅ Process completed successfully");
+    return { success: true, newSheetName: sheetName };
+  } catch (error) {
+    console.error("🚨 Download and insertion error:", error);
+    return { success: false, newSheetName: null };
+  }
 }

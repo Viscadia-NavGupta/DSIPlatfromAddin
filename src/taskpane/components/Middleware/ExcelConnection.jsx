@@ -35,12 +35,12 @@ export async function getAllSheetUsedRangesArray() {
 }
 
 //
-export async function extractLevelData() {
+export async function extractLevelData(DataModelNameRange) {
   try {
     return await Excel.run(async (context) => {
       console.log("🔍 Starting extractLevelData function...");
       let workbook = context.workbook;
-      let namedRange = workbook.names.getItemOrNullObject("DataModel");
+      let namedRange = workbook.names.getItemOrNullObject(DataModelNameRange);
       await context.sync();
 
       if (namedRange.isNullObject) {
@@ -135,55 +135,6 @@ export async function extractLevelData() {
     return [];
   }
 }
-
-// export async function loadWorkbookData() {
-//   try {
-//     await Excel.run(async (context) => {
-//       let sheets = context.workbook.worksheets;
-//       sheets.load("items/name");
-//       await context.sync();
-
-//       workbookData = {};
-//       sheetNames = [];
-
-//       for (let sheet of sheets.items) {
-//         let sheetName = sheet.name.trim();
-//         sheetNames.push(sheetName);
-
-//         let usedRange;
-//         try {
-//           // Get the actual used range in the sheet
-//           usedRange = sheet.getUsedRange();
-//           usedRange.load(["values", "address"]);
-//           await context.sync();
-
-//           // Get used range address (e.g., "B3:F20")
-//           let usedAddress = usedRange.address.split("!")[1]; // Extract address after the sheet name
-//           let lastCell = usedAddress.split(":")[1]; // Extract last cell reference
-
-//           // Define the new range starting from A1 to the last used cell
-//           let expandedRange = sheet.getRange(`A1:${lastCell}`);
-//           expandedRange.load("values");
-//           await context.sync();
-
-//           workbookData[sheetName] = expandedRange.values;
-//         } catch (error) {
-//           console.warn(`Sheet ${sheetName} has no used range. Defaulting to A1.`);
-//           let defaultRange = sheet.getRange("A1");
-//           defaultRange.load("values");
-//           await context.sync();
-
-//           workbookData[sheetName] = defaultRange.values;
-//         }
-//       }
-
-//       console.log("Workbook Data Loaded", workbookData);
-//       console.log("Sheet Names:", sheetNames);
-//     });
-//   } catch (error) {
-//     console.error("Error loading workbook data:", error);
-//   }
-// }
 
 export async function loadWorkbookData() {
   try {
@@ -340,95 +291,6 @@ export function getRangeFromUsedRanges(rangeStr, workbookData) {
   }
 }
 
-// export function getRangeFromUsedRanges(rangeStr, workbookData) {
-//   try {
-//     // Pre-compute sheet name map for case-insensitive lookup
-//     const sheetMap = new Map();
-//     for (const key in workbookData) {
-//       sheetMap.set(key.toLowerCase(), key);
-//     }
-    
-//     // Parse the range string once
-//     const { sheetName, startCell, endCell } = parseRangeString(rangeStr);
-//     const sheetNameLower = sheetName.toLowerCase();
-    
-//     // Find the correct sheet name efficiently
-//     const actualSheetName = sheetMap.get(sheetNameLower) || sheetName;
-//     const sheetData = workbookData[actualSheetName];
-    
-//     // Early exit if sheet not found
-//     if (!sheetData) {
-//       console.error(`Sheet '${sheetName}' not found in preloaded data.`);
-//       return [[]];
-//     }
-    
-//     // Parse cell references once using regex
-//     const startMatch = startCell.match(/([A-Z]+)(\d+)/);
-//     const endMatch = endCell.match(/([A-Z]+)(\d+)/);
-    
-//     if (!startMatch || !endMatch) {
-//       console.error(`Invalid cell reference: ${startCell} or ${endCell}`);
-//       return [[]];
-//     }
-    
-//     // Convert to zero-based indices
-//     const startRow = parseInt(startMatch[2], 10) - 1;
-//     const endRow = parseInt(endMatch[2], 10) - 1;
-//     const startCol = colToIndex(startMatch[1]);
-//     const endCol = colToIndex(endMatch[1]);
-    
-//     // Quick bounds check
-//     if (startRow < 0 || endRow < 0 || startCol < 0 || endCol < 0 || 
-//         !sheetData || startRow >= sheetData.length || 
-//         (sheetData[startRow] && startCol >= sheetData[startRow].length)) {
-//       console.warn(`Range '${rangeStr}' is out of bounds or empty.`);
-//       return [[]];
-//     }
-    
-//     // Handle single cell efficiently
-//     if (startRow === endRow && startCol === endCol) {
-//       return [[sheetData[startRow][startCol]]];
-//     }
-    
-//     // Extract range data efficiently
-//     const resultArray = [];
-//     const maxRow = Math.min(endRow, sheetData.length - 1);
-    
-//     for (let i = startRow; i <= maxRow; i++) {
-//       const row = sheetData[i];
-//       if (row) {
-//         const maxCol = Math.min(endCol, row.length - 1);
-//         const newRow = [];
-        
-//         for (let j = startCol; j <= maxCol; j++) {
-//           newRow.push(row[j] === undefined ? "" : row[j]);
-//         }
-        
-//         resultArray.push(newRow);
-//       } else {
-//         // Handle missing rows by adding empty rows
-//         resultArray.push(new Array(endCol - startCol + 1).fill(""));
-//       }
-//     }
-    
-//     return resultArray;
-//   } catch (error) {
-//     console.error("Error getting range data:", error);
-//     return [[]];
-//   }
-// }
-
-// // Optimized column letter to index conversion
-// function colToIndex(col) {
-//   let index = 0;
-//   const len = col.length;
-  
-//   for (let i = 0; i < len; i++) {
-//     index = index * 26 + (col.charCodeAt(i) - 64);
-//   }
-  
-//   return index - 1;
-// }
 
 async function combineArraysSingleCell(array1, array2) {
   try {
@@ -576,7 +438,7 @@ export function isValidRange(rangeStr) {
   return rangePattern.test(rangeStr);
 }
 
-export async function generateLongFormData(region) {
+export async function generateLongFormData(region,DataModelNameRange) {
   try {
     // Await the result from Excel.run and assign it to the variable 'data'
     const data = await Excel.run(async (context) => {
@@ -591,7 +453,7 @@ export async function generateLongFormData(region) {
 
       console.log("Fetching all sheet used ranges...");
       await loadWorkbookData();
-      let initialSheetData = workbookData;
+      // let initialSheetData = workbookData;
 
       if (!workbookData || Object.keys(workbookData).length === 0) {
         console.warn("No data found in the workbook.");
@@ -599,7 +461,7 @@ export async function generateLongFormData(region) {
       }
 
       console.log("Extracting level data...");
-      let extractedData = await extractLevelData();
+      let extractedData = await extractLevelData(DataModelNameRange);
       if (!extractedData || extractedData.length === 0) {
         console.warn("No extracted data available.");
         return []; // Return an empty array if no extracted data is available
@@ -762,17 +624,17 @@ export async function generateLongFormData(region) {
       const chunkSize = 50000; // Adjust based on performance testing
       App.suspendScreenUpdatingUntilNextSync();
 
-      let outputRange = flatFileSheet
-        .getRange("A1")
-        .getResizedRange(longFormData.length - 1, longFormData[0].length - 1);
-      outputRange.values = longFormData;
-      outputRange.format.autofitColumns();
-      outputRange.format.autofitRows();
-      // await context.sync();
-      console.timeEnd("writing data");
-      console.time("CSV Creation");
-      // Optionally create CSV here if needed
-      console.timeEnd("CSV Creation");
+      // let outputRange = flatFileSheet
+      //   .getRange("A1")
+      //   .getResizedRange(longFormData.length - 1, longFormData[0].length - 1);
+      // outputRange.values = longFormData;
+      // outputRange.format.autofitColumns();
+      // outputRange.format.autofitRows();
+      // // await context.sync();
+      // console.timeEnd("writing data");
+      // console.time("CSV Creation");
+      // // Optionally create CSV here if needed
+      // console.timeEnd("CSV Creation");
 
       console.log(`Data processed successfully. Final row count: ${currentRow - 1}`);
       // Return the longFormData array from within Excel.run
@@ -902,3 +764,108 @@ export function downloadExcelCSV(dataArray, fileName = "data.csv") {
     URL.revokeObjectURL(url);
   }, 1000);
 }
+
+
+export async function apiResponseToExcel(apiResponse, sheetName, startRange) {
+  await Excel.run(async (context) => {
+    // Set Excel calculation mode to manual to improve performance
+    context.workbook.application.calculation = Excel.CalculationMode.manual;
+
+    try {
+      // Get the workbook and worksheets collection
+      const worksheets = context.workbook.worksheets;
+      worksheets.load('items/name');
+      await context.sync();
+
+      // Check if the sheet exists in the workbook
+      const sheet = worksheets.items.find((item) => item.name === sheetName);
+      
+      if (!sheet) {
+        throw new Error(`Sheet "${sheetName}" does not exist in the workbook.`);
+      }
+
+      // Extract 'results1' from the API response
+      const results1 = apiResponse.results1;
+
+      // Ensure results1 is an array and has data
+      if (!Array.isArray(results1) || results1.length === 0) {
+        console.error("No valid data found in results1.");
+        return;
+      }
+
+      // Prepare data more efficiently
+      const headers = Object.keys(results1[0]);
+      const data = [
+        headers,
+        ...results1.map(item => headers.map(header => item[header]))
+      ];
+
+      // Clear the entire sheet before pasting new data
+      sheet.getRange("A1:Z1000").clear(); // Adjust range as needed
+
+      // Get the range starting from the given startRange
+      const range = sheet.getRange(startRange);
+      
+      // Set values in a single operation
+      const resizedRange = range.getResizedRange(data.length - 1, headers.length - 1);
+      resizedRange.values = data;
+
+      // Optional: Auto-fit columns for readability
+      resizedRange.format.autofitColumns();
+
+    } catch (error) {
+      console.error("Error writing to Excel:", error);
+    } finally {
+      // Set Excel calculation mode back to automatic
+      context.workbook.application.calculation = Excel.CalculationMode.automatic;
+
+      // Sync changes
+      await context.sync();
+    }
+  });
+}
+
+
+export async function readNamedRangeToArray(namedRangeName) {
+  console.log("Starting to read named range:", namedRangeName);
+  try {
+    return await Excel.run(async (context) => {
+      console.log("Excel context obtained.");
+
+      // Use the workbook's names collection for workbook-level named ranges
+      const names = context.workbook.names;
+      names.load("items/name");
+      await context.sync();
+
+      console.log("Available workbook names:", names.items.map(n => n.name));
+
+      let namedItem;
+      try {
+        namedItem = names.getItem(namedRangeName);
+        console.log(`Workbook-level named item "${namedRangeName}" found.`);
+      } catch (error) {
+        console.error(`Error: Workbook-level named item "${namedRangeName}" does not exist.`, error);
+        return [];
+      }
+
+      // Get the range associated with the named item
+      const range = namedItem.getRange();
+      range.load("values");
+      await context.sync();
+
+      const rangeValues = range.values;
+      if (!rangeValues || rangeValues.length === 0) {
+        console.error("No data found in the named range.");
+        return [];
+      }
+
+      console.log("Array created from named range:", rangeValues);
+      return rangeValues;
+    });
+  } catch (error) {
+    console.error("Error during Excel.run execution:", error);
+    return [];
+  }
+}
+
+

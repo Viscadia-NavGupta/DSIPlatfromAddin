@@ -15,6 +15,9 @@ import SaveForecastPageinterim from "./MainUIPages/MiscPages/SaveForecastPage";
 import LoadingCircleComponent from "./MainUIPages/MiscPages/LoadingCircle";
 import LoadScenario from "./MainUIPages/LoadScenarioPage/LoadScenario";
 import SaveandLockScenario from "./MainUIPages/Save and Lock/SaveandLockPage";
+import AggSaveScenario from "./MainUIPages/SaveScenario/SaveForecastPageAgg";
+import AGGForecastManagementPage from "./MainUIPages/ForecastManagementPage/AGGForecastManagementPage";
+import SaveScenarioActuals from "./MainUIPages/Save Actuals/saveactuals";
 
 function App() {
   const [page, setPage] = useState("UserLogin"); // Default page
@@ -31,40 +34,40 @@ function App() {
     try {
       console.log("Attempting login for:", username);
       setPageValue("LoadingCircleComponent", "Logging in...");
-      
+
       const response = await AWSConnections.AwsLogin(username, password);
       if (!response.AuthenticationResult) {
         console.error("Login failed: Invalid response.");
         setPageValue("UserLogin");
         return false;
       }
-      
+
       // Store critical tokens and update UI immediately
       localStorage.setItem("username", username);
       localStorage.setItem("accessToken", response.AuthenticationResult.AccessToken);
       localStorage.setItem("idToken", response.AuthenticationResult.IdToken);
-      
+
       // Update UI state immediately to improve perceived performance
       setIsLoggedIn(true);
       setPage("Home");
-      
+
       // Run these operations in parallel to improve performance
       Promise.all([
         // Only decode token if needed
         (async () => {
           const storedFirstName = localStorage.getItem("firstName");
           const storedLastName = localStorage.getItem("lastName");
-          
+
           if (storedFirstName && storedLastName) {
             setUserName(`${storedFirstName} ${storedLastName}`.trim());
             return;
           }
-          
+
           try {
             const decodedToken = await AWSConnections.decodeJwt(response.AuthenticationResult.IdToken);
             const firstName = decodedToken.name || "";
             const lastName = decodedToken.family_name || "";
-            
+
             localStorage.setItem("firstName", firstName);
             localStorage.setItem("lastName", lastName);
             setUserName(`${firstName} ${lastName}`.trim());
@@ -72,13 +75,13 @@ function App() {
             console.warn("Token decode error:", e);
           }
         })(),
-        
+
         // Store non-critical data
         (async () => {
           localStorage.setItem("password", password);
           localStorage.setItem("refreshToken", response.AuthenticationResult.RefreshToken);
         })(),
-        
+
         // Fetch additional user metadata in background
         (async () => {
           try {
@@ -88,7 +91,7 @@ function App() {
               "dsivis-dev-remaining-secrets",
               username
             );
-            
+
             if (metadata && metadata.user_id) {
               localStorage.setItem("User_ID", metadata.user_id);
             }
@@ -96,12 +99,12 @@ function App() {
             console.warn("Error fetching user metadata:", e);
             // Non-critical error - login can still proceed
           }
-        })()
-      ]).catch(err => {
+        })(),
+      ]).catch((err) => {
         console.warn("Background processes error:", err);
         // Non-critical error - user is already logged in
       });
-      
+
       return true;
     } catch (error) {
       console.error("Error during login:", error);
@@ -117,11 +120,11 @@ function App() {
   useEffect(() => {
     const initializeSession = async () => {
       console.log("Initializing session...");
-      
+
       // Check only essential tokens first
       const storedUsername = localStorage.getItem("username");
       const storedToken = localStorage.getItem("accessToken");
-      
+
       if (!storedUsername || !storedToken) {
         console.warn("User not logged in. Redirecting to login page.");
         localStorage.clear();
@@ -129,20 +132,20 @@ function App() {
         setPage("UserLogin");
         return;
       }
-      
+
       // Fast path: Update UI immediately
       console.log("User already logged in:", storedUsername);
       setIsLoggedIn(true);
       setPage("Home");
-      
+
       // Set user name from storage if available
       const storedFirstName = localStorage.getItem("firstName");
       const storedLastName = localStorage.getItem("lastName");
-      
+
       if (storedFirstName && storedLastName) {
         setUserName(`${storedFirstName} ${storedLastName}`.trim());
       }
-      
+
       // Optional: Validate token in background to ensure it's not expired
       (async () => {
         try {
@@ -155,7 +158,7 @@ function App() {
         }
       })();
     };
-    
+
     initializeSession();
   }, []);
 
@@ -226,8 +229,14 @@ function App() {
         return <LoadingCircleComponent message={loadingMessage} />;
       case "LoadScenario":
         return <LoadScenario setPageValue={setPageValue} />;
-        case "SaveandLockScenario":
-          return <SaveandLockScenario setPageValue={setPageValue} />;
+      case "SaveandLockScenario":
+        return <SaveandLockScenario setPageValue={setPageValue} />;
+      case "AggSaveScenario":
+        return <AggSaveScenario setPageValue={setPageValue} />;
+      case "SaveScenarioActuals":
+        return <SaveScenarioActuals setPageValue={setPageValue} />;
+      case "AGGForecastManagementPage":
+        return <AGGForecastManagementPage setPageValue={setPageValue} onBack={() => setPageValue("Home")} />;
       default:
         return <Home userName={userName} setPageValue={setPageValue} />;
     }
