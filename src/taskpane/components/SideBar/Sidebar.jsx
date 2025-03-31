@@ -20,16 +20,16 @@ const Sidebar = ({ setPageValue, currentPage, handleLogout }) => {
 
   const sidebarButtons = [
     { name: "Home", icon: <AiOutlineHome size={20} />, action: "Home" },
-    { name: "Model Management", icon: <ModelBuilder width={26} height={26} />, action: "ModelManagement" },
+    { name: "Model Management", icon: <ModelBuilder width={26} height={26} />, action: "InactiveFeaturea" },
     { name: "Forecast Management", icon: <ForecastManagement width={24} height={24} />, action: "ForecastManagement" },
     {
       name: "Assumptions Catalogue",
       icon: <AssumptionsCatalogue width={24} height={24} />,
-      action: "AssumptionsCatalogue",
+      action: "InactiveFeaturea",
     },
-    { name: "Risk & Analytics", icon: <RiskAnalytics width={24} height={24} />, action: "RiskAnalytics" },
-    { name: "Power BI Report", icon: <PowerBi width={24} height={24} />, action: "PowerBI" },
-    { name: "Report Genie", icon: <ReportGenie width={24} height={24} />, action: "ReportGenie" },
+    { name: "Risk & Analytics", icon: <RiskAnalytics width={24} height={24} />, action: "InactiveFeaturea" },
+    { name: "Power BI Report", icon: <PowerBi width={24} height={24} />, action: "InactiveFeaturea" },
+    { name: "Report Genie", icon: <ReportGenie width={24} height={24} />, action: "InactiveFeaturea" },
   ];
 
   const handleMouseEnter = (text, event) => {
