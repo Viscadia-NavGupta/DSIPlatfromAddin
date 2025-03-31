@@ -5,7 +5,7 @@
   <ProviderName>Viscadia</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue=" "/>
-  <Description DefaultValue="Click to Proceed"/>
+  <Description DefaultValue="Custom Forecasting Solution"/>
   <IconUrl DefaultValue="https://localhost:3000/assets/Viscadia_V_Logo.png"/>
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/Viscadia_V_Logo.png"/>
   <SupportUrl DefaultValue="https://viscadia.com/contact-us/"/>
