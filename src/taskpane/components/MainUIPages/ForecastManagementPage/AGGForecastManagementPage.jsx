@@ -145,7 +145,7 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
     {
       name: "Lock/Submit",
       icon: <CiLock size={buttonSize.iconSize} />,
-      action: () => setPageValue("SaveandLockScenario"),
+      action: () => setPageValue("AggLockScenario"),
       disabled: false,
     },
     {

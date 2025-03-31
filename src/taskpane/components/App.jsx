@@ -18,6 +18,7 @@ import SaveandLockScenario from "./MainUIPages/Save and Lock/SaveandLockPage";
 import AggSaveScenario from "./MainUIPages/SaveScenario/SaveForecastPageAgg";
 import AGGForecastManagementPage from "./MainUIPages/ForecastManagementPage/AGGForecastManagementPage";
 import SaveScenarioActuals from "./MainUIPages/Save Actuals/saveactuals";
+import AggLockScenario from "./MainUIPages/Save and Lock/SaveandLockPageAgg";
 
 function App() {
   const [page, setPage] = useState("UserLogin"); // Default page
@@ -231,6 +232,8 @@ function App() {
         return <LoadScenario setPageValue={setPageValue} />;
       case "SaveandLockScenario":
         return <SaveandLockScenario setPageValue={setPageValue} />;
+      case "AggLockScenario":
+        return <AggLockScenario setPageValue={setPageValue} />;
       case "AggSaveScenario":
         return <AggSaveScenario setPageValue={setPageValue} />;
       case "SaveScenarioActuals":
