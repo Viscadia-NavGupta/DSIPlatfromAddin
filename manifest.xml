@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="TaskPaneApp">
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" 
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" 
+           xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" 
+           xsi:type="TaskPaneApp">
   <Id>3c8d6ba6-25cf-49db-8023-90aa68094e6a</Id>
   <Version>1.0.0.1</Version>
   <ProviderName>Viscadia</ProviderName>
@@ -10,7 +14,7 @@
   <HighResolutionIconUrl DefaultValue="https://main.d3q39f7241n0r1.amplifyapp.com/assets/Viscadia_V_Logo.png"/>
   <SupportUrl DefaultValue="https://viscadia.com/contact-us/"/>
   <AppDomains>
-    <AppDomain>https://www.contoso.com</AppDomain>
+    <AppDomain>https://main.d3q39f7241n0r1.amplifyapp.com</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Workbook"/>
