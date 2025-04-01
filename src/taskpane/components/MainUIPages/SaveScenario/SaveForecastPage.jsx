@@ -38,20 +38,21 @@ const SaveScenario = ({ setPageValue }) => {
   //                       HELPER FUNCTIONS & CALLBACKS
   // =============================================================================
 
-  const checkScenarioExists = useCallback((modelId, cycleName, scenarioName) => {
-    const { dfResult1 } = dataFrames;
-    if (!dfResult1) {
-      console.warn("Result1 DataFrame is not loaded yet.");
-      return false;
-    }
-    const records = dfResult1.toCollection();
-    return records.some(
-      (record) =>
-        record.model_id === modelId &&
-        record.cycle_name === cycleName &&
-        record.scenario_name === scenarioName
-    );
-  }, [dataFrames]);
+  const checkScenarioExists = useCallback(
+    (modelId, cycleName, scenarioName) => {
+      const { dfResult1 } = dataFrames;
+      if (!dfResult1) {
+        console.warn("Result1 DataFrame is not loaded yet.");
+        return false;
+      }
+      const records = dfResult1.toCollection();
+      return records.some(
+        (record) =>
+          record.model_id === modelId && record.cycle_name === cycleName && record.scenario_name === scenarioName
+      );
+    },
+    [dataFrames]
+  );
 
   // Reads Excel cell values from the "cloud_backend_md" sheet.
   const checkofCloudBackendSheet = useCallback(async () => {
@@ -66,9 +67,7 @@ const SaveScenario = ({ setPageValue }) => {
         sheets.load("items/name");
         await context.sync();
 
-        const MetaDataSheet = sheets.items.find(
-          (sheet) => sheet.name.toLowerCase() === "cloud_backend_md"
-        );
+        const MetaDataSheet = sheets.items.find((sheet) => sheet.name.toLowerCase() === "cloud_backend_md");
 
         if (MetaDataSheet) {
           const sheet = MetaDataSheet;
@@ -79,7 +78,7 @@ const SaveScenario = ({ setPageValue }) => {
           };
 
           // Load all ranges together.
-          Object.values(ranges).forEach(range => range.load("values"));
+          Object.values(ranges).forEach((range) => range.load("values"));
           await context.sync();
 
           const ModelNameValue = ranges.ModelName.values[0][0] || "";
@@ -97,7 +96,6 @@ const SaveScenario = ({ setPageValue }) => {
           if (ModelTypeValue === "AGGREGATOR") {
             setPageValue("AggSaveScenario", "Loading scenario for Aggregator model...");
           }
-
         } else {
           console.log("⚠️ No Output Sheet Found.");
           setIsOutputSheet(false);
@@ -189,7 +187,10 @@ const SaveScenario = ({ setPageValue }) => {
 
     if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
       console.log("This scenario combination already exists.");
-      setPageValue("SaveForecastPageinterim", "Scenario name already in use");
+      setPageValue(
+        "SaveForecastPageinterim",
+        "Scenario names already exist in the database. Please choose a different scenario name."
+      );
       return;
     }
 
@@ -197,10 +198,10 @@ const SaveScenario = ({ setPageValue }) => {
       await excelfucntions.setCalculationMode("manual");
       console.time("Parallel processes");
 
-      const [longformData, _, outputbackend_data] = await Promise.all([ 
-        excelfucntions.generateLongFormData("US","DataModel"), // Ensure this is a promise
+      const [longformData, _, outputbackend_data] = await Promise.all([
+        excelfucntions.generateLongFormData("US", "DataModel"), // Ensure this is a promise
         inputfiles.saveData(), // Ensure this is a promise
-        excelfucntions.readNamedRangeToArray("aggregator_data") // Ensure correct named range without trailing space
+        excelfucntions.readNamedRangeToArray("aggregator_data"), // Ensure correct named range without trailing space
       ]);
 
       console.timeEnd("Parallel processes");
@@ -217,7 +218,11 @@ const SaveScenario = ({ setPageValue }) => {
         "",
         "",
         longformData,
-        outputbackend_data
+        outputbackend_data,
+        [],
+        [],
+        [],
+        setPageValue
       );
       console.timeEnd("save forecast");
 
@@ -225,13 +230,16 @@ const SaveScenario = ({ setPageValue }) => {
       setPageValue("LoadingCircleComponent", "100% | Saving your forecast...");
 
       if (saveFlag === "Saved Forecast" || (saveFlag && saveFlag.result === "DONE")) {
-        const message = `Forecast Scenario saved for Model: ${heading.replace("Save Scenario for:", "")} | Cycle: ${selectedCycle} | Scenario: ${scenarioName}`;
+        const message = `Forecast scenario saved for model: ${heading.replace("Save Scenario for:", "")} | Cycle: ${selectedCycle} | Scenario: ${scenarioName}`;
         setPageValue("SaveForecastPageinterim", message);
       } else if (
         saveFlag ===
         "A scenario of this name for the provided model and cycle details already exists, try with another one."
       ) {
-        setPageValue("SaveForecastPageinterim", "Scenario name already in use");
+        setPageValue(
+          "SaveForecastPageinterim",
+          "Scenario names already exist in the database. Please choose a different scenario name."
+        );
       } else if (saveFlag && saveFlag.result === "ERROR") {
         setPageValue("SaveForecastPageinterim", "Some Error Occurred, Please try again");
       }
@@ -251,10 +259,7 @@ const SaveScenario = ({ setPageValue }) => {
         <>
           <Heading>{heading}</Heading>
           <DropdownContainer>
-            <SelectDropdown
-              value={selectedCycle}
-              onChange={(e) => setSelectedCycle(e.target.value)}
-            >
+            <SelectDropdown value={selectedCycle} onChange={(e) => setSelectedCycle(e.target.value)}>
               <option value="" disabled>
                 Select Cycle
               </option>
@@ -275,17 +280,12 @@ const SaveScenario = ({ setPageValue }) => {
               onChange={(e) => setScenarioName(e.target.value)}
             />
           </DropdownContainer>
-          <SaveButton
-            onClick={handleSaveClick}
-            disabled={!selectedCycle || !scenarioName}
-          >
+          <SaveButton onClick={handleSaveClick} disabled={!selectedCycle || !scenarioName}>
             Save
           </SaveButton>
         </>
       ) : (
-        <MessageBox>
-          No Authorised model detected, please refresh the addin
-        </MessageBox>
+        <MessageBox>No Authorised model detected, please refresh the addin</MessageBox>
       )}
     </Container>
   );

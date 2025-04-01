@@ -211,7 +211,7 @@ const AggSaveScenario = ({ setPageValue }) => {
     let concatenatedArray;
     // Concatenate column 1 and column 7 from cloudLoadModelsList with a hyphen in between.
     if (cloudLoadModelsList && cloudLoadModelsList.length > 0) {
-       concatenatedArray = cloudLoadModelsList.map((row) => {
+      concatenatedArray = cloudLoadModelsList.map((row) => {
         // Assuming the named range returns a 2D array and using 1-indexed columns:
         // Column 1 -> index 0 and Column 7 -> index 6.
         if (row.length >= 7) {
@@ -226,7 +226,10 @@ const AggSaveScenario = ({ setPageValue }) => {
 
     if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
       console.log("This scenario combination already exists.");
-      setPageValue("SaveForecastPageinterim", "Scenario name already in use");
+      setPageValue(
+        "SaveForecastPageinterim",
+        "Scenario names already exist in the database. Please choose a different scenario name."
+      );
       return;
     }
 
@@ -255,7 +258,9 @@ const AggSaveScenario = ({ setPageValue }) => {
         longformData,
         "",
         "",
-        concatenatedArray
+        concatenatedArray,
+        [],
+        setPageValue
       );
       console.timeEnd("save forecast");
 
@@ -263,13 +268,16 @@ const AggSaveScenario = ({ setPageValue }) => {
       setPageValue("LoadingCircleComponent", "100% | Saving your forecast...");
 
       if (saveFlag === "Saved Forecast" || (saveFlag && saveFlag.result === "DONE")) {
-        const message = `Forecast Scenario saved for Model: ${heading.replace("Save Aggregator Scenario for: ", "")} | Cycle: ${selectedCycle} | Scenario: ${scenarioName}`;
+        const message = `Forecast scenario saved for model: ${heading.replace("Save Aggregator Scenario for: ", "")} | Cycle: ${selectedCycle} | Scenario: ${scenarioName}`;
         setPageValue("SaveForecastPageinterim", message);
       } else if (
         saveFlag ===
         "A scenario of this name for the provided model and cycle details already exists, try with another one."
       ) {
-        setPageValue("SaveForecastPageinterim", "Scenario name already in use");
+        setPageValue(
+          "SaveForecastPageinterim",
+          "Scenario names already exist in the database. Please choose a different scenario name."
+        );
       } else if (saveFlag && saveFlag.result === "ERROR") {
         setPageValue("SaveForecastPageinterim", "Some Error Occurred, Please try again");
       }

@@ -101,9 +101,11 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
       );
 
       // Use the API response and send it to Excel
+      Excelconnections.setCalculationMode("manual");
       await Excelconnections.apiResponseToExcel(responseBody, "cloud_backend_ds", "A1");
       console.log("Metadata synced to Excel");
       setPageValue("SaveForecastPageinterim", "Dropdowns synced with the latest scenario names from the data lake");
+      Excelconnections.setCalculationMode("automatic");
     } catch (error) {
       console.error("Error fetching metadata or syncing to Excel:", error);
     }
@@ -132,6 +134,7 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
       setPageValue
     );
     setPageValue("SaveForecastPageinterim", "Selected scenarios loaded successfully.");
+    Excelconnections.setCalculationMode("automatic");
     console.log(Aggmodeldata);
     console.log(Sheetnames);
     console.log(forecastIDs);
@@ -153,7 +156,7 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
       disabled: false,
     },
     {
-      name: "Save Actuals only",
+      name: "Save Actuals Only",
       icon: <MdOutlineSave size={buttonSize.iconSize} />,
       action: () => setPageValue("SaveScenarioActuals"),
       disabled: false,
@@ -162,7 +165,7 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
       name: "Load Aggregator ",
       icon: <MdSaveAlt size={buttonSize.iconSize} />,
       action: () => setPageValue("SaveScenarioActuals"),
-      disabled: false,
+      disabled: true,
     },
   ];
 

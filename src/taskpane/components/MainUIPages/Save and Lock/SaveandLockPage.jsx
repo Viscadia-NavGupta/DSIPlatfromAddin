@@ -200,7 +200,7 @@ const SaveandLockScenario = ({ setPageValue }) => {
 
     if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
       console.log("This scenario combination already exists.");
-      setPageValue("SaveForecastPageinterim", "Scenario name already in use, please use a diffrent scenario name");
+      setPageValue("SaveForecastPageinterim", "Scenario names already exist in the database. Please choose a different scenario name.");
       return;
     }
 
@@ -234,13 +234,15 @@ const SaveandLockScenario = ({ setPageValue }) => {
       setPageValue("LoadingCircleComponent", "100% | Saving your forecast...");
 
       if (saveFlag === "Saved Locked Forecast" || (saveFlag && saveFlag.result === "DONE")) {
-        const message = `Forecast Scenario saved & Locked for Model: ${heading.replace("Save & Lock Aggregator Scenario for: ", "")} | Cycle: ${selectedCycle} | Scenario: ${scenarioName}`;
+        
+        const message = `Forecast scenario saved & locked for Model: ${heading.replace("Save & Lock Aggregator Scenario for: ", "")} | Cycle: ${selectedCycle} | Scenario: ${scenarioName}`;
+        
         setPageValue("SaveForecastPageinterim", message);
       } else if (
         saveFlag ===
         "A scenario of this name for the provided model and cycle details already exists, try with another one."
       ) {
-        setPageValue("SaveForecastPageinterim", "Scenario name already in use");
+        setPageValue("SaveForecastPageinterim", "Scenario names already exist in the database. Please choose a different scenario name.");
       } else if (saveFlag && saveFlag.result === "ERROR") {
         setPageValue("SaveForecastPageinterim", "Some Error Occurred, Please try again");
       }

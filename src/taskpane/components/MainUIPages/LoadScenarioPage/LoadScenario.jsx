@@ -14,6 +14,7 @@ import {
 } from "./Loadscenariostyles";
 import * as AWSconnections from "../../Middleware/AWSConnections";
 import * as InputfileConnections from "../../Middleware/inputfile";
+import * as excelconnections from "../../Middleware/ExcelConnection";
 
 const LoadScenario = ({ setPageValue }) => {
   const [modelIDValue, setModelIDValue] = useState("");
@@ -23,9 +24,9 @@ const LoadScenario = ({ setPageValue }) => {
   const [heading, setHeading] = useState("Active Sheet Name");
   const [isOutputSheet, setIsOutputSheet] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [metadataLoaded, setMetadataLoaded] = useState(false); // Track metadata loading
+  const [metadataLoaded, setMetadataLoaded] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
 
-  // Add warnings state
   const [warnings, setWarnings] = useState({
     saveStatus: false,
     cycle: false,
@@ -74,7 +75,6 @@ const LoadScenario = ({ setPageValue }) => {
     }
   }, [modelIDValue]);
 
-  // Update dropdown options when selections change
   useEffect(() => {
     if (fullData.length > 0) {
       updateDropdownOptions();
@@ -83,9 +83,7 @@ const LoadScenario = ({ setPageValue }) => {
 
   const checkofCloudBackendSheet = async () => {
     try {
-      console.log("📊 Checking for Output Sheet...");
       if (typeof window.Excel === "undefined") {
-        console.error("🚨 Excel API is not available.");
         setLoading(false);
         return;
       }
@@ -111,15 +109,13 @@ const LoadScenario = ({ setPageValue }) => {
           setHeading(`Import Scenario for: ${ModelNameValue}`);
           setIsOutputSheet(true);
           setModelIDValue(ModelIDValue);
-          console.log("✅ Model ID Fetched:", ModelIDValue);
         } else {
-          console.log("⚠️ No Output Sheet Found.");
           setIsOutputSheet(false);
         }
         setLoading(false);
       });
     } catch (error) {
-      console.error("🚨 Error checking for Outputs sheet:", error);
+      console.error("Error checking sheet:", error);
       setIsOutputSheet(false);
       setLoading(false);
     }
@@ -127,8 +123,7 @@ const LoadScenario = ({ setPageValue }) => {
 
   const fetchDataFromLambda = async () => {
     try {
-      console.log("📤 Fetching Data from Lambda...");
-      setMetadataLoaded(false); // Mark metadata as loading
+      setMetadataLoaded(false);
       const responseBody = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
@@ -138,144 +133,104 @@ const LoadScenario = ({ setPageValue }) => {
       );
 
       if (!responseBody || !responseBody.results1) {
-        throw new Error("❌ No results1 found in Lambda response.");
+        throw new Error("No results1 found");
       }
-
-      console.log("✅ Full Metadata Response:", responseBody.results1);
 
       const filteredData = responseBody.results1.filter((row) => row.model_id === modelIDValue);
       setFullData(filteredData);
-      
-      // Initialize with all available options
+
       setFilteredSaveStatus([...new Set(filteredData.map((row) => row.save_status).filter(Boolean))]);
       setFilteredCycles([...new Set(filteredData.map((row) => row.cycle_name).filter(Boolean))]);
       setFilteredScenarios([...new Set(filteredData.map((row) => row.scenario_name).filter(Boolean))]);
 
-      setMetadataLoaded(true); // Mark metadata as fully loaded
+      setMetadataLoaded(true);
     } catch (error) {
-      console.error("🚨 Error fetching data from Lambda:", error);
-      setMetadataLoaded(true); // Ensure dropdowns do not stay stuck
+      console.error("Error fetching metadata:", error);
+      setMetadataLoaded(true);
     }
   };
 
   const updateDropdownOptions = () => {
-    // Start with the full dataset
     let filteredData = [...fullData];
 
-    // Apply filters based on current selections
-    if (saveStatus) {
-      filteredData = filteredData.filter((row) => row.save_status === saveStatus);
-    }
-    
-    if (selectedCycle) {
-      filteredData = filteredData.filter((row) => row.cycle_name === selectedCycle);
-    }
-    
-    if (selectedScenario) {
-      filteredData = filteredData.filter((row) => row.scenario_name === selectedScenario);
-    }
+    if (saveStatus) filteredData = filteredData.filter((row) => row.save_status === saveStatus);
+    if (selectedCycle) filteredData = filteredData.filter((row) => row.cycle_name === selectedCycle);
+    if (selectedScenario) filteredData = filteredData.filter((row) => row.scenario_name === selectedScenario);
 
-    // Update dropdown options based on the filtered data
     if (!saveStatus) {
       setFilteredSaveStatus([...new Set(filteredData.map((row) => row.save_status).filter(Boolean))]);
     }
-    
     if (!selectedCycle) {
       setFilteredCycles([...new Set(filteredData.map((row) => row.cycle_name).filter(Boolean))]);
     }
-    
     if (!selectedScenario) {
       setFilteredScenarios([...new Set(filteredData.map((row) => row.scenario_name).filter(Boolean))]);
     }
   };
 
   const handleSelect = (key, value) => {
-    // Reset other selections when changing a dropdown
     if (key === "saveStatus") {
       setSaveStatus(value);
-      // Only reset the other values if they don't exist in the filtered data
       const filteredBySaveStatus = fullData.filter(row => row.save_status === value);
       const availableCycles = [...new Set(filteredBySaveStatus.map(row => row.cycle_name))];
       const availableScenarios = [...new Set(filteredBySaveStatus.map(row => row.scenario_name))];
-      
-      if (!availableCycles.includes(selectedCycle)) {
-        setSelectedCycle(null);
-      }
-      
-      if (!availableScenarios.includes(selectedScenario)) {
-        setSelectedScenario(null);
-      }
-    } 
-    
+      if (!availableCycles.includes(selectedCycle)) setSelectedCycle(null);
+      if (!availableScenarios.includes(selectedScenario)) setSelectedScenario(null);
+    }
+
     if (key === "cycle") {
       setSelectedCycle(value);
-      // Filter based on current saveStatus and new cycle
-      const filteredByCycle = fullData.filter(row => 
-        (!saveStatus || row.save_status === saveStatus) && 
-        row.cycle_name === value
+      const filteredByCycle = fullData.filter(row =>
+        (!saveStatus || row.save_status === saveStatus) && row.cycle_name === value
       );
       const availableScenarios = [...new Set(filteredByCycle.map(row => row.scenario_name))];
-      
-      if (!availableScenarios.includes(selectedScenario)) {
-        setSelectedScenario(null);
-      }
+      if (!availableScenarios.includes(selectedScenario)) setSelectedScenario(null);
     }
-    
+
     if (key === "scenario") {
       setSelectedScenario(value);
     }
-    
+
     setDropdownOpen((prev) => ({ ...prev, [key]: false }));
   };
 
-  const handleImportClick = async () => {
-    console.log("🚀 Import Scenario button clicked!");
-    console.log("✅ Current State Before Warnings:");
-    console.log(" - saveStatus:", saveStatus);
-    console.log(" - selectedCycle:", selectedCycle);
-    console.log(" - selectedScenario:", selectedScenario);
+  const increaseProgressDuringExport = async () => {
+    for (let i = 55; i <= 95; i += 5) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setImportProgress(i);
+      setPageValue("LoadingCircleComponent", `${i}% | Importing assumptions...`);
+    }
+  };
 
-    let newWarnings = {
+  const handleImportClick = async () => {
+    const newWarnings = {
       saveStatus: !saveStatus,
       cycle: !selectedCycle,
       scenario: !selectedScenario,
     };
     setWarnings(newWarnings);
-    console.log("⚠️ Warnings Set:", newWarnings);
-
-    if (!saveStatus || !selectedCycle || !selectedScenario) {
-      console.warn("🚨 Import failed: One or more dropdowns are empty.");
-      return;
-    }
-
-    console.log("✅ Selected values are valid. Proceeding with data processing...");
-
-    if (fullData.length === 0) {
-      console.warn("⚠️ fullData is empty. No data available for filtering.");
-      return;
-    }
+    if (!saveStatus || !selectedCycle || !selectedScenario) return;
 
     const forecastIdArray = fullData
-      .filter(
-        (row) =>
-          row.save_status === saveStatus &&
-          row.cycle_name === selectedCycle &&
-          row.scenario_name === selectedScenario
+      .filter(row =>
+        row.save_status === saveStatus &&
+        row.cycle_name === selectedCycle &&
+        row.scenario_name === selectedScenario
       )
-      .map((row) => row.forecast_id.replace("forecast_", ""));
+      .map(row => row.forecast_id.replace("forecast_", ""));
 
-    console.log("📌 Extracted Forecast IDs:", forecastIdArray);
+    if (forecastIdArray.length === 0) return;
 
-    if (forecastIdArray.length === 0) {
-      console.warn("⚠️ No matching forecast IDs found.");
-      return;
+    // Step 1: Simulate 0–50% progress
+    setImportProgress(0);
+    for (let i = 0; i <= 50; i += 10) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      setPageValue("LoadingCircleComponent", `${i}% | Importing scenario...`);
+      setImportProgress(i);
     }
-
-    console.log("⏳ Importing scenario...");
-    setPageValue("LoadingCircleComponent", "0% | Importing Scenario...");
-
+    excelconnections.setCalculationMode("manual");
     try {
-      let Downloadflag = await AWSconnections.service_orchestration(
+      const Downloadflag = await AWSconnections.service_orchestration(
         "IMPORT_ASSUMPTIONS",
         "",
         modelIDValue,
@@ -286,20 +241,30 @@ const LoadScenario = ({ setPageValue }) => {
         forecastIdArray
       );
 
-      console.log("🛠 API Response:", Downloadflag);
-
       if (Downloadflag && Downloadflag.status === "Scenario Imported") {
-        await InputfileConnections.exportData2();
-        setPageValue("LoadingCircleComponent", "75% | Importing data...");
+        // Step 2: Update message and begin increasing progress
+        setPageValue("LoadingCircleComponent", "55% | Importing assumptions...");
+        setImportProgress(55);
 
-        console.log("✅ Scenario Imported Successfully!");
-        const message = `Forecast Scenario imported for Model: ${heading.replace("Import Scenario for: ", "")} | Cycle: ${selectedCycle} | Scenario: ${selectedScenario}`;
+        const progressPromise = increaseProgressDuringExport();
+
+        await InputfileConnections.exportData2();
+
+        await progressPromise;
+
+        // Step 3: Complete at 100%
+        setImportProgress(100);
+        setPageValue("LoadingCircleComponent", "100% | Import completed");
+
+        const message = `Forecast scenario imported for Model: ${heading.replace("Import Scenario for: ", "")} | Cycle: ${selectedCycle} | Scenario: ${selectedScenario}`;
         setPageValue("SaveForecastPageinterim", message);
+        excelconnections.setCalculationMode("automatic");
+
       } else {
-        console.error("🚨 Scenario Import Failed:", Downloadflag);
+        console.error("Scenario Import Failed:", Downloadflag);
       }
     } catch (error) {
-      console.error("🚨 Error calling service_orchestration:", error);
+      console.error("Error during import:", error);
     }
   };
 
@@ -311,70 +276,37 @@ const LoadScenario = ({ setPageValue }) => {
         <>
           <Heading>{heading}</Heading>
           <DropdownContainer>
-            <CustomDropdown ref={dropdownRefs.saveStatus}>
-              <DropdownButton 
-                onClick={() => setDropdownOpen({ ...dropdownOpen, saveStatus: !dropdownOpen.saveStatus })}
-                style={warnings.saveStatus ? { border: '1px solid red' } : {}}
-              >
-                {saveStatus || "Select Save Status"}
-                <DropdownArrow>
-                  <RiArrowDropDownLine size={24} />
-                </DropdownArrow>
-              </DropdownButton>
-              {dropdownOpen.saveStatus && (
-                <DropdownList>
-                  {filteredSaveStatus.map((status, idx) => (
-                    <DropdownItem key={idx} onClick={() => handleSelect("saveStatus", status)}>
-                      {status}
-                    </DropdownItem>
-                  ))}
-                </DropdownList>
-              )}
-            </CustomDropdown>
-
-            <CustomDropdown ref={dropdownRefs.cycle}>
-              <DropdownButton 
-                onClick={() => setDropdownOpen({ ...dropdownOpen, cycle: !dropdownOpen.cycle })}
-                style={warnings.cycle ? { border: '1px solid red' } : {}}
-              >
-                {selectedCycle || "Select Cycle"}
-                <DropdownArrow>
-                  <RiArrowDropDownLine size={24} />
-                </DropdownArrow>
-              </DropdownButton>
-              {dropdownOpen.cycle && (
-                <DropdownList>
-                  {filteredCycles.map((cycle, idx) => (
-                    <DropdownItem key={idx} onClick={() => handleSelect("cycle", cycle)}>
-                      {cycle}
-                    </DropdownItem>
-                  ))}
-                </DropdownList>
-              )}
-            </CustomDropdown>
-
-            <CustomDropdown ref={dropdownRefs.scenario}>
-              <DropdownButton 
-                onClick={() => setDropdownOpen({ ...dropdownOpen, scenario: !dropdownOpen.scenario })}
-                style={warnings.scenario ? { border: '1px solid red' } : {}}
-              >
-                {selectedScenario || "Select Scenario"}
-                <DropdownArrow>
-                  <RiArrowDropDownLine size={24} />
-                </DropdownArrow>
-              </DropdownButton>
-              {dropdownOpen.scenario && (
-                <DropdownList>
-                  {filteredScenarios.map((scenario, idx) => (
-                    <DropdownItem key={idx} onClick={() => handleSelect("scenario", scenario)}>
-                      {scenario}
-                    </DropdownItem>
-                  ))}
-                </DropdownList>
-              )}
-            </CustomDropdown>
+            {["saveStatus", "cycle", "scenario"].map((key) => (
+              <CustomDropdown key={key} ref={dropdownRefs[key]}>
+                <DropdownButton
+                  onClick={() => setDropdownOpen({ ...dropdownOpen, [key]: !dropdownOpen[key] })}
+                  style={warnings[key] ? { border: "1px solid red" } : {}}
+                >
+                  {{
+                    saveStatus: saveStatus || "Select Save Status",
+                    cycle: selectedCycle || "Select Cycle",
+                    scenario: selectedScenario || "Select Scenario",
+                  }[key]}
+                  <DropdownArrow>
+                    <RiArrowDropDownLine size={24} />
+                  </DropdownArrow>
+                </DropdownButton>
+                {dropdownOpen[key] && (
+                  <DropdownList>
+                    {{
+                      saveStatus: filteredSaveStatus,
+                      cycle: filteredCycles,
+                      scenario: filteredScenarios,
+                    }[key].map((item, idx) => (
+                      <DropdownItem key={idx} onClick={() => handleSelect(key, item)}>
+                        {item}
+                      </DropdownItem>
+                    ))}
+                  </DropdownList>
+                )}
+              </CustomDropdown>
+            ))}
           </DropdownContainer>
-
           <SaveButton onClick={handleImportClick}>Import Scenario</SaveButton>
         </>
       ) : (

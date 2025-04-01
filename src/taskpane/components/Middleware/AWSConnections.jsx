@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from "uuid"; // UUID Generator for request tracking
 import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
 import Papa from "papaparse";
+import * as Excelconnections from "./ExcelConnection";
 
 // =============================================================================
 //                         CONFIGURATION CONSTANTS
@@ -630,43 +631,55 @@ export async function service_orchestration(
           console.log("⏱️ Service request requires polling");
           pollingResult = await poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
         }
+        
 
         // Now, for each element in matchedForecasts, send a service request
         if (buttonname === "SAVE_LOCKED_FORECAST_AGG") {
-          if (matchedForecasts && matchedForecasts.length > 0) {
-            for (const match of matchedForecasts) {
-              try {
-                // Extract new UUID from the forecast_id by removing the "forecast_" prefix.
-                const newUUID = match.forecast_id.replace("forecast_", "");
-                // Use the model_id from the matched forecast as the new Model_UUID.
-                const newModelUUID = match.model_id;
-                const UUID_Generated = [uuidv4()];
-
-                // Send the service request for this matched forecast.
-                const matchStatus = await servicerequest(
-                  serviceorg_URL,
-                  "LOCK_FORECAST",
-                  UUID_Generated[0],
-                  "",
-                  idToken,
-                  CONFIG.AWS_SECRETS_NAME,
-                  User_Id,
-                  "",
-                  "",
-                  [],
-                  newUUID
-                );
-
-                console.log(`Service status for matched forecast ${match.forecast_id}:`, matchStatus);
-
-                // Check if polling is required for this matched forecast.
-                if (matchStatus === "Endpoint request timed out" || (matchStatus && matchStatus.status === "Poll")) {
-                  console.log("⏱️ Service request requires polling");
-                  await poll(newUUID, CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
-                }
-              } catch (error) {
-                console.error("Error processing matched forecast", match, error);
+          let completedCount = 0;
+          const totalCount = matchedForecasts?.length || 0;
+        
+          for (const [index, match] of matchedForecasts.entries()) {
+            try {
+              const newUUID = match.forecast_id.replace("forecast_", "");
+              const newModelUUID = match.model_id;
+              const UUID_Generated = [uuidv4()];
+        
+              const matchStatus = await servicerequest(
+                serviceorg_URL,
+                "LOCK_FORECAST",
+                UUID_Generated[0],
+                "",
+                idToken,
+                CONFIG.AWS_SECRETS_NAME,
+                User_Id,
+                "",
+                "",
+                [],
+                newUUID
+              );
+        
+              console.log(`Service status for matched forecast ${match.forecast_id}:`, matchStatus);
+        
+              let success = false;
+        
+              if (matchStatus === "Forecast is already locked" || matchStatus === "Forecast locked successfully") {
+                success = true;
               }
+        
+              if (matchStatus === "Endpoint request timed out" || (matchStatus && matchStatus.status === "Poll")) {
+                console.log("⏱️ Service request requires polling");
+                await poll(newUUID, CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+                success = true;
+              }
+        
+              if (success) {
+                completedCount++;
+                const progressPercent = 60 + Math.round((completedCount / totalCount) * 30); // max 90%
+                setPageValue("LoadingCircleComponent", `${progressPercent}% | Saving your forecast...`);
+              }
+        
+            } catch (error) {
+              console.error("Error processing matched forecast", match, error);
             }
           }
         }
@@ -1308,3 +1321,24 @@ async function pasteArrayToNamedRange(arrayData, namedRangeName) {
     console.error("❌ Error: " + error);
   });
 }
+
+export const sync_MetaData_AGG = async (setPageValue) => {
+  console.log("Update Actuals button clicked");
+  setPageValue("LoadingCircleComponent", "Syncing data...");
+
+  try {
+    const responseBody = await FetchMetaData(
+      "FETCH_METADATA",
+      localStorage.getItem("idToken"),
+      "DSI-prod-remaining-secrets",
+      localStorage.getItem("User_ID"),
+      localStorage.getItem("username")
+    );
+
+    await Excelconnections.apiResponseToExcel(responseBody, "cloud_backend_ds", "A1");
+    console.log("Metadata synced to Excel");
+    setPageValue("SaveForecastPageinterim", "Dropdowns synced with the latest scenario names from the data lake");
+  } catch (error) {
+    console.error("Error fetching metadata or syncing to Excel:", error);
+  }
+};
