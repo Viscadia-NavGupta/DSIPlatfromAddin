@@ -56,6 +56,13 @@ const HomePage = ({ userName, setPageValue }) => {
     };
   }, [updateSize]);
 
+    const handleOpenGoogle = () => {
+      window.open(
+        "https://app.powerbi.com/groups/5f778f17-6aed-419d-bb6d-b4244c56e0c6/reports/8b257c96-8118-4567-a76a-fd4e85f95414?ctid=c05372cf-28bd-4caf-83dd-e8b65c066ce9&pbi_source=linkShare&bookmarkGuid=d2156673-7b73-41df-8c5d-b2deaeac2f6a",
+        "_blank"
+      );
+    };
+
   const buttons = [
     {
       name: "Model Management",
@@ -84,8 +91,8 @@ const HomePage = ({ userName, setPageValue }) => {
     {
       name: "Power BI Report",
       icon: <PowerBi width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-      action: () => setPageValue("PowerBIReport"),
-      disabled: true,
+      action: () => handleOpenGoogle(),
+      disabled: false,
     },
     {
       name: "Report Genie",
