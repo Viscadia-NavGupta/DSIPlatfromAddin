@@ -624,17 +624,17 @@ export async function generateLongFormData(region,DataModelNameRange) {
       const chunkSize = 50000; // Adjust based on performance testing
       App.suspendScreenUpdatingUntilNextSync();
 
-      // let outputRange = flatFileSheet
-      //   .getRange("A1")
-      //   .getResizedRange(longFormData.length - 1, longFormData[0].length - 1);
-      // outputRange.values = longFormData;
-      // outputRange.format.autofitColumns();
-      // outputRange.format.autofitRows();
-      // // await context.sync();
-      // console.timeEnd("writing data");
-      // console.time("CSV Creation");
-      // // Optionally create CSV here if needed
-      // console.timeEnd("CSV Creation");
+      let outputRange = flatFileSheet
+        .getRange("A1")
+        .getResizedRange(longFormData.length - 1, longFormData[0].length - 1);
+      outputRange.values = longFormData;
+      outputRange.format.autofitColumns();
+      outputRange.format.autofitRows();
+      // await context.sync();
+      console.timeEnd("writing data");
+      console.time("CSV Creation");
+      // Optionally create CSV here if needed
+      console.timeEnd("CSV Creation");
 
       console.log(`Data processed successfully. Final row count: ${currentRow - 1}`);
       // Return the longFormData array from within Excel.run
