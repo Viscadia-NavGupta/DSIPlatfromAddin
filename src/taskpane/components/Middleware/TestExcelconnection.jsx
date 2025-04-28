@@ -781,3 +781,115 @@ export async function setCalculationMode(mode) {
     console.error("Error setting calculation mode:", error);
   }
 }
+
+export async function pivotUpFlatFileToAC() {
+  try {
+    console.log("\u23F3 Starting scalable pivot-up with RowType after level-15...");
+
+    await Excel.run(async (context) => {
+      const sheet = context.workbook.worksheets.getItem("Flat File");
+      const targetSheet = context.workbook.worksheets.getItem("AC");
+
+      const rowLimit = 10000;
+      let startRow = 0;
+      let flatData = [];
+      let hasMore = true;
+
+      while (hasMore) {
+        const range = sheet.getRangeByIndexes(startRow, 0, rowLimit, 50);
+        range.load("values");
+        await context.sync();
+
+        const rows = range.values;
+        const isEmpty = rows.every(row => row.every(cell => cell === null || cell === ""));
+
+        if (isEmpty) {
+          hasMore = false;
+          break;
+        }
+
+        flatData = flatData.concat(rows);
+        console.log(`📦 Loaded ${rows.length} rows from rows ${startRow + 1} to ${startRow + rows.length}`);
+        startRow += rowLimit;
+      }
+
+      if (flatData.length < 2) {
+        console.warn("⚠️ Not enough rows to pivot.");
+        return;
+      }
+
+      const headers = flatData[0];
+      const dataRows = flatData.slice(1);
+
+      const timelineIndex = headers.indexOf("timeline");
+      const valueIndex = headers.indexOf("value");
+
+      const groupedMap = new Map();
+
+      for (let row of dataRows) {
+        const key = row.slice(0, 19).join("||");
+        if (!groupedMap.has(key)) groupedMap.set(key, []);
+        groupedMap.get(key).push(row);
+      }
+
+      let currentRow = 0;
+
+      // Prepare dummy timeline headers (optional to adjust size dynamically later)
+      const dummyTimelineHeaders = ["Timeline1", "Timeline2", "Timeline3", "..."];
+
+      // Write the top global header (optional, or you can skip it if Flat File already has)
+      const fixedColumns = headers.slice(0, 19);
+      const headerRow = fixedColumns.concat(["RowType"]).concat(dummyTimelineHeaders);
+      const headerRange = targetSheet.getRangeByIndexes(currentRow, 0, 1, headerRow.length);
+      headerRange.values = [headerRow];
+      currentRow += 1;
+
+      for (let [key, rows] of groupedMap.entries()) {
+        const base = key.split("||");
+        const timelines = rows.map(r => r[timelineIndex]);
+        const values = rows.map(r => r[valueIndex]);
+
+        const timelineHeaders = [];
+        const timelineValues = [];
+        const seen = new Set();
+        let missingCounter = 1;
+
+        for (let i = 0; i < timelines.length; i++) {
+          let tl = timelines[i];
+          if (tl == null || tl === "") {
+            tl = missingCounter++;
+          }
+
+          if (!seen.has(tl)) {
+            seen.add(tl);
+            timelineHeaders.push(tl);
+            timelineValues.push(values[i]);
+            if (timelineHeaders.length > 1000) break;
+          }
+        }
+
+        const finalHeaderRow = base.concat(["Timeline"]).concat(timelineHeaders);
+        const finalValueRow = base.concat(["Value"]).concat(timelineValues);
+
+        if (finalHeaderRow.length !== finalValueRow.length) {
+          console.warn(`⚠️ Column mismatch at row ${currentRow}`);
+          continue;
+        }
+
+        const headerRowRange = targetSheet.getRangeByIndexes(currentRow, 0, 1, finalHeaderRow.length);
+        const valueRowRange = targetSheet.getRangeByIndexes(currentRow + 1, 0, 1, finalValueRow.length);
+
+        headerRowRange.values = [finalHeaderRow];
+        valueRowRange.values = [finalValueRow];
+
+        currentRow += 2; // move down by 2 after each group
+        console.log(`🔁 Processed group at row ${currentRow}`);
+      }
+
+      await context.sync();
+      console.log("✅ Pivot-up with RowType after 19 columns complete.");
+    });
+  } catch (error) {
+    console.error("❌ Error during pivot-up:", error);
+  }
+}
