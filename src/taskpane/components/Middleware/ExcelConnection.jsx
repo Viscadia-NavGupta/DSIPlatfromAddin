@@ -161,6 +161,8 @@ export async function loadWorkbookData() {
       
       // Single sync call to get all used range addresses
       await context.sync();
+      // console.log(sheetNames);
+      // console.log(rangesToLoad);
       
       // Second pass: create expanded ranges from A1 and load values
       const expandedRanges = [];

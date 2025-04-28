@@ -19,6 +19,7 @@ import ReportGenie from "../Icons/ReportGenie";
 import RiskAnalytics from "../Icons/Risk&Analytics";
 import * as excelconnections from "../Middleware/ExcelConnection";
 import * as inputfuncitons from "../Middleware/inputfile";
+import * as ACCode from "../Middleware/TestExcelconnection";
 
 const HomePage = ({ userName, setPageValue }) => {
   const [buttonSize, setButtonSize] = useState({
@@ -85,8 +86,8 @@ const HomePage = ({ userName, setPageValue }) => {
     {
       name: "Risk & Analytics",
       icon: <RiskAnalytics width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-      action: () => setPageValue("RiskAnalytics"),
-      disabled: true,
+      action: () => ACCode.pivotUpFlatFileToAC(),
+      disabled: false,
     },
     {
       name: "Power BI Report",
