@@ -89,7 +89,7 @@ function App() {
             const metadata = await AWSConnections.AuthorizationData(
               "LOGIN",
               response.AuthenticationResult.IdToken,
-              "DSI-prod-remaining-secrets",
+              "dsivis-dev-remaining-secret",
               username
             );
 

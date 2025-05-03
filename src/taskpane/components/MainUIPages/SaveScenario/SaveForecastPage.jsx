@@ -113,7 +113,7 @@ const SaveScenario = ({ setPageValue }) => {
       const responseBody = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
-        "DSI-prod-remaining-secrets",
+        "dsivis-dev-remaining-secret",
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );

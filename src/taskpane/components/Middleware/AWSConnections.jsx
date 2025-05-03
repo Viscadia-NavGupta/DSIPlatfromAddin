@@ -9,11 +9,11 @@ import * as Excelconnections from "./ExcelConnection";
 // =============================================================================
 const CONFIG = {
   COGNITO: {
-    URL: "https://cognito-idp.us-east-2.amazonaws.com/",
-    CLIENT_ID: "5d9qolco5mqc2bm9o5jjpe78la",
+    URL: "https://cognito-idp.us-east-1.amazonaws.com/",
+    CLIENT_ID: "47ht7bakkhf3k89enj23581vcd",
   },
-  AUTH_URL: "https://j58gb5s8ta.execute-api.us-east-2.amazonaws.com/prod/sqldbquery",
-  AWS_SECRETS_NAME: "DSI-prod-remaining-secrets",
+  AUTH_URL: "https://tj67lue8y7.execute-api.us-east-1.amazonaws.com/dev/sqldbquery",
+  AWS_SECRETS_NAME: "dsivis-dev-remaining-secret",
   POLLING: {
     MAX_ATTEMPTS: 100,
     DELAY_MS: 5000, // Fixed delay; consider exponential backoff if needed.
@@ -1330,7 +1330,7 @@ export const sync_MetaData_AGG = async (setPageValue) => {
     const responseBody = await FetchMetaData(
       "FETCH_METADATA",
       localStorage.getItem("idToken"),
-      "DSI-prod-remaining-secrets",
+      "dsivis-dev-remaining-secret",
       localStorage.getItem("User_ID"),
       localStorage.getItem("username")
     );
