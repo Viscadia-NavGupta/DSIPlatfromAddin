@@ -12,6 +12,7 @@ import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
 import * as excelfucntions from "../../Middleware/ExcelConnection";
 import * as inputfiles from "../../Middleware/inputfile";
+import CONFIG from "../../Middleware/AWSConnections";
 
 const AggSaveScenario = ({ setPageValue }) => {
   // =============================================================================
@@ -123,7 +124,7 @@ const AggSaveScenario = ({ setPageValue }) => {
       const responseBody = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
-        "dsivis-dev-remaining-secret",
+        "CONFIG.AWS_SECRETS_NAME",
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );
@@ -296,7 +297,7 @@ const AggSaveScenario = ({ setPageValue }) => {
   return (
     <Container>
       {loading ? (
-        <MessageBox>Loading, please wait...</MessageBox>
+        <MessageBox>Checking cloud compatibility, please wait...</MessageBox>
       ) : isOutputSheet ? (
         <>
           <Heading>{heading}</Heading>

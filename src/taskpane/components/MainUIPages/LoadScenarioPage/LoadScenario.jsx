@@ -271,7 +271,7 @@ const LoadScenario = ({ setPageValue }) => {
   return (
     <Container>
       {loading || !metadataLoaded ? (
-        <MessageBox>Loading, please wait...</MessageBox>
+        <MessageBox>Checking cloud compatibility, please wait...</MessageBox>
       ) : isOutputSheet ? (
         <>
           <Heading>{heading}</Heading>

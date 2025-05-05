@@ -1,5 +1,6 @@
 // app.js
 import React, { useState, useEffect } from "react";
+import CONFIG from "./Middleware/AWSConnections";
 import UserLogin from "./LoginPage/UserLogin";
 import ForgotPassword from "./ForgotPasswordPage/ForgotPasswordPage";
 import ContactUs from "./ContactUs/ContactUs";
@@ -89,7 +90,7 @@ function App() {
             const metadata = await AWSConnections.AuthorizationData(
               "LOGIN",
               response.AuthenticationResult.IdToken,
-              "dsivis-dev-remaining-secret",
+              CONFIG.AWS_SECRETS_NAME,
               username
             );
 

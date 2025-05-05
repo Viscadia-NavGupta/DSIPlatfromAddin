@@ -12,6 +12,7 @@ import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
 import * as excelfucntions from "../../Middleware/ExcelConnection";
 import * as inputfiles from "../../Middleware/inputfile";
+import CONFIG from "../../Middleware/AWSConnections";
 
 const SaveScenario = ({ setPageValue }) => {
   // =============================================================================
@@ -113,7 +114,7 @@ const SaveScenario = ({ setPageValue }) => {
       const responseBody = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
-        "dsivis-dev-remaining-secret",
+        CONFIG.AWS_SECRETS_NAME,
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );
@@ -198,7 +199,7 @@ const SaveScenario = ({ setPageValue }) => {
       await excelfucntions.setCalculationMode("manual");
       console.time("Parallel processes");
 
-      const [longformData, _, outputbackend_data] = await Promise.all([
+      const [longformData, inputfile, outputbackend_data] = await Promise.all([
         excelfucntions.generateLongFormData("US", "DataModel"), // Ensure this is a promise
         inputfiles.saveData(), // Ensure this is a promise
         excelfucntions.readNamedRangeToArray("aggregator_data"), // Ensure correct named range without trailing space
@@ -254,7 +255,7 @@ const SaveScenario = ({ setPageValue }) => {
   return (
     <Container>
       {loading ? (
-        <MessageBox>Loading, please wait...</MessageBox>
+        <MessageBox>Checking cloud compatibility, please wait...</MessageBox>
       ) : isOutputSheet ? (
         <>
           <Heading>{heading}</Heading>

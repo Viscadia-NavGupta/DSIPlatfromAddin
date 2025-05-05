@@ -219,6 +219,7 @@ export async function saveData() {
     await context.sync(); // Load values from DataModel range
 
     let vntControl = dataModelRange.values;
+    vntControl = vntControl.map(row => row.slice(0, -1));
 
     // Extend vntControl array with 3 additional columns
     vntControl = await appendColumns(vntControl, 3);

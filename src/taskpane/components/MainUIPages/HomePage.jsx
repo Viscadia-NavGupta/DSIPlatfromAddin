@@ -92,7 +92,7 @@ const HomePage = ({ userName, setPageValue }) => {
     {
       name: "Power BI Report",
       icon: <PowerBi width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-      action: () => handleOpenGoogle(),
+      action: () => inputfuncitons.saveData(),
       disabled: false,
     },
     {
