@@ -17,7 +17,7 @@ import ModelBuilder from "../Icons/Modelbuilder";
 import PowerBi from "../Icons/PowerBi";
 import ReportGenie from "../Icons/ReportGenie";
 import RiskAnalytics from "../Icons/Risk&Analytics";
-import * as excelconnections from "../Middleware/ExcelConnection";
+import * as excelconnections from "../Middleware/DEVExcelConnections";
 import * as inputfuncitons from "../Middleware/inputfile";
 import * as ACCode from "../Middleware/TestExcelconnection";
 

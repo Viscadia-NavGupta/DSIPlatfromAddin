@@ -556,6 +556,7 @@ export async function exportData2() {
           await context.sync();
 
           let vntControl = dataModelRange.values;
+          vntControl = vntControl.map(row => row.slice(0, -1));
           vntControl = await appendColumns(vntControl, 3); // Append 3 extra columns
 
           console.log("✅ Named Range 'DataModel' successfully loaded!");

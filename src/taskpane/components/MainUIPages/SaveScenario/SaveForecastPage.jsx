@@ -15,9 +15,6 @@ import * as inputfiles from "../../Middleware/inputfile";
 import CONFIG from "../../Middleware/AWSConnections";
 
 const SaveScenario = ({ setPageValue }) => {
-  // =============================================================================
-  //                              STATE VARIABLES
-  // =============================================================================
   const [selectedCycle, setSelectedCycle] = useState("");
   const [scenarioName, setScenarioName] = useState("");
   const [heading, setHeading] = useState("Active Sheet Name");
@@ -27,17 +24,13 @@ const SaveScenario = ({ setPageValue }) => {
   const [loading, setLoading] = useState(true);
   const [modelIDValue, setModelIDValue] = useState("");
   const [modelType, setModelType] = useState("");
+  const [modelIDError, setModelIDError] = useState("");
 
-  // DataFrames state from Lambda fetch
   const [dataFrames, setDataFrames] = useState({
     dfResult1: null,
     dfResult2: null,
     dfResult3: null,
   });
-
-  // =============================================================================
-  //                       HELPER FUNCTIONS & CALLBACKS
-  // =============================================================================
 
   const checkScenarioExists = useCallback(
     (modelId, cycleName, scenarioName) => {
@@ -55,7 +48,6 @@ const SaveScenario = ({ setPageValue }) => {
     [dataFrames]
   );
 
-  // Reads Excel cell values from the "cloud_backend_md" sheet.
   const checkofCloudBackendSheet = useCallback(async () => {
     try {
       console.log("📊 Checking for Output Sheet...");
@@ -63,6 +55,7 @@ const SaveScenario = ({ setPageValue }) => {
         console.error("🚨 Excel API is not available.");
         return;
       }
+
       await Excel.run(async (context) => {
         const sheets = context.workbook.worksheets;
         sheets.load("items/name");
@@ -78,22 +71,30 @@ const SaveScenario = ({ setPageValue }) => {
             ModelType: sheet.getRange("B8"),
           };
 
-          // Load all ranges together.
           Object.values(ranges).forEach((range) => range.load("values"));
           await context.sync();
 
-          const ModelNameValue = ranges.ModelName.values[0][0] || "";
-          const ModelIDValue = ranges.ModelID.values[0][0] || "";
-          const ModelTypeValue = ranges.ModelType.values[0][0] || "";
+          const ModelNameValue = ranges.ModelName.values[0][0]?.toString().trim() || "";
+          const ModelIDValue = ranges.ModelID.values[0][0]?.toString().trim() || "";
+          const ModelTypeValue = ranges.ModelType.values[0][0]?.toString().trim() || "";
+
+          console.log("🔍 Extracted Model Values:", {
+            ModelNameValue,
+            ModelIDValue,
+            ModelTypeValue,
+          });
+
+          if (!ModelNameValue || !ModelIDValue || !ModelTypeValue) {
+            console.warn("⚠️ One or more required model values are blank.");
+            setIsOutputSheet(false);
+            return;
+          }
 
           setHeading(`Save Scenario for: ${ModelNameValue}`);
-          setIsOutputSheet(true);
           setModelIDValue(ModelIDValue);
           setModelType(ModelTypeValue);
+          setIsOutputSheet(true);
 
-          console.log("✅ Output Sheet Found:", ModelNameValue, ModelIDValue, ModelTypeValue);
-
-          // Check if the ModelType is "AGGREGATOR", and update the page value
           if (ModelTypeValue === "AGGREGATOR") {
             setPageValue("AggSaveScenario", "Loading scenario for Aggregator model...");
           }
@@ -123,7 +124,6 @@ const SaveScenario = ({ setPageValue }) => {
         throw new Error("❌ Missing one or more required results in Lambda response.");
       }
 
-      // Create DataFrames for each result.
       const df1 = new DataFrame(responseBody.results1);
       const df2 = new DataFrame(responseBody.results2);
       const df3 = new DataFrame(responseBody.result3);
@@ -134,7 +134,6 @@ const SaveScenario = ({ setPageValue }) => {
         dfResult3: df3,
       });
 
-      // Extract distinct cycle names from df2.
       const cycleItemsArray = df2
         .distinct("cycle_name")
         .toArray()
@@ -150,11 +149,11 @@ const SaveScenario = ({ setPageValue }) => {
   useEffect(() => {
     const initializePage = async () => {
       try {
-        // Run initialization tasks concurrently.
         await Promise.all([checkofCloudBackendSheet(), fetchDataFromLambda()]);
       } catch (error) {
         console.error("🚨 Initialization failed:", error);
       } finally {
+        console.log("🔄 Finished init, setting loading to false");
         setLoading(false);
       }
     };
@@ -163,13 +162,20 @@ const SaveScenario = ({ setPageValue }) => {
   }, [checkofCloudBackendSheet, fetchDataFromLambda]);
 
   useEffect(() => {
+    console.log("🔄 Running model ID check...");
+    console.log("Values:", { loading, modelIDValue, df3: !!dataFrames.dfResult3 });
+
     if (!loading && modelIDValue && dataFrames.dfResult3) {
-      const models = dataFrames.dfResult3.toCollection(); // Array of objects from result3.
+      const models = dataFrames.dfResult3.toCollection();
+      console.log("Models from dfResult3:", models);
+
       const authorized = models.some((model) => model.model_id === modelIDValue);
       if (!authorized) {
         console.warn("🚨 No authorized model detected");
+        setModelIDError("Model ID mismatch. The current model is not authorized.");
         setIsOutputSheet(false);
       } else {
+        setModelIDError("");
         console.log("✅ Authorized model detected");
       }
     }
@@ -200,9 +206,9 @@ const SaveScenario = ({ setPageValue }) => {
       console.time("Parallel processes");
 
       const [longformData, inputfile, outputbackend_data] = await Promise.all([
-        excelfucntions.generateLongFormData("US", "DataModel"), // Ensure this is a promise
-        inputfiles.saveData(), // Ensure this is a promise
-        excelfucntions.readNamedRangeToArray("aggregator_data"), // Ensure correct named range without trailing space
+        excelfucntions.generateLongFormData("US", "DataModel"),
+        inputfiles.saveData(),
+        excelfucntions.readNamedRangeToArray("aggregator_data"),
       ]);
 
       console.timeEnd("Parallel processes");
@@ -256,6 +262,8 @@ const SaveScenario = ({ setPageValue }) => {
     <Container>
       {loading ? (
         <MessageBox>Checking cloud compatibility, please wait...</MessageBox>
+      ) : modelIDError ? (
+        <MessageBox>{modelIDError}</MessageBox>
       ) : isOutputSheet ? (
         <>
           <Heading>{heading}</Heading>
@@ -286,7 +294,7 @@ const SaveScenario = ({ setPageValue }) => {
           </SaveButton>
         </>
       ) : (
-        <MessageBox>No Authorised model detected, please refresh the addin</MessageBox>
+        <MessageBox>No authorized output sheet or model found. Please refresh the add-in.</MessageBox>
       )}
     </Container>
   );
