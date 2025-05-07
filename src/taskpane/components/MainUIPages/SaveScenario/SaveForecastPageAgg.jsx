@@ -124,7 +124,7 @@ const AggSaveScenario = ({ setPageValue }) => {
       const responseBody = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
-        "CONFIG.AWS_SECRETS_NAME",
+        CONFIG.AWS_SECRETS_NAME,
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );

@@ -7,6 +7,7 @@ import { IoMdSync } from "react-icons/io";
 import { DataFrame } from "dataframe-js"; // Ensure DataFrame is imported
 import * as Excelconnections from "../../Middleware/ExcelConnection";
 import * as AWSconnections from "../../Middleware/AWSConnections";
+import CONFIG from "../../Middleware/AWSConnections";
 import {
   HomePageContainer,
   ContentWrapper,
@@ -17,6 +18,7 @@ import {
   BackButtonIcon,
   IconWrapper,
 } from "./AGGForecastManagementPageStyles";
+import { config } from "process";
 
 const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
   const [buttonSize, setButtonSize] = useState({ width: 90, height: 75, fontSize: "0.7rem", iconSize: 32 });
@@ -95,7 +97,7 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
       const responseBody = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
-        "DSI-prod-remaining-secrets",
+        CONFIG.AWS_SECRETS_NAME,
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );

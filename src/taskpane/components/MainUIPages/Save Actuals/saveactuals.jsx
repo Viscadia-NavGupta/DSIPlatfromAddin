@@ -5,6 +5,7 @@ import * as AWSconnections from "../../Middleware/AWSConnections";
 import * as excelfucntions from "../../Middleware/ExcelConnection";
 import * as inputfiles from "../../Middleware/inputfile";
 import * as Excelconnections from "../../Middleware/ExcelConnection"; // Ensure this import exists
+import CONFIG from "../../Middleware/AWSConnections";
 
 const SaveScenarioActuals = ({ setPageValue }) => {
   const [scenarioName, setScenarioName] = useState("");
@@ -93,7 +94,7 @@ const SaveScenarioActuals = ({ setPageValue }) => {
       const responseBody = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
-        "DSI-prod-remaining-secrets",
+        CONFIG.AWS_SECRETS_NAME,
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );

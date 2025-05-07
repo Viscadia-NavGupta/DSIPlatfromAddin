@@ -20,6 +20,8 @@ import AggSaveScenario from "./MainUIPages/SaveScenario/SaveForecastPageAgg";
 import AGGForecastManagementPage from "./MainUIPages/ForecastManagementPage/AGGForecastManagementPage";
 import SaveScenarioActuals from "./MainUIPages/Save Actuals/saveactuals";
 import AggLockScenario from "./MainUIPages/Save and Lock/SaveandLockPageAgg";
+import ForecastLibrarypage from "./MainUIPages/Forecast Library/ForecastLibrarypage";
+import FLSyncData from "./MainUIPages/Forecast Library/SyncdataDropdown";
 
 function App() {
   const [page, setPage] = useState("UserLogin"); // Default page
@@ -239,6 +241,8 @@ function App() {
         return <AggSaveScenario setPageValue={setPageValue} />;
       case "SaveScenarioActuals":
         return <SaveScenarioActuals setPageValue={setPageValue} />;
+        case "ForecastLibrarypage":
+          return <ForecastLibrarypage setPageValue={setPageValue} />;
       case "AGGForecastManagementPage":
         return <AGGForecastManagementPage setPageValue={setPageValue} onBack={() => setPageValue("Home")} />;
       default:

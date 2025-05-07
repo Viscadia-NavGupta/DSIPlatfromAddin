@@ -78,10 +78,10 @@ const HomePage = ({ userName, setPageValue }) => {
       disabled: false,
     },
     {
-      name: "Assumptions Catalogue",
+      name: "Forecast Library",
       icon: <AssumptionsCatalogue width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-      action: () => setPageValue("LoadScenario"),
-      disabled: true,
+      action: () => setPageValue("ForecastLibrarypage"),
+      disabled: false,
     },
     {
       name: "Risk & Analytics",

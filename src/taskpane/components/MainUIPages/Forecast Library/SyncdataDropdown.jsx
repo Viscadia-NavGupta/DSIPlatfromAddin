@@ -15,14 +15,12 @@ import {
 import * as AWSconnections from "../../Middleware/AWSConnections";
 import * as InputfileConnections from "../../Middleware/inputfile";
 import * as excelconnections from "../../Middleware/ExcelConnection";
-import CONFIG from "../../Middleware/AWSConnections";
-import { config } from "process";
 
-const LoadScenario = ({ setPageValue }) => {
+const FLSyncData = ({ setPageValue }) => {
   const [modelIDValue, setModelIDValue] = useState("");
   const [saveStatus, setSaveStatus] = useState(null);
   const [selectedCycle, setSelectedCycle] = useState(null);
-  const [selectedScenario, setSelectedScenario] = useState(null);
+  const [selectedAsset, setSelectedAsset] = useState(null);
   const [heading, setHeading] = useState("Active Sheet Name");
   const [isOutputSheet, setIsOutputSheet] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -32,24 +30,24 @@ const LoadScenario = ({ setPageValue }) => {
   const [warnings, setWarnings] = useState({
     saveStatus: false,
     cycle: false,
-    scenario: false,
+    asset: false,
   });
 
   const [fullData, setFullData] = useState([]);
   const [filteredSaveStatus, setFilteredSaveStatus] = useState([]);
   const [filteredCycles, setFilteredCycles] = useState([]);
-  const [filteredScenarios, setFilteredScenarios] = useState([]);
+  const [filteredAssets, setFilteredAssets] = useState([]);
 
   const [dropdownOpen, setDropdownOpen] = useState({
     saveStatus: false,
     cycle: false,
-    scenario: false,
+    asset: false,
   });
 
   const dropdownRefs = {
     saveStatus: useRef(null),
     cycle: useRef(null),
-    scenario: useRef(null),
+    asset: useRef(null),
   };
 
   useEffect(() => {
@@ -81,7 +79,7 @@ const LoadScenario = ({ setPageValue }) => {
     if (fullData.length > 0) {
       updateDropdownOptions();
     }
-  }, [saveStatus, selectedCycle, selectedScenario, fullData]);
+  }, [saveStatus, selectedCycle, selectedAsset, fullData]);
 
   const checkofCloudBackendSheet = async () => {
     try {
@@ -129,7 +127,7 @@ const LoadScenario = ({ setPageValue }) => {
       const responseBody = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
-        CONFIG.AWS_SECRETS_NAME,
+        "DSI-prod-remaining-secrets",
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );
@@ -143,7 +141,7 @@ const LoadScenario = ({ setPageValue }) => {
 
       setFilteredSaveStatus([...new Set(filteredData.map((row) => row.save_status).filter(Boolean))]);
       setFilteredCycles([...new Set(filteredData.map((row) => row.cycle_name).filter(Boolean))]);
-      setFilteredScenarios([...new Set(filteredData.map((row) => row.scenario_name).filter(Boolean))]);
+      setFilteredAssets([...new Set(filteredData.map((row) => row.asset).filter(Boolean))]);
 
       setMetadataLoaded(true);
     } catch (error) {
@@ -157,7 +155,7 @@ const LoadScenario = ({ setPageValue }) => {
 
     if (saveStatus) filteredData = filteredData.filter((row) => row.save_status === saveStatus);
     if (selectedCycle) filteredData = filteredData.filter((row) => row.cycle_name === selectedCycle);
-    if (selectedScenario) filteredData = filteredData.filter((row) => row.scenario_name === selectedScenario);
+    if (selectedAsset) filteredData = filteredData.filter((row) => row.asset === selectedAsset);
 
     if (!saveStatus) {
       setFilteredSaveStatus([...new Set(filteredData.map((row) => row.save_status).filter(Boolean))]);
@@ -165,8 +163,8 @@ const LoadScenario = ({ setPageValue }) => {
     if (!selectedCycle) {
       setFilteredCycles([...new Set(filteredData.map((row) => row.cycle_name).filter(Boolean))]);
     }
-    if (!selectedScenario) {
-      setFilteredScenarios([...new Set(filteredData.map((row) => row.scenario_name).filter(Boolean))]);
+    if (!selectedAsset) {
+      setFilteredAssets([...new Set(filteredData.map((row) => row.asset).filter(Boolean))]);
     }
   };
 
@@ -175,22 +173,17 @@ const LoadScenario = ({ setPageValue }) => {
       setSaveStatus(value);
       const filteredBySaveStatus = fullData.filter(row => row.save_status === value);
       const availableCycles = [...new Set(filteredBySaveStatus.map(row => row.cycle_name))];
-      const availableScenarios = [...new Set(filteredBySaveStatus.map(row => row.scenario_name))];
+      const availableAssets = [...new Set(filteredBySaveStatus.map(row => row.asset))];
       if (!availableCycles.includes(selectedCycle)) setSelectedCycle(null);
-      if (!availableScenarios.includes(selectedScenario)) setSelectedScenario(null);
+      if (!availableAssets.includes(selectedAsset)) setSelectedAsset(null);
     }
 
     if (key === "cycle") {
       setSelectedCycle(value);
-      const filteredByCycle = fullData.filter(row =>
-        (!saveStatus || row.save_status === saveStatus) && row.cycle_name === value
-      );
-      const availableScenarios = [...new Set(filteredByCycle.map(row => row.scenario_name))];
-      if (!availableScenarios.includes(selectedScenario)) setSelectedScenario(null);
     }
 
-    if (key === "scenario") {
-      setSelectedScenario(value);
+    if (key === "asset") {
+      setSelectedAsset(value);
     }
 
     setDropdownOpen((prev) => ({ ...prev, [key]: false }));
@@ -208,35 +201,35 @@ const LoadScenario = ({ setPageValue }) => {
     const newWarnings = {
       saveStatus: !saveStatus,
       cycle: !selectedCycle,
-      scenario: !selectedScenario,
+      asset: !selectedAsset,
     };
     setWarnings(newWarnings);
-    if (!saveStatus || !selectedCycle || !selectedScenario) return;
+    if (!saveStatus || !selectedCycle || !selectedAsset) return;
 
     const forecastIdArray = fullData
       .filter(row =>
         row.save_status === saveStatus &&
         row.cycle_name === selectedCycle &&
-        row.scenario_name === selectedScenario
+        row.asset === selectedAsset
       )
       .map(row => row.forecast_id.replace("forecast_", ""));
 
     if (forecastIdArray.length === 0) return;
 
-    // Step 1: Simulate 0–50% progress
     setImportProgress(0);
     for (let i = 0; i <= 50; i += 10) {
       await new Promise((resolve) => setTimeout(resolve, 300));
       setPageValue("LoadingCircleComponent", `${i}% | Importing scenario...`);
       setImportProgress(i);
     }
+
     excelconnections.setCalculationMode("manual");
     try {
       const Downloadflag = await AWSconnections.service_orchestration(
         "IMPORT_ASSUMPTIONS",
         "",
         modelIDValue,
-        selectedScenario,
+        "",
         selectedCycle,
         "",
         "",
@@ -244,24 +237,19 @@ const LoadScenario = ({ setPageValue }) => {
       );
 
       if (Downloadflag && Downloadflag.status === "Scenario Imported") {
-        // Step 2: Update message and begin increasing progress
         setPageValue("LoadingCircleComponent", "55% | Importing assumptions...");
         setImportProgress(55);
-
         const progressPromise = increaseProgressDuringExport();
 
         await InputfileConnections.exportData2();
-
         await progressPromise;
 
-        // Step 3: Complete at 100%
         setImportProgress(100);
         setPageValue("LoadingCircleComponent", "100% | Import completed");
 
-        const message = `Forecast scenario imported for Model: ${heading.replace("Import Scenario for: ", "")} | Cycle: ${selectedCycle} | Scenario: ${selectedScenario}`;
+        const message = `Forecast scenario imported for Model: ${heading.replace("Import Scenario for: ", "")} | Cycle: ${selectedCycle} | Asset: ${selectedAsset}`;
         setPageValue("SaveForecastPageinterim", message);
         excelconnections.setCalculationMode("automatic");
-
       } else {
         console.error("Scenario Import Failed:", Downloadflag);
       }
@@ -278,7 +266,7 @@ const LoadScenario = ({ setPageValue }) => {
         <>
           <Heading>{heading}</Heading>
           <DropdownContainer>
-            {["saveStatus", "cycle", "scenario"].map((key) => (
+            {["saveStatus", "cycle", "asset"].map((key) => (
               <CustomDropdown key={key} ref={dropdownRefs[key]}>
                 <DropdownButton
                   onClick={() => setDropdownOpen({ ...dropdownOpen, [key]: !dropdownOpen[key] })}
@@ -287,7 +275,7 @@ const LoadScenario = ({ setPageValue }) => {
                   {{
                     saveStatus: saveStatus || "Select Save Status",
                     cycle: selectedCycle || "Select Cycle",
-                    scenario: selectedScenario || "Select Scenario",
+                    asset: selectedAsset || "Select Asset",
                   }[key]}
                   <DropdownArrow>
                     <RiArrowDropDownLine size={24} />
@@ -298,7 +286,7 @@ const LoadScenario = ({ setPageValue }) => {
                     {{
                       saveStatus: filteredSaveStatus,
                       cycle: filteredCycles,
-                      scenario: filteredScenarios,
+                      asset: filteredAssets,
                     }[key].map((item, idx) => (
                       <DropdownItem key={idx} onClick={() => handleSelect(key, item)}>
                         {item}
@@ -318,4 +306,4 @@ const LoadScenario = ({ setPageValue }) => {
   );
 };
 
-export default LoadScenario;
+export default FLSyncData;
