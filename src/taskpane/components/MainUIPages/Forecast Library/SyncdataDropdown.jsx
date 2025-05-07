@@ -11,7 +11,7 @@ import {
   DropdownItem,
   SaveButton,
   DropdownArrow,
-} from "./Loadscenariostyles";
+} from "./FLSyncDataStyles";
 import * as AWSconnections from "../../Middleware/AWSConnections";
 import * as InputfileConnections from "../../Middleware/inputfile";
 import * as excelconnections from "../../Middleware/ExcelConnection";
