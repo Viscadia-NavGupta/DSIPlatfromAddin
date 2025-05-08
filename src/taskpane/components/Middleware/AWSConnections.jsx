@@ -926,193 +926,110 @@ export async function downloadAndInsertDataFromExcel(s3Url, sheetName) {
  * @param {string} format - File format ("csv" or "xlsx").
  * @returns {Promise<boolean>} - Success status.
  */
-// export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, format = "csv") {
-//   try {
-//     console.time("⏱️ Total array upload");
-//     if (!dataArray || dataArray.length === 0) {
-//       console.error("🚨 No data provided for upload");
-//       return false;
-//     }
-//     const rowCount = dataArray.length;
-//     const colCount = dataArray[0].length;
-//     console.log(`📊 Processing ${rowCount} rows × ${colCount} columns as ${format.toUpperCase()}`);
-//     let blob;
-//     let contentType;
-
-//     if (format.toLowerCase() === "csv") {
-//       console.time("⏱️ CSV creation");
-//       let csvContent = "";
-//       const chunkSize = CONFIG.UPLOAD.CHUNK_SIZE;
-//       for (let i = 0; i < rowCount; i += chunkSize) {
-//         const endRow = Math.min(i + chunkSize, rowCount);
-//         let chunkContent = "";
-//         for (let j = i; j < endRow; j++) {
-//           const row = dataArray[j];
-//           const rowString = row
-//             .map((cell) => {
-//               if (cell === null || cell === undefined) return "";
-//               const cellStr = String(cell);
-//               return cellStr.includes(",") || cellStr.includes('"') || cellStr.includes("\n")
-//                 ? '"' + cellStr.replace(/"/g, '""') + '"'
-//                 : cellStr;
-//             })
-//             .join(",");
-//           chunkContent += rowString + "\n";
-//         }
-//         csvContent += chunkContent;
-//       }
-//       blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-//       contentType = "text/csv";
-//       console.timeEnd("⏱️ CSV creation");
-//     } else {
-//       const useWorker = typeof Worker !== "undefined" && rowCount * colCount > 100000;
-//       if (useWorker) {
-//         console.time("⏱️ Worker processing");
-//         blob = await createExcelBlobInWorker(dataArray, fileName.replace(/\.(xlsx|csv)$/i, ""));
-//         console.timeEnd("⏱️ Worker processing");
-//       } else {
-//         console.time("⏱️ Workbook creation");
-//         const ws = {};
-//         const range = { s: { c: 0, r: 0 }, e: { c: colCount - 1, r: rowCount - 1 } };
-//         ws["!ref"] = XLSX.utils.encode_range(range);
-//         for (let R = 0; R < rowCount; ++R) {
-//           for (let C = 0; C < colCount; ++C) {
-//             const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
-//             const cellValue = dataArray[R][C];
-//             if (cellValue == null) continue;
-//             if (typeof cellValue === "number") {
-//               ws[cell_ref] = { v: cellValue, t: "n" };
-//             } else if (typeof cellValue === "boolean") {
-//               ws[cell_ref] = { v: cellValue, t: "b" };
-//             } else if (cellValue instanceof Date) {
-//               ws[cell_ref] = { v: cellValue, t: "d" };
-//             } else {
-//               ws[cell_ref] = { v: cellValue, t: "s" };
-//             }
-//           }
-//         }
-//         const wb = XLSX.utils.book_new();
-//         XLSX.utils.book_append_sheet(wb, ws, fileName.replace(/\.(xlsx|csv)$/i, ""));
-//         console.timeEnd("⏱️ Workbook creation");
-
-//         console.time("⏱️ Blob creation");
-//         const binaryString = XLSX.write(wb, {
-//           bookType: "xlsx",
-//           type: "binary",
-//           compression: true,
-//           compressionOptions: { level: CONFIG.UPLOAD.COMPRESSION_LEVEL },
-//         });
-//         const buf = new ArrayBuffer(binaryString.length);
-//         const view = new Uint8Array(buf);
-//         for (let i = 0; i < binaryString.length; i++) {
-//           view[i] = binaryString.charCodeAt(i) & 0xff;
-//         }
-//         blob = new Blob([buf], {
-//           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-//         });
-//         // Clean up memory
-//         for (let key in ws) {
-//           ws[key] = null;
-//         }
-//         console.timeEnd("⏱️ Blob creation");
-//       }
-//       contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-//     }
-
-//     console.log(`📤 Uploading ${(blob.size / (1024 * 1024)).toFixed(2)} MB to: ${uploadURL}`);
-//     console.time("⏱️ Upload");
-//     const response = await fetch(uploadURL, {
-//       method: "PUT",
-//       headers: {
-//         "Content-Type": contentType,
-//         "x-amz-acl": "bucket-owner-full-control",
-//         "Cache-Control": "no-cache",
-//       },
-//       body: blob,
-//     });
-//     console.timeEnd("⏱️ Upload");
-//     console.timeEnd("⏱️ Total array upload");
-
-//     if (response.ok) {
-//       console.log(`✅ File uploaded successfully. Size: ${(blob.size / (1024 * 1024)).toFixed(2)} MB`);
-//       return true;
-//     } else {
-//       console.error(`❌ Error uploading file. Status: ${response.status}`, await response.text());
-//       return false;
-//     }
-//   } catch (error) {
-//     console.error("🚨 Error in uploadFileToS3FromArray:", error);
-//     return false;
-//   } finally {
-//     // Hint for garbage collection if available
-//     if (typeof global !== "undefined" && global.gc) {
-//       global.gc();
-//     }
-//   }
-// }
-
-
 export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, format = "csv") {
   try {
     console.time("⏱️ Total array upload");
-
     if (!dataArray || dataArray.length === 0) {
       console.error("🚨 No data provided for upload");
       return false;
     }
-
     const rowCount = dataArray.length;
-    const colCount = dataArray[0] ? dataArray[0].length : 0;
+    const colCount = dataArray[0].length;
     console.log(`📊 Processing ${rowCount} rows × ${colCount} columns as ${format.toUpperCase()}`);
+    let blob;
+    let contentType;
 
-    console.time("⏱️ CSV creation");
-
-    const rows = new Array(rowCount);
-    const batchSize = CONFIG.UPLOAD.CHUNK_SIZE || 5000; // fallback if config missing
-
-    for (let i = 0; i < rowCount; i += batchSize) {
-      const endRow = Math.min(i + batchSize, rowCount);
-
-      for (let j = i; j < endRow; j++) {
-        const row = dataArray[j];
-        rows[j] = row.map(cell => {
-          if (cell === null || cell === undefined) return "";
-          const cellStr = String(cell);
-          return cellStr.includes(",") || cellStr.includes('"') || cellStr.includes("\n")
-            ? '"' + cellStr.replace(/"/g, '""') + '"'
-            : cellStr;
-        }).join(",");
+    if (format.toLowerCase() === "csv") {
+      console.time("⏱️ CSV creation");
+      let csvContent = "";
+      const chunkSize = CONFIG.UPLOAD.CHUNK_SIZE;
+      for (let i = 0; i < rowCount; i += chunkSize) {
+        const endRow = Math.min(i + chunkSize, rowCount);
+        let chunkContent = "";
+        for (let j = i; j < endRow; j++) {
+          const row = dataArray[j];
+          const rowString = row
+            .map((cell) => {
+              if (cell === null || cell === undefined) return "";
+              const cellStr = String(cell);
+              return cellStr.includes(",") || cellStr.includes('"') || cellStr.includes("\n")
+                ? '"' + cellStr.replace(/"/g, '""') + '"'
+                : cellStr;
+            })
+            .join(",");
+          chunkContent += rowString + "\n";
+        }
+        csvContent += chunkContent;
       }
+      blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      contentType = "text/csv";
+      console.timeEnd("⏱️ CSV creation");
+    } else {
+      const useWorker = typeof Worker !== "undefined" && rowCount * colCount > 100000;
+      if (useWorker) {
+        console.time("⏱️ Worker processing");
+        blob = await createExcelBlobInWorker(dataArray, fileName.replace(/\.(xlsx|csv)$/i, ""));
+        console.timeEnd("⏱️ Worker processing");
+      } else {
+        console.time("⏱️ Workbook creation");
+        const ws = {};
+        const range = { s: { c: 0, r: 0 }, e: { c: colCount - 1, r: rowCount - 1 } };
+        ws["!ref"] = XLSX.utils.encode_range(range);
+        for (let R = 0; R < rowCount; ++R) {
+          for (let C = 0; C < colCount; ++C) {
+            const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
+            const cellValue = dataArray[R][C];
+            if (cellValue == null) continue;
+            if (typeof cellValue === "number") {
+              ws[cell_ref] = { v: cellValue, t: "n" };
+            } else if (typeof cellValue === "boolean") {
+              ws[cell_ref] = { v: cellValue, t: "b" };
+            } else if (cellValue instanceof Date) {
+              ws[cell_ref] = { v: cellValue, t: "d" };
+            } else {
+              ws[cell_ref] = { v: cellValue, t: "s" };
+            }
+          }
+        }
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, fileName.replace(/\.(xlsx|csv)$/i, ""));
+        console.timeEnd("⏱️ Workbook creation");
 
-      if (i > 0 && i % (batchSize * 4) === 0) {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        console.time("⏱️ Blob creation");
+        const binaryString = XLSX.write(wb, {
+          bookType: "xlsx",
+          type: "binary",
+          compression: true,
+          compressionOptions: { level: CONFIG.UPLOAD.COMPRESSION_LEVEL },
+        });
+        const buf = new ArrayBuffer(binaryString.length);
+        const view = new Uint8Array(buf);
+        for (let i = 0; i < binaryString.length; i++) {
+          view[i] = binaryString.charCodeAt(i) & 0xff;
+        }
+        blob = new Blob([buf], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        // Clean up memory
+        for (let key in ws) {
+          ws[key] = null;
+        }
+        console.timeEnd("⏱️ Blob creation");
       }
+      contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     }
 
-    const csvContent = rows.join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    rows.length = 0;
-
-    console.timeEnd("⏱️ CSV creation");
     console.log(`📤 Uploading ${(blob.size / (1024 * 1024)).toFixed(2)} MB to: ${uploadURL}`);
-
     console.time("⏱️ Upload");
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000);
-
     const response = await fetch(uploadURL, {
       method: "PUT",
       headers: {
-        "Content-Type": "text/csv",
+        "Content-Type": contentType,
         "x-amz-acl": "bucket-owner-full-control",
         "Cache-Control": "no-cache",
       },
       body: blob,
-      signal: controller.signal,
     });
-
-    clearTimeout(timeoutId);
     console.timeEnd("⏱️ Upload");
     console.timeEnd("⏱️ Total array upload");
 
@@ -1120,22 +1037,97 @@ export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, fo
       console.log(`✅ File uploaded successfully. Size: ${(blob.size / (1024 * 1024)).toFixed(2)} MB`);
       return true;
     } else {
-      console.error(`❌ Upload failed. Status: ${response.status}`, await response.text());
+      console.error(`❌ Error uploading file. Status: ${response.status}`, await response.text());
       return false;
     }
-
   } catch (error) {
     console.error("🚨 Error in uploadFileToS3FromArray:", error);
-    if (error.name === 'AbortError') {
-      console.error("⏱️ Upload timed out after 60 seconds");
-    }
     return false;
   } finally {
+    // Hint for garbage collection if available
     if (typeof global !== "undefined" && global.gc) {
       global.gc();
     }
   }
 }
+
+
+// export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, format = "csv") {
+//   try {
+//     console.time("⏱️ Total array upload");
+
+//     if (!dataArray || dataArray.length === 0) {
+//       console.error("🚨 No data provided for upload");
+//       return false;
+//     }
+
+//     const rowCount = dataArray.length;
+//     const colCount = dataArray[0] ? dataArray[0].length : 0;
+//     console.log(`📊 Processing ${rowCount} rows × ${colCount} columns as ${format.toUpperCase()}`);
+
+//     console.time("⏱️ CSV creation");
+
+//     const rows = new Array(rowCount);
+//     const batchSize = CONFIG.UPLOAD.CHUNK_SIZE || 50000;
+
+//     for (let i = 0; i < rowCount; i += batchSize) {
+//       const endRow = Math.min(i + batchSize, rowCount);
+//       for (let j = i; j < endRow; j++) {
+//         const row = dataArray[j];
+//         rows[j] = row.map(cell => {
+//           if (cell === null || cell === undefined) return "";
+//           const cellStr = String(cell);
+//           return cellStr.includes(",") || cellStr.includes('"') || cellStr.includes("\n")
+//             ? '"' + cellStr.replace(/"/g, '""') + '"'
+//             : cellStr;
+//         }).join(",");
+//       }
+
+//       if (i > 0 && i % (batchSize * 4) === 0) {
+//         await new Promise(resolve => setTimeout(resolve, 0));
+//       }
+//     }
+
+//     const csvContent = rows.join("\n");
+//     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+//     rows.length = 0;
+
+//     console.timeEnd("⏱️ CSV creation");
+//     console.log(`📤 Uploading ${(blob.size / (1024 * 1024)).toFixed(2)} MB to: ${uploadURL}`);
+
+//     console.time("⏱️ Upload");
+
+//     const response = await fetch(uploadURL, {
+//       method: "PUT",
+//       headers: {
+//         "Content-Type": "text/csv",
+//         "x-amz-acl": "bucket-owner-full-control",
+//         "Cache-Control": "no-cache",
+//       },
+//       body: blob,
+//     });
+
+//     console.timeEnd("⏱️ Upload");
+//     console.timeEnd("⏱️ Total array upload");
+
+//     if (response.ok) {
+//       console.log(`✅ File uploaded successfully. Size: ${(blob.size / (1024 * 1024)).toFixed(2)} MB`);
+//       return true;
+//     } else {
+//       console.error(`❌ Upload failed. Status: ${response.status}`, await response.text());
+//       return false;
+//     }
+
+//   } catch (error) {
+//     console.error("🚨 Error in uploadFileToS3FromArray:", error);
+//     return false;
+//   } finally {
+//     if (typeof global !== "undefined" && global.gc) {
+//       global.gc();
+//     }
+//   }
+// }
+
 
 // =============================================================================
 //                          POLLING FUNCTION

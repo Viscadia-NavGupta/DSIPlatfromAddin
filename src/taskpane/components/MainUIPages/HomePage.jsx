@@ -87,19 +87,19 @@ const HomePage = ({ userName, setPageValue }) => {
       name: "Risk & Analytics",
       icon: <RiskAnalytics width={buttonSize.iconSize} height={buttonSize.iconSize} />,
       action: () => ACCode.pivotUpFlatFileToAC(),
-      disabled: false,
+      disabled: true,
     },
     {
       name: "Power BI Report",
       icon: <PowerBi width={buttonSize.iconSize} height={buttonSize.iconSize} />,
       action: () => inputfuncitons.saveData(),
-      disabled: false,
+      disabled: true,
     },
     {
       name: "Report Genie",
       icon: <ReportGenie width={buttonSize.iconSize} height={buttonSize.iconSize} />,
       action: () => excelconnections.generateLongFormData("US","DataModel"),
-      disabled: false,
+      disabled: true,
     },
   ];
 

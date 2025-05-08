@@ -241,8 +241,10 @@ function App() {
         return <AggSaveScenario setPageValue={setPageValue} />;
       case "SaveScenarioActuals":
         return <SaveScenarioActuals setPageValue={setPageValue} />;
-        case "ForecastLibrarypage":
-          return <ForecastLibrarypage setPageValue={setPageValue} />;
+      case "ForecastLibrarypage":
+        return <ForecastLibrarypage setPageValue={setPageValue} />;
+      case "FLSyncData":
+        return <FLSyncData setPageValue={setPageValue} />;
       case "AGGForecastManagementPage":
         return <AGGForecastManagementPage setPageValue={setPageValue} onBack={() => setPageValue("Home")} />;
       default:

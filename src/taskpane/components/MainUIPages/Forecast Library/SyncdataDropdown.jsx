@@ -15,12 +15,13 @@ import {
 import * as AWSconnections from "../../Middleware/AWSConnections";
 import * as InputfileConnections from "../../Middleware/inputfile";
 import * as excelconnections from "../../Middleware/ExcelConnection";
+import CONFIG from "../../Middleware/AWSConnections";
 
 const FLSyncData = ({ setPageValue }) => {
   const [modelIDValue, setModelIDValue] = useState("");
-  const [saveStatus, setSaveStatus] = useState(null);
-  const [selectedCycle, setSelectedCycle] = useState(null);
-  const [selectedAsset, setSelectedAsset] = useState(null);
+  const [saveStatus, setSaveStatus] = useState([]);
+  const [selectedCycle, setSelectedCycle] = useState([]);
+  const [selectedAsset, setSelectedAsset] = useState([]);
   const [heading, setHeading] = useState("Active Sheet Name");
   const [isOutputSheet, setIsOutputSheet] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -81,6 +82,13 @@ const FLSyncData = ({ setPageValue }) => {
     }
   }, [saveStatus, selectedCycle, selectedAsset, fullData]);
 
+  // Update dropdown options
+  const updateDropdownOptions = () => {
+    setFilteredSaveStatus([...new Set(fullData.map((row) => row.save_status).filter(Boolean))]);
+    setFilteredCycles([...new Set(fullData.map((row) => row.cycle_name).filter(Boolean))]);
+    setFilteredAssets([...new Set(fullData.map((row) => row.asset).filter(Boolean))]);
+  };
+
   const checkofCloudBackendSheet = async () => {
     try {
       if (typeof window.Excel === "undefined") {
@@ -106,7 +114,7 @@ const FLSyncData = ({ setPageValue }) => {
           const ModelNameValue = ModelName.values[0][0] || "";
           const ModelIDValue = ModelID.values[0][0] || "";
 
-          setHeading(`Import Scenario for: ${ModelNameValue}`);
+          setHeading("Sync Data for Forecast Library");
           setIsOutputSheet(true);
           setModelIDValue(ModelIDValue);
         } else {
@@ -127,7 +135,7 @@ const FLSyncData = ({ setPageValue }) => {
       const responseBody = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
-        "DSI-prod-remaining-secrets",
+        CONFIG.AWS_SECRETS_NAME,
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );
@@ -139,10 +147,6 @@ const FLSyncData = ({ setPageValue }) => {
       const filteredData = responseBody.results1.filter((row) => row.model_id === modelIDValue);
       setFullData(filteredData);
 
-      setFilteredSaveStatus([...new Set(filteredData.map((row) => row.save_status).filter(Boolean))]);
-      setFilteredCycles([...new Set(filteredData.map((row) => row.cycle_name).filter(Boolean))]);
-      setFilteredAssets([...new Set(filteredData.map((row) => row.asset).filter(Boolean))]);
-
       setMetadataLoaded(true);
     } catch (error) {
       console.error("Error fetching metadata:", error);
@@ -150,67 +154,40 @@ const FLSyncData = ({ setPageValue }) => {
     }
   };
 
-  const updateDropdownOptions = () => {
-    let filteredData = [...fullData];
+  const handleMultiSelect = (key, value) => {
+    const setter = {
+      saveStatus: setSaveStatus,
+      cycle: setSelectedCycle,
+      asset: setSelectedAsset,
+    }[key];
 
-    if (saveStatus) filteredData = filteredData.filter((row) => row.save_status === saveStatus);
-    if (selectedCycle) filteredData = filteredData.filter((row) => row.cycle_name === selectedCycle);
-    if (selectedAsset) filteredData = filteredData.filter((row) => row.asset === selectedAsset);
+    const current = {
+      saveStatus,
+      cycle: selectedCycle,
+      asset: selectedAsset,
+    }[key];
 
-    if (!saveStatus) {
-      setFilteredSaveStatus([...new Set(filteredData.map((row) => row.save_status).filter(Boolean))]);
-    }
-    if (!selectedCycle) {
-      setFilteredCycles([...new Set(filteredData.map((row) => row.cycle_name).filter(Boolean))]);
-    }
-    if (!selectedAsset) {
-      setFilteredAssets([...new Set(filteredData.map((row) => row.asset).filter(Boolean))]);
-    }
-  };
-
-  const handleSelect = (key, value) => {
-    if (key === "saveStatus") {
-      setSaveStatus(value);
-      const filteredBySaveStatus = fullData.filter(row => row.save_status === value);
-      const availableCycles = [...new Set(filteredBySaveStatus.map(row => row.cycle_name))];
-      const availableAssets = [...new Set(filteredBySaveStatus.map(row => row.asset))];
-      if (!availableCycles.includes(selectedCycle)) setSelectedCycle(null);
-      if (!availableAssets.includes(selectedAsset)) setSelectedAsset(null);
-    }
-
-    if (key === "cycle") {
-      setSelectedCycle(value);
-    }
-
-    if (key === "asset") {
-      setSelectedAsset(value);
-    }
-
-    setDropdownOpen((prev) => ({ ...prev, [key]: false }));
-  };
-
-  const increaseProgressDuringExport = async () => {
-    for (let i = 55; i <= 95; i += 5) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setImportProgress(i);
-      setPageValue("LoadingCircleComponent", `${i}% | Importing assumptions...`);
+    if (current.includes(value)) {
+      setter(current.filter((v) => v !== value));
+    } else {
+      setter([...current, value]);
     }
   };
 
   const handleImportClick = async () => {
     const newWarnings = {
-      saveStatus: !saveStatus,
-      cycle: !selectedCycle,
-      asset: !selectedAsset,
+      saveStatus: saveStatus.length === 0,
+      cycle: selectedCycle.length === 0,
+      asset: selectedAsset.length === 0,
     };
     setWarnings(newWarnings);
-    if (!saveStatus || !selectedCycle || !selectedAsset) return;
+    if (newWarnings.saveStatus || newWarnings.cycle || newWarnings.asset) return;
 
     const forecastIdArray = fullData
       .filter(row =>
-        row.save_status === saveStatus &&
-        row.cycle_name === selectedCycle &&
-        row.asset === selectedAsset
+        saveStatus.includes(row.save_status) &&
+        selectedCycle.includes(row.cycle_name) &&
+        selectedAsset.includes(row.asset)
       )
       .map(row => row.forecast_id.replace("forecast_", ""));
 
@@ -239,16 +216,10 @@ const FLSyncData = ({ setPageValue }) => {
       if (Downloadflag && Downloadflag.status === "Scenario Imported") {
         setPageValue("LoadingCircleComponent", "55% | Importing assumptions...");
         setImportProgress(55);
-        const progressPromise = increaseProgressDuringExport();
-
         await InputfileConnections.exportData2();
-        await progressPromise;
-
         setImportProgress(100);
         setPageValue("LoadingCircleComponent", "100% | Import completed");
-
-        const message = `Forecast scenario imported for Model: ${heading.replace("Import Scenario for: ", "")} | Cycle: ${selectedCycle} | Asset: ${selectedAsset}`;
-        setPageValue("SaveForecastPageinterim", message);
+        setPageValue("SaveForecastPageinterim", `Forecast scenario imported.`);
         excelconnections.setCalculationMode("automatic");
       } else {
         console.error("Scenario Import Failed:", Downloadflag);
@@ -272,11 +243,11 @@ const FLSyncData = ({ setPageValue }) => {
                   onClick={() => setDropdownOpen({ ...dropdownOpen, [key]: !dropdownOpen[key] })}
                   style={warnings[key] ? { border: "1px solid red" } : {}}
                 >
-                  {{
-                    saveStatus: saveStatus || "Select Save Status",
-                    cycle: selectedCycle || "Select Cycle",
-                    asset: selectedAsset || "Select Asset",
-                  }[key]}
+                  Select {key.charAt(0).toUpperCase() + key.slice(1)} ({{
+                    saveStatus: saveStatus.length,
+                    cycle: selectedCycle.length,
+                    asset: selectedAsset.length,
+                  }[key]} selected)
                   <DropdownArrow>
                     <RiArrowDropDownLine size={24} />
                   </DropdownArrow>
@@ -288,8 +259,12 @@ const FLSyncData = ({ setPageValue }) => {
                       cycle: filteredCycles,
                       asset: filteredAssets,
                     }[key].map((item, idx) => (
-                      <DropdownItem key={idx} onClick={() => handleSelect(key, item)}>
-                        {item}
+                      <DropdownItem key={idx} onClick={() => handleMultiSelect(key, item)}>
+                        <input type="checkbox" checked={{
+                          saveStatus,
+                          cycle: selectedCycle,
+                          asset: selectedAsset,
+                        }[key].includes(item)} readOnly /> {item}
                       </DropdownItem>
                     ))}
                   </DropdownList>
@@ -297,7 +272,7 @@ const FLSyncData = ({ setPageValue }) => {
               </CustomDropdown>
             ))}
           </DropdownContainer>
-          <SaveButton onClick={handleImportClick}>Import Scenario</SaveButton>
+          <SaveButton onClick={handleImportClick}>Sync Data</SaveButton>
         </>
       ) : (
         <MessageBox>No Authorized model detected, please refresh the add-in.</MessageBox>

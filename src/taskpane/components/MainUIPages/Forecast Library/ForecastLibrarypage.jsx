@@ -172,16 +172,16 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
   };
 
   const buttons = [
-    { name: "Sync Data", icon: <IoMdSync size={buttonSize.iconSize} />, action: sync_MetaData_AGG, disabled: false },
-    { name: "Load Models", icon: <MdSaveAlt size={buttonSize.iconSize} />, action: LoadAggModels, disabled: false },
+    { name: "Sync Data", icon: <IoMdSync size={buttonSize.iconSize} />, action: () => setPageValue("FLSyncData"), disabled: false },
+    { name: "Load Data", icon: <MdSaveAlt size={buttonSize.iconSize} />, action: LoadAggModels, disabled: false },
   ];
 
-  const reportButtons = [
-    { name: "Report 1", icon: <BsFileEarmarkBarGraph size={buttonSize.iconSize} />, action: () => {}, disabled: false },
-    { name: "Report 2", icon: <BsFileEarmarkBarGraph size={buttonSize.iconSize} />, action: () => {}, disabled: false },
-    { name: "Report 3", icon: <BsFileEarmarkBarGraph size={buttonSize.iconSize} />, action: () => {}, disabled: false },
-    { name: "Report 4", icon: <BsFileEarmarkBarGraph size={buttonSize.iconSize} />, action: () => {}, disabled: false },
-  ];
+  // const reportButtons = [
+  //   { name: "Report 1", icon: <BsFileEarmarkBarGraph size={buttonSize.iconSize} />, action: () => {}, disabled: false },
+  //   { name: "Report 2", icon: <BsFileEarmarkBarGraph size={buttonSize.iconSize} />, action: () => {}, disabled: false },
+  //   { name: "Report 3", icon: <BsFileEarmarkBarGraph size={buttonSize.iconSize} />, action: () => {}, disabled: false },
+  //   { name: "Report 4", icon: <BsFileEarmarkBarGraph size={buttonSize.iconSize} />, action: () => {}, disabled: false },
+  // ];
 
   return (
     <HomePageContainer>
@@ -217,16 +217,16 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
             </ButtonsContainer>
 
             {/* Divider Line */}
-            <div style={{ borderBottom: "2px solid #B4322A", width: "90%", marginBottom: "12px" }} />
+            {/* <div style={{ borderBottom: "2px solid #B4322A", width: "90%", marginBottom: "12px" }} /> */}
 
             {/* Custom Reports Header */}
-            <div style={{ textAlign: "center", color: "#B4322A", fontWeight: "bold", fontSize: "1rem", marginBottom: "10px" }}>
+            {/* <div style={{ textAlign: "center", color: "#B4322A", fontWeight: "bold", fontSize: "1rem", marginBottom: "10px" }}>
               Custom Reports
-            </div>
+            </div> */}
 
             {/* Custom Report Buttons */}
-            <ButtonsContainer>
-              {reportButtons.map((button, index) => (
+            {/* <ButtonsContainer> */}
+              {/* {reportButtons.map((button, index) => (
                 <Button
                   key={index}
                   onClick={!button.disabled ? button.action : undefined}
@@ -238,8 +238,8 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
                   <p>{button.name}</p>
                   {button.disabled && <Tooltip className="tooltip">Feature not activated.</Tooltip>}
                 </Button>
-              ))}
-            </ButtonsContainer>
+              ))} */}
+            {/* </ButtonsContainer> */}
           </>
         )}
       </ContentWrapper>
