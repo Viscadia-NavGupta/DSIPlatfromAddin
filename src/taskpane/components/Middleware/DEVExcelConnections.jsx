@@ -478,11 +478,12 @@ export async function generateLongFormData(region,DataModelNameRange) {
       longFormData.push(headers);
 
       let currentRow = 1;
-      let transformFlag = false;
-      let runflag = false;
+
 
       for (let i = 0; i < extractedData.length; i++) {
         let baseRow = currentRow;
+        let transformFlag = false;
+        let runflag = false;
         let levelData = [];
         let flag = Array(15).fill(null);
 
