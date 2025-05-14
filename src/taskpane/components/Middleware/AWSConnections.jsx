@@ -652,19 +652,19 @@ export async function service_orchestration(
           console.log("⏱️ Service request requires polling");
           pollingResult = await poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
         }
-        
+
 
         // Now, for each element in matchedForecasts, send a service request
         if (buttonname === "SAVE_LOCKED_FORECAST_AGG") {
           let completedCount = 0;
           const totalCount = matchedForecasts?.length || 0;
-        
+
           for (const [index, match] of matchedForecasts.entries()) {
             try {
               const newUUID = match.forecast_id.replace("forecast_", "");
               const newModelUUID = match.model_id;
               const UUID_Generated = [uuidv4()];
-        
+
               const matchStatus = await servicerequest(
                 serviceorg_URL,
                 "LOCK_FORECAST",
@@ -678,27 +678,27 @@ export async function service_orchestration(
                 [],
                 newUUID
               );
-        
+
               console.log(`Service status for matched forecast ${match.forecast_id}:`, matchStatus);
-        
+
               let success = false;
-        
+
               if (matchStatus === "Forecast is already locked" || matchStatus === "Forecast locked successfully") {
                 success = true;
               }
-        
+
               if (matchStatus === "Endpoint request timed out" || (matchStatus && matchStatus.status === "Poll")) {
                 console.log("⏱️ Service request requires polling");
                 await poll(newUUID, CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
                 success = true;
               }
-        
+
               if (success) {
                 completedCount++;
                 const progressPercent = 60 + Math.round((completedCount / totalCount) * 30); // max 90%
                 setPageValue("LoadingCircleComponent", `${progressPercent}% | Saving your forecast...`);
               }
-        
+
             } catch (error) {
               console.error("Error processing matched forecast", match, error);
             }
@@ -800,7 +800,9 @@ export async function uploadFileToS3(sheetName, uploadURL) {
       const csvContent = csvLines.join("\n");
       console.timeEnd("⏱️ CSV creation");
 
-      const blob = new Blob([csvContent], { type: "text/csv" });
+      const utf8BOM = "\uFEFF";
+      const blob = new Blob([utf8BOM + csvContent], { type: "text/csv;charset=utf-8" });
+
       console.log(`📦 Blob size: ${(blob.size / (1024 * 1024)).toFixed(2)} MB`);
 
       console.time("⏱️ Upload");
