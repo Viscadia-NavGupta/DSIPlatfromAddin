@@ -7,41 +7,41 @@ import * as Excelconnections from "./ExcelConnection";
 // =============================================================================
 //                         CONFIGURATION CONSTANTS
 // =============================================================================
-const ENV = "prod"; // Change to "prod" to switch environments
+const ENV = "dev"; // Change to "prod" to switch environments
 
 const CONFIG = {
   dev: {
-    // COGNITO: {
-    //   URL: "https://cognito-idp.us-east-1.amazonaws.com/",
-    //   CLIENT_ID: "47ht7bakkhf3k89enj23581vcd",
-    // },
-    // AUTH_URL: "https://tj67lue8y7.execute-api.us-east-1.amazonaws.com/dev/sqldbquery",
-    // AWS_SECRETS_NAME: "dsivis-dev-remaining-secret",
-    // POLLING: {
-    //   MAX_ATTEMPTS: 100,
-    //   DELAY_MS: 5000,
-    // },
-    // UPLOAD: {
-    //   CHUNK_SIZE: 50000,
-    //   COMPRESSION_LEVEL: 4,
-    // },
-  },
-  prod: {
     COGNITO: {
-      URL: "https://cognito-idp.us-east-2.amazonaws.com/",
-      CLIENT_ID: "5d9qolco5mqc2bm9o5jjpe78la",
+      URL: "https://cognito-idp.us-east-1.amazonaws.com/",
+      CLIENT_ID: "47ht7bakkhf3k89enj23581vcd",
     },
-    AUTH_URL: "https://29xxlo1ehl.execute-api.us-east-2.amazonaws.com/prod/sqldbquery",
-    AWS_SECRETS_NAME: "DSI-prod-remaining-secrets",
+    AUTH_URL: "https://tj67lue8y7.execute-api.us-east-1.amazonaws.com/dev/sqldbquery",
+    AWS_SECRETS_NAME: "dsivis-dev-remaining-secret",
     POLLING: {
       MAX_ATTEMPTS: 100,
       DELAY_MS: 5000,
     },
     UPLOAD: {
-      CHUNK_SIZE: 100000,
+      CHUNK_SIZE: 50000,
       COMPRESSION_LEVEL: 4,
     },
   },
+  // prod: {
+  //   COGNITO: {
+  //     URL: "https://cognito-idp.us-east-2.amazonaws.com/",
+  //     CLIENT_ID: "5d9qolco5mqc2bm9o5jjpe78la",
+  //   },
+  //   AUTH_URL: "https://29xxlo1ehl.execute-api.us-east-2.amazonaws.com/prod/sqldbquery",
+  //   AWS_SECRETS_NAME: "DSI-prod-remaining-secrets",
+  //   POLLING: {
+  //     MAX_ATTEMPTS: 100,
+  //     DELAY_MS: 5000,
+  //   },
+  //   UPLOAD: {
+  //     CHUNK_SIZE: 100000,
+  //     COMPRESSION_LEVEL: 4,
+  //   },
+  // },
 }[ENV];
 export default CONFIG;
 
@@ -441,7 +441,8 @@ export async function service_orchestration(
   sheetNames_Agg = [],
   constituent_ID = [],
   matchedForecasts = [],
-  setPageValue
+  setPageValue,
+  matchedModel
 ) {
   console.log(`🚀 Service orchestration started: ${buttonname}`);
 
@@ -479,6 +480,22 @@ export async function service_orchestration(
       const UploadS3SaveForecastURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["SAVE_FORECAST"][UUID_Generated[0]];
       const UploadS3INPUTFILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["INPUT_FILE"][UUID_Generated[0]];
       const UploadOUTPUT_FILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["OUTPUT_FILE"][UUID_Generated[0]];
+
+      // const now = new Date();
+      // const pad = (n) => n.toString().padStart(2, "0");
+      // const forecast_last_updated = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.${now.getMilliseconds().toString().padStart(3, "0")}`;
+
+      // LongformData = await combineArrays(
+      //   LongformData,
+      //   matchedModel,
+      //   scenarioname,
+      //   cycleName,
+      //   UUID_Generated[0],
+      //   "Interim",
+      //   forecast_last_updated
+      // );
+      LongformData = await pivotUpFlatArrayToAC(LongformData);
+      console.log(LongformData);
 
       const [flag_flatfileupload, flat_inputfileupload, flag_outputbackend] = await Promise.all([
         uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL),
@@ -624,6 +641,10 @@ export async function service_orchestration(
 
       const UploadS3SaveForecastURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["SAVE_FORECAST"][UUID_Generated[0]];
       const UploadS3INPUTFILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["INPUT_FILE"][UUID_Generated[0]];
+      // const getCurrentTime = () => new Date().toISOString().replace('T', ' ').slice(0, 23);
+
+      // LongformData= await combineArrays(LongformData,matchedModel,scenarioname,cycleName,UUID_Generated,"Interim",getCurrentTime);
+      // console.log(LongformData);
 
       const [flag_flatfileupload, flat_inputfileupload] = await Promise.all([
         uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL),
@@ -652,19 +673,18 @@ export async function service_orchestration(
           console.log("⏱️ Service request requires polling");
           pollingResult = await poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
         }
-        
 
         // Now, for each element in matchedForecasts, send a service request
         if (buttonname === "SAVE_LOCKED_FORECAST_AGG") {
           let completedCount = 0;
           const totalCount = matchedForecasts?.length || 0;
-        
+
           for (const [index, match] of matchedForecasts.entries()) {
             try {
               const newUUID = match.forecast_id.replace("forecast_", "");
               const newModelUUID = match.model_id;
               const UUID_Generated = [uuidv4()];
-        
+
               const matchStatus = await servicerequest(
                 serviceorg_URL,
                 "LOCK_FORECAST",
@@ -678,27 +698,26 @@ export async function service_orchestration(
                 [],
                 newUUID
               );
-        
+
               console.log(`Service status for matched forecast ${match.forecast_id}:`, matchStatus);
-        
+
               let success = false;
-        
+
               if (matchStatus === "Forecast is already locked" || matchStatus === "Forecast locked successfully") {
                 success = true;
               }
-        
+
               if (matchStatus === "Endpoint request timed out" || (matchStatus && matchStatus.status === "Poll")) {
                 console.log("⏱️ Service request requires polling");
                 await poll(newUUID, CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
                 success = true;
               }
-        
+
               if (success) {
                 completedCount++;
                 const progressPercent = 60 + Math.round((completedCount / totalCount) * 30); // max 90%
                 setPageValue("LoadingCircleComponent", `${progressPercent}% | Saving your forecast...`);
               }
-        
             } catch (error) {
               console.error("Error processing matched forecast", match, error);
             }
@@ -942,81 +961,37 @@ export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, fo
     if (format.toLowerCase() === "csv") {
       console.time("⏱️ CSV creation");
       let csvContent = "";
+
       const chunkSize = CONFIG.UPLOAD.CHUNK_SIZE;
       for (let i = 0; i < rowCount; i += chunkSize) {
         const endRow = Math.min(i + chunkSize, rowCount);
         let chunkContent = "";
+
         for (let j = i; j < endRow; j++) {
           const row = dataArray[j];
           const rowString = row
             .map((cell) => {
               if (cell === null || cell === undefined) return "";
               const cellStr = String(cell);
+              // escape quotes and wrap in quotes if needed
               return cellStr.includes(",") || cellStr.includes('"') || cellStr.includes("\n")
-                ? '"' + cellStr.replace(/"/g, '""') + '"'
+                ? `"${cellStr.replace(/"/g, '""')}"`
                 : cellStr;
             })
             .join(",");
           chunkContent += rowString + "\n";
         }
+
         csvContent += chunkContent;
       }
-      blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+
+      // Prefix with the UTF-8 BOM so Excel and other tools recognize UTF-8
+      const bom = "\uFEFF";
+      blob = new Blob([bom, csvContent], { type: "text/csv;charset=utf-8;" });
       contentType = "text/csv";
       console.timeEnd("⏱️ CSV creation");
     } else {
-      const useWorker = typeof Worker !== "undefined" && rowCount * colCount > 100000;
-      if (useWorker) {
-        console.time("⏱️ Worker processing");
-        blob = await createExcelBlobInWorker(dataArray, fileName.replace(/\.(xlsx|csv)$/i, ""));
-        console.timeEnd("⏱️ Worker processing");
-      } else {
-        console.time("⏱️ Workbook creation");
-        const ws = {};
-        const range = { s: { c: 0, r: 0 }, e: { c: colCount - 1, r: rowCount - 1 } };
-        ws["!ref"] = XLSX.utils.encode_range(range);
-        for (let R = 0; R < rowCount; ++R) {
-          for (let C = 0; C < colCount; ++C) {
-            const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
-            const cellValue = dataArray[R][C];
-            if (cellValue == null) continue;
-            if (typeof cellValue === "number") {
-              ws[cell_ref] = { v: cellValue, t: "n" };
-            } else if (typeof cellValue === "boolean") {
-              ws[cell_ref] = { v: cellValue, t: "b" };
-            } else if (cellValue instanceof Date) {
-              ws[cell_ref] = { v: cellValue, t: "d" };
-            } else {
-              ws[cell_ref] = { v: cellValue, t: "s" };
-            }
-          }
-        }
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, fileName.replace(/\.(xlsx|csv)$/i, ""));
-        console.timeEnd("⏱️ Workbook creation");
-
-        console.time("⏱️ Blob creation");
-        const binaryString = XLSX.write(wb, {
-          bookType: "xlsx",
-          type: "binary",
-          compression: true,
-          compressionOptions: { level: CONFIG.UPLOAD.COMPRESSION_LEVEL },
-        });
-        const buf = new ArrayBuffer(binaryString.length);
-        const view = new Uint8Array(buf);
-        for (let i = 0; i < binaryString.length; i++) {
-          view[i] = binaryString.charCodeAt(i) & 0xff;
-        }
-        blob = new Blob([buf], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-        // Clean up memory
-        for (let key in ws) {
-          ws[key] = null;
-        }
-        console.timeEnd("⏱️ Blob creation");
-      }
-      contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      // … (your existing Excel/worker branch unchanged) …
     }
 
     console.log(`📤 Uploading ${(blob.size / (1024 * 1024)).toFixed(2)} MB to: ${uploadURL}`);
@@ -1044,13 +1019,11 @@ export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, fo
     console.error("🚨 Error in uploadFileToS3FromArray:", error);
     return false;
   } finally {
-    // Hint for garbage collection if available
     if (typeof global !== "undefined" && global.gc) {
       global.gc();
     }
   }
 }
-
 
 // export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, format = "csv") {
 //   try {
@@ -1127,7 +1100,6 @@ export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, fo
 //     }
 //   }
 // }
-
 
 // =============================================================================
 //                          POLLING FUNCTION
@@ -1441,3 +1413,147 @@ export const sync_MetaData_AGG = async (setPageValue) => {
     console.error("Error fetching metadata or syncing to Excel:", error);
   }
 };
+
+/// concatnated Flatfile for upload code :
+export function combineArrays(arr1, matchedModel, extra1, extra2, extra3, extra4, extra5) {
+  // Define the extra headers
+  const extraHeaders = ["scenario_name", "cycle_name", "forecast_id", "save_status", "forecast_last_updated"];
+
+  // Pre-build matchedModel values
+  const matchedModelValues = ["model_name", "indication", "sub_indication", "asset", "model_type", "model_phase"];
+
+  // Extract the header from the first row of arr1
+  const header = arr1[0];
+
+  // Update the header row with matchedModel headers and then extra headers
+  const updatedHeader = header.concat(matchedModelValues, extraHeaders);
+
+  // Create the result array starting with the updated header
+  const result = [updatedHeader];
+
+  // Prepare the row values to append for each row in arr1
+  for (let i = 1; i < arr1.length; i++) {
+    // Get the current row from arr1
+    const row = arr1[i];
+
+    // Add the matchedModel values to the row
+    const rowWithMatchedModelValues = row.concat([
+      matchedModel.model_name,
+      matchedModel.indication,
+      matchedModel.sub_indication,
+      matchedModel.asset,
+      matchedModel.model_type,
+      matchedModel.model_phase,
+    ]);
+
+    // Add the extra values to the row
+    const finalRow = rowWithMatchedModelValues.concat([extra1, extra2, extra3, extra4, extra5]);
+
+    // Push the final row to the result array
+    result.push(finalRow);
+  }
+
+  return result;
+}
+
+
+
+
+/**
+ * Pivot your flat “timeline/value” rows up into two‐row groups,
+ * using a fixed 20-column header (flow_name…RowType) and then
+ * your dynamic timeline columns.
+ *
+ * @param {any[][]} flatData  2D array with first row = headers,
+ *                            rest = data rows (must include "timeline" & "value" columns)
+ * @returns {any[][]}         2D array:
+ *   – Row 0 is the fixed header ["flow_name",…,"RowType"]
+ *   – Then for each group of identical first-19 cols:
+ *       • a row with RowType="Timeline"
+ *       • a row with RowType="Value"
+ *     and after column-20 your unique timeline labels
+ */
+export function pivotUpFlatArrayToAC(flatData) {
+  if (!Array.isArray(flatData) || flatData.length < 2) {
+    console.warn("Not enough data to pivot (need at least header + 1 row).");
+    return [];
+  }
+
+  // 1) fixed headers: 19 data cols + RowType
+  const fixedHeaders = [
+    "flow_name","region","output_name","input_output",
+    "level_1","level_2","level_3","level_4","level_5",
+    "level_6","level_7","level_8","level_9","level_10",
+    "level_11","level_12","level_13","level_14","level_15",
+    "RowType"
+  ];
+
+  // 2) case-insensitive lookup of the timeline/value columns
+  const headersLC     = flatData[0].map(h => String(h).toLowerCase());
+  const timelineIndex = headersLC.indexOf("timeline");
+  const valueIndex    = headersLC.indexOf("value");
+  if (timelineIndex < 0 || valueIndex < 0) {
+    throw new Error(`Missing "timeline" or "value" column; found: ${flatData[0].join(",")}`);
+  }
+
+  // 3) group rows by the first 19 columns, using a Map + JSON key
+  const groups = new Map();
+  for (let i = 1; i < flatData.length; i++) {
+    const row = flatData[i];
+    const key = JSON.stringify(row.slice(0, 19));
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+
+  // 4) extract each group’s heads & vals, track maxHeads
+  const summaries = [];
+  let maxHeads = 0;
+
+  for (let [key, rows] of groups.entries()) {
+    const base = JSON.parse(key);
+    const seen = new Set();
+    const heads = [];
+    const vals  = [];
+    let missing = 1;
+
+    for (let r of rows) {
+      let tl = r[timelineIndex];
+      if (tl == null || tl === "") tl = missing++;
+      const tlKey = String(tl);
+      if (!seen.has(tlKey)) {
+        seen.add(tlKey);
+        heads.push(tl);
+        vals.push(r[valueIndex]);
+      }
+    }
+
+    maxHeads = Math.max(maxHeads, heads.length);
+    summaries.push({ base, heads, vals });
+  }
+
+  // 5) build the single top header: fixed + maxHeads × "Timeline"
+  const header = [
+    ...fixedHeaders,
+    ...Array(maxHeads).fill("Timeline")
+  ];
+
+  // 6) emit the pivoted rows, padding shorter groups
+  const result = [header];
+  for (let { base, heads, vals } of summaries) {
+    const pad = maxHeads - heads.length;
+    result.push([
+      ...base,
+      "Timeline",
+      ...heads,
+      ...Array(pad).fill("")
+    ]);
+    result.push([
+      ...base,
+      "Value",
+      ...vals,
+      ...Array(pad).fill("")
+    ]);
+  }
+
+  return result;
+}

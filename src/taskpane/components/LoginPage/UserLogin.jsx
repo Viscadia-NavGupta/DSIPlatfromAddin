@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+// src/LoginPage/UserLogin.js
+import React from "react";
 import {
   PageContainer,
   LogoContainer,
@@ -12,69 +13,54 @@ import {
   FooterImageContainer,
 } from "./UserLoginStyles";
 
-const LoginPage = ({ setPageValue, handleLogin }) => {
-  const [errorMessage, setErrorMessage] = useState(""); // State to manage error messages
-
-  const navigateToForgotPassword = () => {
-    setPageValue("ForgotPassword");
-  };
-
-  const navigateToContactUs = () => {
-    setPageValue("ContactUs");
-  };
+const LoginPage = ({ setPageValue, handleLogin, errorMessage, setErrorMessage }) => {
+  const navigateToForgotPassword = () => setPageValue("ForgotPassword");
+  const navigateToContactUs = () => setPageValue("ContactUs");
 
   const loginUser = async (e) => {
-    e.preventDefault(); // Prevent page refresh on form submission
+    e.preventDefault();
 
-    const username = document.querySelector('input[placeholder="Username"]').value;
-    const password = document.querySelector('input[placeholder="Password"]').value;
+    const username = e.currentTarget.username.value.trim();
+    const password = e.currentTarget.password.value;
 
-    // Validation for missing fields
     if (!username || !password) {
       setErrorMessage("Please enter both username and password.");
       return;
     }
+    if (!username.includes("@")) {
+      setErrorMessage("Username must contain an '@' symbol.");
+      return;
+    }
 
-    // Validation for "@" in the email
-    // if (!username.includes("@")) {
-    //   setErrorMessage("The username must contain an '@' symbol.");
-    //   return;
-    // }
-
-    setErrorMessage(""); // Clear error message if inputs are valid
+    setErrorMessage("");
 
     try {
-      // Call handleLogin with inputs
-      const isAuthenticated = await handleLogin(username, password);
-
-      if (!isAuthenticated) {
-        setErrorMessage("Invalid username or password."); // Show error if login fails
-      }
-    } catch (error) {
-      console.error("Login failed:", error);
-      setErrorMessage("An error occurred. Please try again."); // Generic error message
+      await handleLogin(username, password);
+    } catch (err) {
+      console.error("Login error:", err);
+      setErrorMessage("Login failed. Please check your username and password.");
     }
   };
 
   return (
     <PageContainer>
-      {/* Logo Section */}
       <LogoContainer>
         <img src="/../assets/Viscadia_logo_red.png" alt="Viscadia Logo" />
       </LogoContainer>
 
-      {/* Welcome Text */}
       <WelcomeText>
         <h1>Welcome</h1>
         <p>Please enter your login details</p>
       </WelcomeText>
 
-      {/* Login Form */}
       <FormContainer onSubmit={loginUser}>
-        {/* Display error message */}
-        {errorMessage && <p style={{ color: "red", marginBottom: "10px" }}>{errorMessage}</p>}
-        <InputField type="text" placeholder="Username" />
-        <InputField type="password" placeholder="Password" />
+        {errorMessage && (
+          <p style={{ color: "red", marginBottom: "10px" }}>{errorMessage}</p>
+        )}
+
+        <InputField name="username" type="text" placeholder="Username" />
+        <InputField name="password" type="password" placeholder="Password" />
+
         <CheckboxContainer>
           <label>
             <input type="checkbox" />
@@ -90,22 +76,26 @@ const LoginPage = ({ setPageValue, handleLogin }) => {
             Forgot password?
           </a>
         </CheckboxContainer>
-        <Button primary onClick={loginUser}>
+
+        <Button primary type="submit">
           Log In
         </Button>
-        <Button onClick={navigateToContactUs}>Contact Us</Button>
+        <Button
+          onClick={(e) => {
+            e.preventDefault();
+            navigateToContactUs();
+          }}
+        >
+          Contact Us
+        </Button>
       </FormContainer>
 
-      {/* Footer Section */}
       <FooterContainer>
-        {/* Footer Text */}
         <FooterTextContainer>
           <span>© 2025 Viscadia. All rights reserved.</span>
         </FooterTextContainer>
-
-        {/* Footer Image */}
         <FooterImageContainer>
-          <img src="/../assets/Flow.png" alt="Footer Background" />
+          <img src="/../assets/ViscadiaFlow-Low.png" alt="Footer Background" />
         </FooterImageContainer>
       </FooterContainer>
     </PageContainer>

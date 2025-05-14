@@ -87,7 +87,7 @@ const HomePage = ({ userName, setPageValue }) => {
       name: "Risk & Analytics",
       icon: <RiskAnalytics width={buttonSize.iconSize} height={buttonSize.iconSize} />,
       action: () => ACCode.pivotUpFlatFileToAC(),
-      disabled: true,
+      disabled: false,
     },
     {
       name: "Power BI Report",
@@ -99,7 +99,7 @@ const HomePage = ({ userName, setPageValue }) => {
       name: "Report Genie",
       icon: <ReportGenie width={buttonSize.iconSize} height={buttonSize.iconSize} />,
       action: () => excelconnections.generateLongFormData("US","DataModel"),
-      disabled: true,
+      disabled: false,
     },
   ];
 

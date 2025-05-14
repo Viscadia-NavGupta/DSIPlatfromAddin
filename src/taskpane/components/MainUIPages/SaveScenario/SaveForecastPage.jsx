@@ -210,10 +210,15 @@ const SaveScenario = ({ setPageValue }) => {
         inputfiles.saveData(),
         excelfucntions.readNamedRangeToArray("aggregator_data"),
       ]);
-
+      
+      const modelsMap = new Map();
+      dataFrames.dfResult3.toCollection().forEach(model => {
+        modelsMap.set(model.model_id, model);
+      });
+      const matchedModel = modelsMap.get(modelIDValue);
       console.timeEnd("Parallel processes");
       setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
-
+     
       console.time("save forecast");
       const saveFlag = await AWSconnections.service_orchestration(
         "SAVE_FORECAST",
@@ -229,7 +234,8 @@ const SaveScenario = ({ setPageValue }) => {
         [],
         [],
         [],
-        setPageValue
+        setPageValue,
+        matchedModel
       );
       console.timeEnd("save forecast");
 
