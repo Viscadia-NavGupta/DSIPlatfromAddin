@@ -196,7 +196,7 @@ export async function AuthorizationData(buttonname, idToken, secretName, emailId
   const headers = {
     Authorization: `Bearer ${idToken}`,
     "Content-Type": "application/json",
-    Connection: "keep-alive",
+    // Connection: "keep-alive",
   };
 
   const body = {
@@ -230,11 +230,13 @@ export async function AuthorizationData(buttonname, idToken, secretName, emailId
       });
       data = await response.json();
     }
+
     console.log("✅ Authorization data retrieved");
     return data;
   } catch (error) {
     console.error("🚨 Authorization error:", error);
-    throw error;
+    // Return error instead of throwing
+    return { status: 'error', message: error.message || String(error) };
   }
 }
 
@@ -451,11 +453,13 @@ export async function service_orchestration(
     const idToken = localStorage.getItem("idToken");
     const User_Id = parseInt(localStorage.getItem("User_ID"), 10);
 
-    let AWSsecrets = await AuthorizationData("FETCH_METADATA", idToken, CONFIG.AWS_SECRETS_NAME, username);
+
+    let AWSsecrets = await AuthorizationData("SAVE_LOCKED_FORECAST", idToken, CONFIG.AWS_SECRETS_NAME, username);
     if (AWSsecrets?.message === "The incoming token has expired") {
       console.warn("🔄 Token expired, refreshing...");
       await AWSrefreshtoken();
       AWSsecrets = await AuthorizationData("FETCH_METADATA", idToken, CONFIG.AWS_SECRETS_NAME, username);
+
     }
 
     if (!AWSsecrets || !AWSsecrets.results) {
@@ -466,6 +470,8 @@ export async function service_orchestration(
     const secretsObject = AWSsecrets.results[CONFIG.AWS_SECRETS_NAME];
     const serviceorg_URL = secretsObject.ServOrch;
     const pollingUrl = secretsObject.Polling;
+
+    // check if the user is authorized to perform the action or not if not retrun a value and print on frontend
 
     if (buttonname === "SAVE_FORECAST" || buttonname === "SAVE_LOCKED_FORECAST") {
       console.log("📤 Preparing forecast upload");
@@ -481,19 +487,6 @@ export async function service_orchestration(
       const UploadS3INPUTFILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["INPUT_FILE"][UUID_Generated[0]];
       const UploadOUTPUT_FILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["OUTPUT_FILE"][UUID_Generated[0]];
 
-      // const now = new Date();
-      // const pad = (n) => n.toString().padStart(2, "0");
-      // const forecast_last_updated = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.${now.getMilliseconds().toString().padStart(3, "0")}`;
-
-      // LongformData = await combineArrays(
-      //   LongformData,
-      //   matchedModel,
-      //   scenarioname,
-      //   cycleName,
-      //   UUID_Generated[0],
-      //   "Interim",
-      //   forecast_last_updated
-      // );
       LongformData = await pivotUpFlatArrayToAC(LongformData);
       console.log(LongformData);
 
@@ -1481,17 +1474,17 @@ export function pivotUpFlatArrayToAC(flatData) {
 
   // 1) fixed headers: 19 data cols + RowType
   const fixedHeaders = [
-    "flow_name","region","output_name","input_output",
-    "level_1","level_2","level_3","level_4","level_5",
-    "level_6","level_7","level_8","level_9","level_10",
-    "level_11","level_12","level_13","level_14","level_15",
+    "flow_name", "region", "output_name", "input_output",
+    "level_1", "level_2", "level_3", "level_4", "level_5",
+    "level_6", "level_7", "level_8", "level_9", "level_10",
+    "level_11", "level_12", "level_13", "level_14", "level_15",
     "RowType"
   ];
 
   // 2) case-insensitive lookup of the timeline/value columns
-  const headersLC     = flatData[0].map(h => String(h).toLowerCase());
+  const headersLC = flatData[0].map(h => String(h).toLowerCase());
   const timelineIndex = headersLC.indexOf("timeline");
-  const valueIndex    = headersLC.indexOf("value");
+  const valueIndex = headersLC.indexOf("value");
   if (timelineIndex < 0 || valueIndex < 0) {
     throw new Error(`Missing "timeline" or "value" column; found: ${flatData[0].join(",")}`);
   }
@@ -1513,7 +1506,7 @@ export function pivotUpFlatArrayToAC(flatData) {
     const base = JSON.parse(key);
     const seen = new Set();
     const heads = [];
-    const vals  = [];
+    const vals = [];
     let missing = 1;
 
     for (let r of rows) {
@@ -1556,4 +1549,18 @@ export function pivotUpFlatArrayToAC(flatData) {
   }
 
   return result;
+}
+
+
+// this fucntion is checking if the user has access to the button or not
+// SAVE_FORECAST,SAVE_LOCKED_FORECAST, UNLOCK_FORECAST, LOCK_FORECAST, FETCH_ASSUMPTIONS, FETCH_METADATA, DELETE_FORECAST
+export async function ButtonAccess(buttonname) {
+  // grab everything AuthorizationData needs:
+  const emailId    = localStorage.getItem('username');
+  const idToken    = localStorage.getItem('idToken');
+  const secretName = CONFIG.AWS_SECRETS_NAME;
+  const UUID       = [ uuidv4()];               // wrap in array
+
+  // just call your working function:
+  return AuthorizationData(buttonname, idToken, secretName, emailId, UUID);
 }

@@ -183,7 +183,21 @@ const SaveScenario = ({ setPageValue }) => {
 
   const handleSaveClick = useCallback(async () => {
     console.time("Total save time request");
-    setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
+    setPageValue("LoadingCircleComponent", "0% | Checking Access...");
+    console.log("🔄 Checking Access...");
+    const ButtonAcccess = await AWSconnections.ButtonAccess("SAVE_FORECAST");
+    // in this part acess to button is checked
+    if (ButtonAcccess?.message === 'ACCESS DENIED') {
+      console.warn('🔒 Access denied for SAVE_FORECAST');
+      setPageValue(
+        'SaveForecastPageinterim',
+        'You do not have permission to save forecast.'
+      );
+      // change this section update the message to be more user friendly
+      console.timeEnd('Total save time request');
+      return;
+    }
+    setPageValue("LoadingCircleComponent", "0% |saving your forecast...");
 
     console.log("📤 Saving Forecast:", {
       cycle_name: selectedCycle,
@@ -191,7 +205,7 @@ const SaveScenario = ({ setPageValue }) => {
     });
     console.log("🔹 Using Model ID:", modelIDValue);
     console.log("🔹 Using Model Type:", modelType);
-
+    // Check if the scenario name ia already present for this model, cycle and scenairo name
     if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
       console.log("This scenario combination already exists.");
       setPageValue(
@@ -204,13 +218,13 @@ const SaveScenario = ({ setPageValue }) => {
     try {
       await excelfucntions.setCalculationMode("manual");
       console.time("Parallel processes");
-
+      // creating flat file for models here
       const [longformData, inputfile, outputbackend_data] = await Promise.all([
         excelfucntions.generateLongFormData("US", "DataModel"),
         inputfiles.saveData(),
         excelfucntions.readNamedRangeToArray("aggregator_data"),
       ]);
-      
+
       const modelsMap = new Map();
       dataFrames.dfResult3.toCollection().forEach(model => {
         modelsMap.set(model.model_id, model);
@@ -218,7 +232,7 @@ const SaveScenario = ({ setPageValue }) => {
       const matchedModel = modelsMap.get(modelIDValue);
       console.timeEnd("Parallel processes");
       setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
-     
+
       console.time("save forecast");
       const saveFlag = await AWSconnections.service_orchestration(
         "SAVE_FORECAST",
