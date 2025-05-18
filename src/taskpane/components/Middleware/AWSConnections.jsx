@@ -7,7 +7,7 @@ import * as Excelconnections from "./ExcelConnection";
 // =============================================================================
 //                         CONFIGURATION CONSTANTS
 // =============================================================================
-const ENV = "dev"; // Change to "prod" to switch environments
+const ENV = "prod"; // Change to "prod" to switch environments
 
 const CONFIG = {
   dev: {
@@ -26,22 +26,22 @@ const CONFIG = {
       COMPRESSION_LEVEL: 4,
     },
   },
-  // prod: {
-  //   COGNITO: {
-  //     URL: "https://cognito-idp.us-east-2.amazonaws.com/",
-  //     CLIENT_ID: "5d9qolco5mqc2bm9o5jjpe78la",
-  //   },
-  //   AUTH_URL: "https://29xxlo1ehl.execute-api.us-east-2.amazonaws.com/prod/sqldbquery",
-  //   AWS_SECRETS_NAME: "DSI-prod-remaining-secrets",
-  //   POLLING: {
-  //     MAX_ATTEMPTS: 100,
-  //     DELAY_MS: 5000,
-  //   },
-  //   UPLOAD: {
-  //     CHUNK_SIZE: 100000,
-  //     COMPRESSION_LEVEL: 4,
-  //   },
-  // },
+  prod: {
+    COGNITO: {
+      URL: "https://cognito-idp.us-east-2.amazonaws.com/",
+      CLIENT_ID: "5d9qolco5mqc2bm9o5jjpe78la",
+    },
+    AUTH_URL: "https://29xxlo1ehl.execute-api.us-east-2.amazonaws.com/prod/sqldbquery",
+    AWS_SECRETS_NAME: "DSI-prod-remaining-secrets",
+    POLLING: {
+      MAX_ATTEMPTS: 100,
+      DELAY_MS: 5000,
+    },
+    UPLOAD: {
+      CHUNK_SIZE: 100000,
+      COMPRESSION_LEVEL: 4,
+    },
+  },
 }[ENV];
 export default CONFIG;
 
@@ -443,8 +443,7 @@ export async function service_orchestration(
   sheetNames_Agg = [],
   constituent_ID = [],
   matchedForecasts = [],
-  setPageValue,
-  matchedModel
+  setPageValue
 ) {
   console.log(`🚀 Service orchestration started: ${buttonname}`);
 
@@ -453,8 +452,9 @@ export async function service_orchestration(
     const idToken = localStorage.getItem("idToken");
     const User_Id = parseInt(localStorage.getItem("User_ID"), 10);
 
+    // fetch AWS secrets from meta data 
 
-    let AWSsecrets = await AuthorizationData("SAVE_LOCKED_FORECAST", idToken, CONFIG.AWS_SECRETS_NAME, username);
+    let AWSsecrets = await AuthorizationData("FETCH_METADATA", idToken, CONFIG.AWS_SECRETS_NAME, username);
     if (AWSsecrets?.message === "The incoming token has expired") {
       console.warn("🔄 Token expired, refreshing...");
       await AWSrefreshtoken();
@@ -465,16 +465,16 @@ export async function service_orchestration(
     if (!AWSsecrets || !AWSsecrets.results) {
       throw new Error("❌ Failed to retrieve AWS secrets");
     }
-
+    // create a new UUID for the request
     const UUID_Generated = [uuidv4()];
     const secretsObject = AWSsecrets.results[CONFIG.AWS_SECRETS_NAME];
     const serviceorg_URL = secretsObject.ServOrch;
     const pollingUrl = secretsObject.Polling;
 
-    // check if the user is authorized to perform the action or not if not retrun a value and print on frontend
-
+    
     if (buttonname === "SAVE_FORECAST" || buttonname === "SAVE_LOCKED_FORECAST") {
       console.log("📤 Preparing forecast upload");
+      // save_forecast is used to get the s3 objects to upload the lifes 
       const S3Uploadobejct = await AuthorizationData(
         "SAVE_FORECAST",
         idToken,
@@ -487,8 +487,10 @@ export async function service_orchestration(
       const UploadS3INPUTFILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["INPUT_FILE"][UUID_Generated[0]];
       const UploadOUTPUT_FILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["OUTPUT_FILE"][UUID_Generated[0]];
 
+      // horizontal format conversion 
       LongformData = await pivotUpFlatArrayToAC(LongformData);
-      console.log(LongformData);
+
+      // uploading files to s3
 
       const [flag_flatfileupload, flat_inputfileupload, flag_outputbackend] = await Promise.all([
         uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL),

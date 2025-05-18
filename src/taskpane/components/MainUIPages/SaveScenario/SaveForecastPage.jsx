@@ -197,7 +197,7 @@ const SaveScenario = ({ setPageValue }) => {
       console.timeEnd('Total save time request');
       return;
     }
-    setPageValue("LoadingCircleComponent", "0% |saving your forecast...");
+    setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
 
     console.log("📤 Saving Forecast:", {
       cycle_name: selectedCycle,
@@ -221,15 +221,15 @@ const SaveScenario = ({ setPageValue }) => {
       // creating flat file for models here
       const [longformData, inputfile, outputbackend_data] = await Promise.all([
         excelfucntions.generateLongFormData("US", "DataModel"),
-        inputfiles.saveData(),
+        excelfucntions.saveData(),
         excelfucntions.readNamedRangeToArray("aggregator_data"),
       ]);
 
-      const modelsMap = new Map();
-      dataFrames.dfResult3.toCollection().forEach(model => {
-        modelsMap.set(model.model_id, model);
-      });
-      const matchedModel = modelsMap.get(modelIDValue);
+      // // const modelsMap = new Map();
+      // // dataFrames.dfResult3.toCollection().forEach(model => {
+      // //   modelsMap.set(model.model_id, model);
+      // });
+      // const matchedModel = modelsMap.get(modelIDValue);
       console.timeEnd("Parallel processes");
       setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
 
@@ -248,15 +248,14 @@ const SaveScenario = ({ setPageValue }) => {
         [],
         [],
         [],
-        setPageValue,
-        matchedModel
+        setPageValue
       );
       console.timeEnd("save forecast");
 
       console.log("Save response:", saveFlag);
       setPageValue("LoadingCircleComponent", "100% | Saving your forecast...");
 
-      if (saveFlag === "Saved Forecast" || (saveFlag && saveFlag.result === "DONE")) {
+      if (saveFlag === "SUCCESS" || (saveFlag && saveFlag.result === "DONE")) {
         const message = `Forecast scenario saved for model: ${heading.replace("Save Scenario for:", "")} | Cycle: ${selectedCycle} | Scenario: ${scenarioName}`;
         setPageValue("SaveForecastPageinterim", message);
       } else if (
@@ -268,6 +267,9 @@ const SaveScenario = ({ setPageValue }) => {
           "Scenario names already exist in the database. Please choose a different scenario name."
         );
       } else if (saveFlag && saveFlag.result === "ERROR") {
+        setPageValue("SaveForecastPageinterim", "Some Error Occurred, Please try again");
+      } else {
+        // catch anything else
         setPageValue("SaveForecastPageinterim", "Some Error Occurred, Please try again");
       }
     } catch (error) {

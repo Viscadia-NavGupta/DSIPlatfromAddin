@@ -30,7 +30,6 @@ export async function getAllSheetUsedRangesArray() {
       return sheetDataArray;
     });
   } catch (error) {
-    console.error(error);
   }
 }
 
@@ -38,13 +37,11 @@ export async function getAllSheetUsedRangesArray() {
 export async function extractLevelData(DataModelNameRange) {
   try {
     return await Excel.run(async (context) => {
-      console.log("🔍 Starting extractLevelData function...");
       let workbook = context.workbook;
       let namedRange = workbook.names.getItemOrNullObject(DataModelNameRange);
       await context.sync();
 
       if (namedRange.isNullObject) {
-        // console.error("❌ DataModel range not found.");
         return [];
       }
 
@@ -52,10 +49,8 @@ export async function extractLevelData(DataModelNameRange) {
       dataModelRange.load("values");
       await context.sync();
 
-      // console.log("🔍 Extracting all named ranges...");
       let namedRangesArray = await extractNamedRanges(); // ✅ Fetch all named ranges from workbook
 
-      // console.log("✅ Named ranges extracted successfully.");
       let dataArray = dataModelRange.values;
       let outputArray = [];
 
@@ -67,11 +62,8 @@ export async function extractLevelData(DataModelNameRange) {
           }
 
           if (!dataArray[b][a]) {
-            // console.warn(`⚠️ Skipping empty or invalid named range at [${b}, ${a}].`);
             continue; // ✅ Skip empty values
           }
-
-          // console.log(`🔎 Processing data: '${dataArray[b][a]}'...`);
 
           let [extractedSheet, extractedName] = dataArray[b][a].includes("!")
             ? dataArray[b][a].split("!")
@@ -88,10 +80,7 @@ export async function extractLevelData(DataModelNameRange) {
 
           if (matchedRange) {
             let [sheetName, name, address] = matchedRange;
-            // console.log(`🔄 Mapping named range '${name}' from '${sheetName}' to address '${address}'.`);
             dataArray[b][a] = address;
-          } else {
-            // console.error(`🚨 ERROR: Named range '${dataArray[b][a]}' NOT FOUND in namedRangesArray.`);
           }
         }
       }
@@ -131,7 +120,6 @@ export async function extractLevelData(DataModelNameRange) {
       return outputArray;
     });
   } catch (error) {
-    // console.error("🚨 ERROR in extractLevelData:", error);
     return [];
   }
 }
@@ -161,8 +149,6 @@ export async function loadWorkbookData() {
 
       // Single sync call to get all used range addresses
       await context.sync();
-      // console.log(sheetNames);
-      // console.log(rangesToLoad);
 
       // Second pass: create expanded ranges from A1 and load values
       const expandedRanges = [];
@@ -191,7 +177,6 @@ export async function loadWorkbookData() {
             });
           }
         } catch (error) {
-          console.warn(`Issue with sheet ${item.sheet.name}:`, error);
           let defaultRange = item.sheet.getRange("A1");
           defaultRange.load("values");
           expandedRanges.push({
@@ -209,12 +194,9 @@ export async function loadWorkbookData() {
         workbookData[item.sheetName] = item.expandedRange.values;
       }
 
-      console.log("Workbook Data Loaded", workbookData);
-      console.log("Sheet Names:", sheetNames);
       return workbookData;
     });
   } catch (error) {
-    console.error("Error loading workbook data:", error);
     throw error;
   }
 }
@@ -241,16 +223,11 @@ export function getRangeFromUsedRanges(rangeStr, workbookData) {
   try {
     let { sheetName, startCell, endCell } = parseRangeString(rangeStr);
 
-    console.log(`Extracted Sheet Name: '${sheetName}'`);
-    console.log("Available Sheets in workbookData:", Object.keys(workbookData));
-
     if (!workbookData[sheetName]) {
       let possibleMatches = Object.keys(workbookData).filter((name) => name.toLowerCase() === sheetName.toLowerCase());
       if (possibleMatches.length > 0) {
         sheetName = possibleMatches[0];
-        console.warn(`Corrected sheet name to '${sheetName}'`);
       } else {
-        console.error(`Sheet '${sheetName}' not found in preloaded data.`);
         return [[]]; // ✅ Always return a 2D array
       }
     }
@@ -272,23 +249,19 @@ export function getRangeFromUsedRanges(rangeStr, workbookData) {
 
     // ✅ Ensure data is within bounds
     if (!sheetData || sheetData.length <= startRow || !sheetData[startRow] || sheetData[startRow].length <= startCol) {
-      console.warn(`Range '${rangeStr}' is out of bounds or empty.`);
       return [[]]; // ✅ Always return a 2D array
     }
 
     // ✅ Handle single-cell references by returning a 2D array
     if (startRow === endRow && startCol === endCol) {
       let singleValue = sheetData[startRow][startCol];
-      console.log(`Extracted Single Cell Data from '${sheetName}'!${startCell}:`, singleValue);
       return [[singleValue]]; // ✅ Convert single values to 2D array
     }
 
     let resultArray = sheetData.slice(startRow, endRow + 1).map((row) => row.slice(startCol, endCol + 1));
 
-    console.log(`Extracted Data from '${sheetName}'!${startCell}:${endCell}`, resultArray);
     return resultArray;
   } catch (error) {
-    console.error("Error getting range data:", error);
     return [[]]; // ✅ Always return a 2D array on failure
   }
 }
@@ -297,10 +270,8 @@ async function combineArraysSingleCell(array1, array2) {
   try {
     // ✅ Ensure `array1` is always an array
     if (!Array.isArray(array1)) {
-      console.warn("array1 is not an array, converting to a default structure.");
       array1 = [[]]; // Ensures at least a 2D array
     } else if (array1.length === 0) {
-      console.warn("array1 is empty, using a placeholder.");
       array1 = [[]];
     }
 
@@ -311,7 +282,6 @@ async function combineArraysSingleCell(array1, array2) {
     } else if (Array.isArray(array2) && array2.length === 1 && !Array.isArray(array2[0])) {
       singleValue = array2[0]; // 1D single-cell case
     } else {
-      console.error("Invalid format: The second array must be a 1x1 array.");
       return [["Invalid array2 format"]];
     }
 
@@ -321,7 +291,6 @@ async function combineArraysSingleCell(array1, array2) {
 
     // ✅ Ensure `array1[0]` exists before accessing `.length`
     if (!Array.isArray(array1[0])) {
-      console.warn("array1[0] is not an array, converting it to a single row.");
       array1 = array1.map((item) => [item]); // Convert 1D to 2D array
       cols1 = 1;
     }
@@ -340,7 +309,6 @@ async function combineArraysSingleCell(array1, array2) {
 
     return resultArray;
   } catch (error) {
-    console.error("Error in combineArraysSingleCell:", error);
     return [["Error in function"]];
   }
 }
@@ -353,7 +321,6 @@ async function combineArrays(array1, array2) {
 
     // ✅ Ensure both inputs are arrays
     if (!Array.isArray(array1) || !Array.isArray(array2)) {
-      console.warn("One of the inputs is not an array. Returning placeholder.");
       return [["No arrays given."]];
     }
 
@@ -403,7 +370,6 @@ async function combineArrays(array1, array2) {
 
     return combinedArray;
   } catch (error) {
-    console.error("Error in combineArrays:", error);
     return [["Error occurred during array combination."]];
   }
 }
@@ -425,7 +391,6 @@ function convert2DTo1D(arr2D) {
 
     return arr1D;
   } catch (error) {
-    console.error("Error in convert2DTo1D:", error);
     return null;
   }
 }
@@ -441,9 +406,11 @@ export function isValidRange(rangeStr) {
 
 export async function generateLongFormData(region, DataModelNameRange) {
   try {
+    console.log("Starting generateLongFormData function...");
+    console.time("generateLongFormData");
+    
     // Await the result from Excel.run and assign it to the variable 'data'
     const data = await Excel.run(async (context) => {
-      console.time("Flatfile generation");
       let App = context.workbook.application;
       let workbook = context.workbook;
       let flatFileSheet = workbook.worksheets.getItem("Flat File");
@@ -451,24 +418,19 @@ export async function generateLongFormData(region, DataModelNameRange) {
 
       // Disable calculations for performance
       workbook.application.calculationMode = Excel.CalculationMode.manual;
-
-      console.log("Fetching all sheet used ranges...");
+      console.time("loadWorkbookData");
       await loadWorkbookData();
-      // let initialSheetData = workbookData;
+      console.timeEnd("loadWorkbookData");
 
       if (!workbookData || Object.keys(workbookData).length === 0) {
-        console.warn("No data found in the workbook.");
         return []; // Return an empty array if no data is found
       }
 
-      console.log("Extracting level data...");
       let extractedData = await extractLevelData(DataModelNameRange);
       if (!extractedData || extractedData.length === 0) {
-        console.warn("No extracted data available.");
         return []; // Return an empty array if no extracted data is available
       }
 
-      console.log("Processing data transformation...");
       let longFormData = [];
       let headers = [];
       headers.push("flow_name", "region", "output_name", "input_output");
@@ -490,8 +452,6 @@ export async function generateLongFormData(region, DataModelNameRange) {
         let flow_name = "Primary";
         let region_name = region;
         let SingleCell_flag = false;
-        console.log(`Processing: ${metricName}`);
-        console.log(i);
 
         for (let a = 0; a < extractedData[i].length; a++) {
           if (typeof extractedData[i][a][2] === "string" && Boolean(isValidRange(extractedData[i][a][2]))) {
@@ -579,7 +539,6 @@ export async function generateLongFormData(region, DataModelNameRange) {
 
         for (let y = 0; y < rangeArray.length; y++) {
           if (!Array.isArray(rangeArray[y]) || rangeArray[y].length < 11) {
-            console.warn(`Skipping row ${y}: insufficient columns`, rangeArray[y]);
             continue;
           }
 
@@ -604,10 +563,6 @@ export async function generateLongFormData(region, DataModelNameRange) {
           }
         }
       }
-      console.clear();
-      console.log("Writing long form data to Flat File sheet...");
-      console.timeEnd("Flatfile generation");
-      console.time("writing data");
 
       flatFileSheet.getUsedRange().clear(); // Clears contents, formats, and hyperlinks
       await context.sync();
@@ -616,6 +571,8 @@ export async function generateLongFormData(region, DataModelNameRange) {
       const chunkSize = 50000; // Adjust based on performance testing
       App.suspendScreenUpdatingUntilNextSync();
 
+      console.time("writeData");
+
       let outputRange = flatFileSheet
         .getRange("A1")
         .getResizedRange(longFormData.length - 1, longFormData[0].length - 1);
@@ -623,19 +580,17 @@ export async function generateLongFormData(region, DataModelNameRange) {
       outputRange.format.autofitColumns();
       outputRange.format.autofitRows();
       await context.sync();
-      console.timeEnd("writing data");
-      console.time("CSV Creation");
-      // Optionally create CSV here if needed
-      console.timeEnd("CSV Creation");
 
-      console.log(`Data processed successfully. Final row count: ${currentRow - 1}`);
-      // Return the longFormData array from within Excel.run
+      console.timeEnd("writeData");
+
       return longFormData;
     });
+    
+    console.log("Finished generateLongFormData function.");
+    console.timeEnd("generateLongFormData");
     // Return the data obtained from Excel.run
     return data;
   } catch (error) {
-    console.error("Error in generateLongFormData:", error);
   }
 }
 
@@ -711,16 +666,13 @@ export async function setCalculationMode(mode) {
       }
 
       await context.sync();
-      console.log(`Calculation mode set to: ${mode}`);
     });
   } catch (error) {
-    console.error("Error setting calculation mode:", error);
   }
 }
 
 export function downloadExcelCSV(dataArray, fileName = "data.csv") {
   if (!dataArray || dataArray.length === 0) {
-    console.error("No data provided for CSV generation.");
     return;
   }
 
@@ -778,7 +730,6 @@ export async function apiResponseToExcel(apiResponse, sheetName, startRange) {
 
       // Ensure results1 is an array and has data
       if (!Array.isArray(results1) || results1.length === 0) {
-        console.error("No valid data found in results1.");
         return;
       }
 
@@ -799,7 +750,6 @@ export async function apiResponseToExcel(apiResponse, sheetName, startRange) {
       // Optional: Auto-fit columns for readability
       resizedRange.format.autofitColumns();
     } catch (error) {
-      console.error("Error writing to Excel:", error);
     } finally {
       // Set Excel calculation mode back to automatic
       context.workbook.application.calculation = Excel.CalculationMode.automatic;
@@ -811,27 +761,17 @@ export async function apiResponseToExcel(apiResponse, sheetName, startRange) {
 }
 
 export async function readNamedRangeToArray(namedRangeName) {
-  console.log("Starting to read named range:", namedRangeName);
   try {
     return await Excel.run(async (context) => {
-      console.log("Excel context obtained.");
-
       // Use the workbook's names collection for workbook-level named ranges
       const names = context.workbook.names;
       names.load("items/name");
       await context.sync();
 
-      console.log(
-        "Available workbook names:",
-        names.items.map((n) => n.name)
-      );
-
       let namedItem;
       try {
         namedItem = names.getItem(namedRangeName);
-        console.log(`Workbook-level named item "${namedRangeName}" found.`);
       } catch (error) {
-        console.error(`Error: Workbook-level named item "${namedRangeName}" does not exist.`, error);
         return [];
       }
 
@@ -842,15 +782,12 @@ export async function readNamedRangeToArray(namedRangeName) {
 
       const rangeValues = range.values;
       if (!rangeValues || rangeValues.length === 0) {
-        console.error("No data found in the named range.");
         return [];
       }
 
-      console.log("Array created from named range:", rangeValues);
       return rangeValues;
     });
   } catch (error) {
-    console.error("Error during Excel.run execution:", error);
     return [];
   }
 }
