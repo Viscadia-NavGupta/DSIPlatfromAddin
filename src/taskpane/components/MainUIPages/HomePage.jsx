@@ -20,6 +20,8 @@ import RiskAnalytics from "../Icons/Risk&Analytics";
 import * as excelconnections from "../Middleware/DEVExcelConnections";
 import * as inputfuncitons from "../Middleware/inputfile";
 import * as ACCode from "../Middleware/TestExcelconnection";
+import * as ProdExcelConnections from	"../Middleware/ExcelConnection";
+import * as InputfileConnections from "../Middleware/inputfile";
 
 const HomePage = ({ userName, setPageValue }) => {
   const [buttonSize, setButtonSize] = useState({
@@ -68,8 +70,8 @@ const HomePage = ({ userName, setPageValue }) => {
     {
       name: "Model Management",
       icon: <ModelBuilder width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-      action: () => {},
-      disabled: true,
+      action: () =>  ProdExcelConnections.exportData2(),
+      disabled: false,
     },
     {
       name: "Forecast Management",
@@ -92,8 +94,8 @@ const HomePage = ({ userName, setPageValue }) => {
     {
       name: "Power BI Report",
       icon: <PowerBi width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-      action: () => inputfuncitons.saveData(),
-      disabled: true,
+      action: () => ProdExcelConnections.saveData(),
+      disabled: false,
     },
     {
       name: "Report Genie",

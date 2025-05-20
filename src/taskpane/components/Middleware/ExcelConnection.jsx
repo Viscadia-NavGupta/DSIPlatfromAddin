@@ -1068,7 +1068,7 @@ export async function saveData() {
     }
 
     // Create a new array with a valid size
-    let vntSave = new Array(maxrow + intTableRowOffset).fill(null).map(() => new Array(maxcol + 16).fill(""));
+    let vntSave = new Array(maxrow + intTableRowOffset).fill(null).map(() => new Array(maxcol + 17).fill(""));
 
     //****************** Start Control table loop ********************//
     let lngCounter = 0;
@@ -1090,21 +1090,23 @@ export async function saveData() {
 
               for (let j = 0; j < 15; j++) {
                 let controlValue = vntControl[i][j + 4];
+                vntSave[lngCounter][16] =vntControl[i][3];
                 vntSave[lngCounter][j + 1] = controlValue.startsWith("=") ? controlValue.slice(1) : controlValue;
               }
 
               for (let c = 0; c < vntTempData[r].length; c++) {
-                vntSave[lngCounter][c + 16] = vntTempData[r][c];
+                vntSave[lngCounter][c + 17] = vntTempData[r][c];
               }
 
               lngCounter++;
             }
           } else {
-            vntSave[lngCounter][17] = vntTempData;
+            vntSave[lngCounter][18] = vntTempData;
             vntSave[lngCounter][0] = vntControl[i][0];
 
             for (let j = 0; j < 15; j++) {
               let controlValue = vntControl[i][j + 4];
+              vntSave[lngCounter][16] =vntControl[i][3];
               vntSave[lngCounter][j + 1] = controlValue.startsWith("=") ? controlValue.slice(1) : controlValue;
             }
 
@@ -1265,7 +1267,7 @@ async function filterArrayByMultipleCriteria(sourceArray, criteria, countRow, co
     if (filteredRowCount > 0) {
       for (let a = 0; a < filteredRowCount; a++) {
         for (let b = 0; b < countCol; b++) {
-          vntFiltered[a][b] = filteredArray[a][b + 16]; // ✅ Fixed Offset to Start from Column 11
+          vntFiltered[a][b] = filteredArray[a][b + 17]; // ✅ Fixed Offset to Start from Column 11
         }
       }
     }
@@ -1423,7 +1425,7 @@ export async function exportData2() {
           for (let j = 2; j <= 16; j++) {
             criteria[j] = typeof vntControl[i][j + 2] === "string" ? vntControl[i][j + 2].replace(/^'/, "") : vntControl[i][j + 2]; // Remove only leading quote
           }
-
+          criteria[17] = typeof vntControl[i][3] === "string" ? vntControl[i][3].replace(/^'/, "") : vntControl[i][3]; // Remove only leading quote
 
           // ✅ 11. Filter Data
           let vnt_filtereddata = await filterArrayByMultipleCriteria(

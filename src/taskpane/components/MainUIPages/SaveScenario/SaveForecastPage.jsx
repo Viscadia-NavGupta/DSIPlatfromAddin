@@ -42,7 +42,9 @@ const SaveScenario = ({ setPageValue }) => {
       const records = dfResult1.toCollection();
       return records.some(
         (record) =>
-          record.model_id === modelId && record.cycle_name === cycleName && record.scenario_name === scenarioName
+          record.model_id === modelId &&
+          record.cycle_name === cycleName &&
+          record.scenario_name === scenarioName
       );
     },
     [dataFrames]
@@ -61,7 +63,9 @@ const SaveScenario = ({ setPageValue }) => {
         sheets.load("items/name");
         await context.sync();
 
-        const MetaDataSheet = sheets.items.find((sheet) => sheet.name.toLowerCase() === "cloud_backend_md");
+        const MetaDataSheet = sheets.items.find(
+          (sheet) => sheet.name.toLowerCase() === "cloud_backend_md"
+        );
 
         if (MetaDataSheet) {
           const sheet = MetaDataSheet;
@@ -74,9 +78,12 @@ const SaveScenario = ({ setPageValue }) => {
           Object.values(ranges).forEach((range) => range.load("values"));
           await context.sync();
 
-          const ModelNameValue = ranges.ModelName.values[0][0]?.toString().trim() || "";
-          const ModelIDValue = ranges.ModelID.values[0][0]?.toString().trim() || "";
-          const ModelTypeValue = ranges.ModelType.values[0][0]?.toString().trim() || "";
+          const ModelNameValue =
+            ranges.ModelName.values[0][0]?.toString().trim() || "";
+          const ModelIDValue =
+            ranges.ModelID.values[0][0]?.toString().trim() || "";
+          const ModelTypeValue =
+            ranges.ModelType.values[0][0]?.toString().trim() || "";
 
           console.log("🔍 Extracted Model Values:", {
             ModelNameValue,
@@ -96,7 +103,10 @@ const SaveScenario = ({ setPageValue }) => {
           setIsOutputSheet(true);
 
           if (ModelTypeValue === "AGGREGATOR") {
-            setPageValue("AggSaveScenario", "Loading scenario for Aggregator model...");
+            setPageValue(
+              "AggSaveScenario",
+              "Loading scenario for Aggregator model..."
+            );
           }
         } else {
           console.log("⚠️ No Output Sheet Found.");
@@ -120,8 +130,15 @@ const SaveScenario = ({ setPageValue }) => {
         localStorage.getItem("username")
       );
 
-      if (!responseBody || !responseBody.results1 || !responseBody.results2 || !responseBody.result3) {
-        throw new Error("❌ Missing one or more required results in Lambda response.");
+      if (
+        !responseBody ||
+        !responseBody.results1 ||
+        !responseBody.results2 ||
+        !responseBody.result3
+      ) {
+        throw new Error(
+          "❌ Missing one or more required results in Lambda response."
+        );
       }
 
       const df1 = new DataFrame(responseBody.results1);
@@ -169,10 +186,14 @@ const SaveScenario = ({ setPageValue }) => {
       const models = dataFrames.dfResult3.toCollection();
       console.log("Models from dfResult3:", models);
 
-      const authorized = models.some((model) => model.model_id === modelIDValue);
+      const authorized = models.some(
+        (model) => model.model_id === modelIDValue
+      );
       if (!authorized) {
         console.warn("🚨 No authorized model detected");
-        setModelIDError("Model ID mismatch. The current model is not authorized.");
+        setModelIDError(
+          "Model ID mismatch. The current model is not authorized."
+        );
         setIsOutputSheet(false);
       } else {
         setModelIDError("");
@@ -186,15 +207,13 @@ const SaveScenario = ({ setPageValue }) => {
     setPageValue("LoadingCircleComponent", "0% | Checking Access...");
     console.log("🔄 Checking Access...");
     const ButtonAcccess = await AWSconnections.ButtonAccess("SAVE_FORECAST");
-    // in this part acess to button is checked
-    if (ButtonAcccess?.message === 'ACCESS DENIED') {
-      console.warn('🔒 Access denied for SAVE_FORECAST');
+    if (ButtonAcccess?.message === "ACCESS DENIED") {
+      console.warn("🔒 Access denied for SAVE_FORECAST");
       setPageValue(
-        'SaveForecastPageinterim',
-        'You do not have permission to save forecast.'
+        "SaveForecastPageinterim",
+        "You do not have permission to save forecast."
       );
-      // change this section update the message to be more user friendly
-      console.timeEnd('Total save time request');
+      console.timeEnd("Total save time request");
       return;
     }
     setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
@@ -205,7 +224,7 @@ const SaveScenario = ({ setPageValue }) => {
     });
     console.log("🔹 Using Model ID:", modelIDValue);
     console.log("🔹 Using Model Type:", modelType);
-    // Check if the scenario name ia already present for this model, cycle and scenairo name
+
     if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
       console.log("This scenario combination already exists.");
       setPageValue(
@@ -218,21 +237,14 @@ const SaveScenario = ({ setPageValue }) => {
     try {
       await excelfucntions.setCalculationMode("manual");
       console.time("Parallel processes");
-      // creating flat file for models here
       const [longformData, inputfile, outputbackend_data] = await Promise.all([
         excelfucntions.generateLongFormData("US", "DataModel"),
         excelfucntions.saveData(),
         excelfucntions.readNamedRangeToArray("aggregator_data"),
       ]);
-
-      // // const modelsMap = new Map();
-      // // dataFrames.dfResult3.toCollection().forEach(model => {
-      // //   modelsMap.set(model.model_id, model);
-      // });
-      // const matchedModel = modelsMap.get(modelIDValue);
       console.timeEnd("Parallel processes");
-      setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
 
+      setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
       console.time("save forecast");
       const saveFlag = await AWSconnections.service_orchestration(
         "SAVE_FORECAST",
@@ -255,8 +267,13 @@ const SaveScenario = ({ setPageValue }) => {
       console.log("Save response:", saveFlag);
       setPageValue("LoadingCircleComponent", "100% | Saving your forecast...");
 
+      // === Updated multi-line message ===
+      const message = `Forecast scenario saved for
+                        Model: ${heading.replace("Save Scenario for:", "")}
+                        Cycle: ${selectedCycle}
+                        Scenario: ${scenarioName}`;
+
       if (saveFlag === "SUCCESS" || (saveFlag && saveFlag.result === "DONE")) {
-        const message = `Forecast scenario saved for model: ${heading.replace("Save Scenario for:", "")} | Cycle: ${selectedCycle} | Scenario: ${scenarioName}`;
         setPageValue("SaveForecastPageinterim", message);
       } else if (
         saveFlag ===
@@ -267,30 +284,51 @@ const SaveScenario = ({ setPageValue }) => {
           "Scenario names already exist in the database. Please choose a different scenario name."
         );
       } else if (saveFlag && saveFlag.result === "ERROR") {
-        setPageValue("SaveForecastPageinterim", "Some Error Occurred, Please try again");
+        setPageValue(
+          "SaveForecastPageinterim",
+          "Some Error Occurred, Please try again"
+        );
       } else {
-        // catch anything else
-        setPageValue("SaveForecastPageinterim", "Some Error Occurred, Please try again");
+        setPageValue(
+          "SaveForecastPageinterim",
+          "Some Error Occurred, Please try again"
+        );
       }
     } catch (error) {
       console.error("Error during save process:", error);
-      setPageValue("SaveForecastPageinterim", "An error occurred during save");
+      setPageValue(
+        "SaveForecastPageinterim",
+        "An error occurred during save"
+      );
     }
 
     console.timeEnd("Total save time request");
-  }, [selectedCycle, scenarioName, modelIDValue, modelType, checkScenarioExists, setPageValue]);
+  }, [
+    selectedCycle,
+    scenarioName,
+    modelIDValue,
+    modelType,
+    checkScenarioExists,
+    setPageValue,
+    heading,
+  ]);
 
   return (
     <Container>
       {loading ? (
-        <MessageBox>Checking cloud compatibility, please wait...</MessageBox>
+        <MessageBox>
+          Checking cloud compatibility, please wait...
+        </MessageBox>
       ) : modelIDError ? (
         <MessageBox>{modelIDError}</MessageBox>
       ) : isOutputSheet ? (
         <>
           <Heading>{heading}</Heading>
           <DropdownContainer>
-            <SelectDropdown value={selectedCycle} onChange={(e) => setSelectedCycle(e.target.value)}>
+            <SelectDropdown
+              value={selectedCycle}
+              onChange={(e) => setSelectedCycle(e.target.value)}
+            >
               <option value="" disabled>
                 Select Cycle
               </option>
@@ -311,12 +349,17 @@ const SaveScenario = ({ setPageValue }) => {
               onChange={(e) => setScenarioName(e.target.value)}
             />
           </DropdownContainer>
-          <SaveButton onClick={handleSaveClick} disabled={!selectedCycle || !scenarioName}>
+          <SaveButton
+            onClick={handleSaveClick}
+            disabled={!selectedCycle || !scenarioName}
+          >
             Save
           </SaveButton>
         </>
       ) : (
-        <MessageBox>No authorized output sheet or model found. Please refresh the add-in.</MessageBox>
+        <MessageBox>
+          No authorized output sheet or model found. Please refresh the add-in.
+        </MessageBox>
       )}
     </Container>
   );
