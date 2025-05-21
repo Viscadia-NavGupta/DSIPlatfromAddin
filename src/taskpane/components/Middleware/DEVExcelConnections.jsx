@@ -439,10 +439,6 @@ export async function generateLongFormData(region, DataModelNameRange) {
       longFormData.push(headers);
 
       let currentRow = 1;
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/Dev-DSI-Addin
 
       for (let i = 0; i < extractedData.length; i++) {
         let baseRow = currentRow;
@@ -450,8 +446,6 @@ export async function generateLongFormData(region, DataModelNameRange) {
         let runflag = false;
         let levelData = [];
         let flag = Array(15).fill(null);
-        let transformFlag = false;
-        let runflag = false;
 
         let metricName = extractedData[i][0][0];
         let input_output = extractedData[i][0][5];

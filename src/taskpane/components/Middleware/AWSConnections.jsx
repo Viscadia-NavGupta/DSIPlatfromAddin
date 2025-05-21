@@ -671,11 +671,6 @@ export async function service_orchestration(
           console.log("⏱️ Service request requires polling");
           pollingResult = await poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
         }
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/Dev-DSI-Addin
-
         // Now, for each element in matchedForecasts, send a service request
         if (buttonname === "SAVE_LOCKED_FORECAST_AGG") {
           let completedCount = 0;
@@ -720,10 +715,6 @@ export async function service_orchestration(
                 const progressPercent = 60 + Math.round((completedCount / totalCount) * 30); // max 90%
                 setPageValue("LoadingCircleComponent", `${progressPercent}% | Saving your forecast...`);
               }
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/Dev-DSI-Addin
             } catch (error) {
               console.error("Error processing matched forecast", match, error);
             }
