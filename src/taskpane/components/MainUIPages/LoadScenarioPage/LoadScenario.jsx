@@ -250,7 +250,7 @@ const LoadScenario = ({ setPageValue }) => {
 
         const progressPromise = increaseProgressDuringExport();
 
-        await InputfileConnections.exportData2();
+        await excelconnections.exportData2();
 
         await progressPromise;
 

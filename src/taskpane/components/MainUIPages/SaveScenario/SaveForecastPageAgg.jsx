@@ -240,7 +240,7 @@ const AggSaveScenario = ({ setPageValue }) => {
 
       const [longformData, _] = await Promise.all([
         excelfucntions.generateLongFormData("US", "DataModel"),
-        inputfiles.saveData(),
+        excelfucntions.saveData(),
       ]);
 
       console.timeEnd("Parallel processes");

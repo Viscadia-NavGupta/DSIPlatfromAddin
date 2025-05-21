@@ -23,7 +23,7 @@ const SubmitPage = ({ setPageValue }) => {
           Thank you! Your message has been successfully submitted.
         </SubHeading>
       </MessageContainer>
-      <Button onClick={() => setPageValue("Home")}>Return Home</Button>
+      <Button onClick={() => setPageValue("UserLogin")}>Return Home</Button>
       <FooterText>© 2024 Viscadia. All rights reserved.</FooterText>
     </PageContainer>
   );

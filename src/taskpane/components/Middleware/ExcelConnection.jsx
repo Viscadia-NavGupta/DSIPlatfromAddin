@@ -38,7 +38,7 @@ export async function getAllSheetUsedRangesArray() {
 export async function extractLevelData(DataModelNameRange) {
   try {
     return await Excel.run(async (context) => {
-      console.log("🔍 Starting extractLevelData function...");
+      // console.log("🔍 Starting extractLevelData function...");
       let workbook = context.workbook;
       let namedRange = workbook.names.getItemOrNullObject(DataModelNameRange);
       await context.sync();
@@ -147,33 +147,33 @@ export async function loadWorkbookData() {
       workbookData = {};
       sheetNames = [];
       const rangesToLoad = [];
-      
+
       // First pass: get all used ranges and their addresses
       for (let sheet of sheets.items) {
         let sheetName = sheet.name.trim();
         sheetNames.push(sheetName);
-        
+
         // Get the used range for this sheet
         let usedRange = sheet.getUsedRange();
         usedRange.load(["address"]);
         rangesToLoad.push({ sheet, usedRange });
       }
-      
+
       // Single sync call to get all used range addresses
       await context.sync();
       // console.log(sheetNames);
       // console.log(rangesToLoad);
-      
+
       // Second pass: create expanded ranges from A1 and load values
       const expandedRanges = [];
-      
+
       for (let item of rangesToLoad) {
         try {
           if (item.usedRange && item.usedRange.address) {
             // Get used range address (e.g., "Sheet1!B3:F20")
             let usedAddress = item.usedRange.address;
             let lastCell = usedAddress.split("!")[1].split(":")[1] || usedAddress.split("!")[1];
-            
+
             // Define the new range starting from A1 to the last used cell
             let expandedRange = item.sheet.getRange(`A1:${lastCell}`);
             expandedRange.load("values");
@@ -200,17 +200,17 @@ export async function loadWorkbookData() {
           });
         }
       }
-      
+
       // Final sync to get all expanded range values at once
       await context.sync();
-      
+
       // Process all the expanded ranges
       for (let item of expandedRanges) {
         workbookData[item.sheetName] = item.expandedRange.values;
       }
 
-      console.log("Workbook Data Loaded", workbookData);
-      console.log("Sheet Names:", sheetNames);
+      // console.log("Workbook Data Loaded", workbookData);
+      // console.log("Sheet Names:", sheetNames);
       return workbookData;
     });
   } catch (error) {
@@ -241,8 +241,8 @@ export function getRangeFromUsedRanges(rangeStr, workbookData) {
   try {
     let { sheetName, startCell, endCell } = parseRangeString(rangeStr);
 
-    console.log(`Extracted Sheet Name: '${sheetName}'`);
-    console.log("Available Sheets in workbookData:", Object.keys(workbookData));
+    // console.log(`Extracted Sheet Name: '${sheetName}'`);
+    // console.log("Available Sheets in workbookData:", Object.keys(workbookData));
 
     if (!workbookData[sheetName]) {
       let possibleMatches = Object.keys(workbookData).filter((name) => name.toLowerCase() === sheetName.toLowerCase());
@@ -279,13 +279,13 @@ export function getRangeFromUsedRanges(rangeStr, workbookData) {
     // ✅ Handle single-cell references by returning a 2D array
     if (startRow === endRow && startCol === endCol) {
       let singleValue = sheetData[startRow][startCol];
-      console.log(`Extracted Single Cell Data from '${sheetName}'!${startCell}:`, singleValue);
+      // console.log(`Extracted Single Cell Data from '${sheetName}'!${startCell}:`, singleValue);
       return [[singleValue]]; // ✅ Convert single values to 2D array
     }
 
     let resultArray = sheetData.slice(startRow, endRow + 1).map((row) => row.slice(startCol, endCol + 1));
 
-    console.log(`Extracted Data from '${sheetName}'!${startCell}:${endCell}`, resultArray);
+    // console.log(`Extracted Data from '${sheetName}'!${startCell}:${endCell}`, resultArray);
     return resultArray;
   } catch (error) {
     console.error("Error getting range data:", error);
@@ -440,7 +440,7 @@ export function isValidRange(rangeStr) {
   return rangePattern.test(rangeStr);
 }
 
-export async function generateLongFormData(region,DataModelNameRange) {
+export async function generateLongFormData(region, DataModelNameRange) {
   try {
     // Await the result from Excel.run and assign it to the variable 'data'
     const data = await Excel.run(async (context) => {
@@ -453,7 +453,7 @@ export async function generateLongFormData(region,DataModelNameRange) {
       // Disable calculations for performance
       workbook.application.calculationMode = Excel.CalculationMode.manual;
 
-      console.log("Fetching all sheet used ranges...");
+      // console.log("Fetching all sheet used ranges...");
       await loadWorkbookData();
       // let initialSheetData = workbookData;
 
@@ -462,14 +462,14 @@ export async function generateLongFormData(region,DataModelNameRange) {
         return []; // Return an empty array if no data is found
       }
 
-      console.log("Extracting level data...");
+      // console.log("Extracting level data...");
       let extractedData = await extractLevelData(DataModelNameRange);
       if (!extractedData || extractedData.length === 0) {
         console.warn("No extracted data available.");
         return []; // Return an empty array if no extracted data is available
       }
 
-      console.log("Processing data transformation...");
+      // console.log("Processing data transformation...");
       let longFormData = [];
       let headers = [];
       headers.push("flow_name", "region", "output_name", "input_output");
@@ -478,21 +478,23 @@ export async function generateLongFormData(region,DataModelNameRange) {
       longFormData.push(headers);
 
       let currentRow = 1;
-      let transformFlag = false;
-      let runflag = false;
+
 
       for (let i = 0; i < extractedData.length; i++) {
         let baseRow = currentRow;
         let levelData = [];
         let flag = Array(15).fill(null);
+        let transformFlag = false;
+        let runflag = false;
+
 
         let metricName = extractedData[i][0][0];
         let input_output = extractedData[i][0][5];
         let flow_name = "Primary";
         let region_name = region;
         let SingleCell_flag = false;
-        console.log(`Processing: ${metricName}`);
-        console.log(i);
+        // console.log(`Processing: ${metricName}`);
+        // console.log(i);
 
         for (let a = 0; a < extractedData[i].length; a++) {
           if (
@@ -634,10 +636,6 @@ export async function generateLongFormData(region,DataModelNameRange) {
       // outputRange.format.autofitRows();
       // await context.sync();
       console.timeEnd("writing data");
-      console.time("CSV Creation");
-      // Optionally create CSV here if needed
-      console.timeEnd("CSV Creation");
-
       console.log(`Data processed successfully. Final row count: ${currentRow - 1}`);
       // Return the longFormData array from within Excel.run
       return longFormData;
@@ -781,7 +779,7 @@ export async function apiResponseToExcel(apiResponse, sheetName, startRange) {
 
       // Check if the sheet exists in the workbook
       const sheet = worksheets.items.find((item) => item.name === sheetName);
-      
+
       if (!sheet) {
         throw new Error(`Sheet "${sheetName}" does not exist in the workbook.`);
       }
@@ -807,7 +805,7 @@ export async function apiResponseToExcel(apiResponse, sheetName, startRange) {
 
       // Get the range starting from the given startRange
       const range = sheet.getRange(startRange);
-      
+
       // Set values in a single operation
       const resizedRange = range.getResizedRange(data.length - 1, headers.length - 1);
       resizedRange.values = data;
@@ -871,3 +869,799 @@ export async function readNamedRangeToArray(namedRangeName) {
 }
 
 
+
+// -------------------------------------------------input file  functions--------------------------------------------------
+
+async function appendColumns(arr, numNewCols) {
+  return Excel.run(async (context) => {
+    let workbook = context.workbook;
+    let namedItems = workbook.names;
+    namedItems.load("items/name");
+
+    await context.sync(); // Load Named Ranges once
+
+    let namedRangeMap = {}; // Store named ranges in a key-value map
+    let rangesToLoad = [];
+
+    // Load named ranges and their addresses
+    namedItems.items.forEach(nameItem => {
+      let range = nameItem.getRangeOrNullObject(); // Avoid errors on missing ranges
+      range.load(["address"]); // Load only address
+      namedRangeMap[nameItem.name] = range; // Store reference
+      rangesToLoad.push(range);
+    });
+
+    await context.sync(); // Sync to get addresses
+
+    // Now populate the map with actual addresses
+    for (let name in namedRangeMap) {
+      if (!namedRangeMap[name].isNullObject) {
+        namedRangeMap[name] = namedRangeMap[name].address;
+      }
+    }
+
+    let oldCols = arr[0].length;
+    let newCols = oldCols + numNewCols;
+
+    // Step 1: Create a new array and replace Named Ranges for every element
+    let newArr = arr.map(row =>
+      row.map(cell => {
+        if (typeof cell === "string") {
+          cell = cell.replace(/^=/, ""); // Remove '=' if present
+          if (namedRangeMap[cell]) {
+            return namedRangeMap[cell]; // Replace with its address
+          }
+        }
+        return cell;
+      }).concat(new Array(numNewCols).fill("")) // Append new columns
+    );
+
+    // Step 2: Process arr[i][4] to count rows and columns
+    for (let i = 0; i < arr.length; i++) {
+      let element = newArr[i][3]; // Process only column index 4
+
+      if (element && typeof element === "string") {
+        element = element.replace(/^=/, ""); // Remove '=' if present
+
+        // If it's a Named Range, replace with its reference
+        if (namedRangeMap[element]) {
+          element = namedRangeMap[element];
+        }
+
+        // Count rows and columns for the evaluated range
+        let rangeInfo = getRangeDimensions(element);
+        if (rangeInfo.rowCount > 0 && rangeInfo.colCount > 0) {
+          newArr[i][oldCols] = rangeInfo.rowCount;
+          newArr[i][oldCols + 1] = rangeInfo.colCount;
+          newArr[i][oldCols + 2] = element; // Store processed address
+        }
+      }
+    }
+
+    return newArr;
+  }).catch((error) => {
+    console.error("Error in appendColumns:", error);
+    return arr; // Return original array in case of error
+  });
+}
+
+
+
+// Function to determine row and column count
+function getRangeDimensions(rangeAddress) {
+  try {
+    if (!rangeAddress) return { rowCount: 0, colCount: 0 };
+
+    // Remove unnecessary characters (e.g., '=' or sheet name)
+    let cleanedAddress = rangeAddress.replace(/^=.*?!/, "").replace(/'/g, "");
+
+    // Check for multi-cell range (e.g., "A1:B10")
+    let match = cleanedAddress.match(/([A-Z]+)(\d+):([A-Z]+)(\d+)/);
+    if (match) {
+      let [, colStart, rowStart, colEnd, rowEnd] = match;
+      return {
+        rowCount: Math.abs(parseInt(rowEnd) - parseInt(rowStart)) + 1,
+        colCount: Math.abs(columnToNumber(colEnd) - columnToNumber(colStart)) + 1,
+      };
+    }
+
+    // Check for single-cell reference (e.g., "E6") and return {1,1}
+    let singleCellMatch = cleanedAddress.match(/([A-Z]+)(\d+)/);
+    if (singleCellMatch) {
+      return { rowCount: 1, colCount: 1 };
+    }
+
+    return { rowCount: 0, colCount: 0 }; // Return 0 if invalid input
+  } catch (error) {
+    console.error("Error parsing range address:", error);
+    return { rowCount: 0, colCount: 0 };
+  }
+}
+
+// Helper function to convert column letters to numbers
+function columnToNumber(col) {
+  let num = 0;
+  for (let i = 0; i < col.length; i++) {
+    num = num * 26 + (col.charCodeAt(i) - "A".charCodeAt(0) + 1);
+  }
+  return num;
+}
+
+
+function sumColumn(arr, colIndex) {
+  let total = 0;
+
+  for (let i = 0; i < arr.length; i++) {
+    let value = arr[i][colIndex];
+
+    // Ensure value is neither null nor undefined and is a valid number
+    if (value !== null && value !== undefined && value !== "" && !isNaN(value) && isFinite(value)) {
+      total += parseFloat(value); // Convert and add
+    }
+  }
+
+  return total;
+}
+
+function findMaxInColumn(arr, colIndex) {
+  let maxVal = Number.NEGATIVE_INFINITY;
+
+  for (let i = 0; i < arr.length; i++) {
+    let value = arr[i][colIndex];
+
+    // Ensure value is neither null nor undefined and is a valid number
+    if (value !== null && value !== undefined && value !== "" && !isNaN(value) && isFinite(value)) {
+      maxVal = Math.max(maxVal, parseFloat(value));
+    }
+  }
+
+  return maxVal === Number.NEGATIVE_INFINITY ? null : maxVal; // Return null if no valid numbers were found
+}
+
+
+export async function saveData() {
+  return Excel.run(async (context) => {
+    let workbook = context.workbook;
+    let sheet = workbook.worksheets.getActiveWorksheet();
+    let inputSheet = workbook.worksheets.getItem("Input File");
+
+    //****************** Import Data ********************//
+    let namedRange = workbook.names.getItemOrNullObject("DataModel");
+    await context.sync(); // Load named range
+    await loadWorkbookData();
+
+    if (namedRange.isNullObject) {
+      console.error("Error: DataModel range not found.");
+      return;
+    }
+
+    let dataModelRange = namedRange.getRange();
+    dataModelRange.load("values");
+    await context.sync(); // Load values from DataModel range
+
+    let vntControl = dataModelRange.values;
+    vntControl = vntControl.map(row => row.slice(0, -1));
+
+    // Extend vntControl array with 3 additional columns
+    vntControl = await appendColumns(vntControl, 3);
+
+    // Position value in the table
+    const intRowOffsetData = 3;
+    const intRowOffsetwks = 2;
+    const intRowOffsetRange = 3;
+    const intRowOffsetRSize = 4;
+    const intRowOffsetCSize = 5;
+    const intTableRowOffset = 0;
+
+    // Ensure maxrow and maxcol are valid numbers
+    let maxrow = sumColumn(vntControl, 19);
+    let maxcol = findMaxInColumn(vntControl, 20);
+
+    // Check for invalid values before creating the array
+    if (isNaN(maxrow) || maxrow <= 0) {
+      console.error("Invalid maxrow value:", maxrow);
+      maxrow = 1; // Set a default minimum valid row count
+    }
+    if (isNaN(maxcol) || maxcol <= 0) {
+      console.error("Invalid maxcol value:", maxcol);
+      maxcol = 1; // Set a default minimum valid column count
+    }
+
+    // Create a new array with a valid size
+    let vntSave = new Array(maxrow + intTableRowOffset).fill(null).map(() => new Array(maxcol + 17).fill(""));
+
+    //****************** Start Control table loop ********************//
+    let lngCounter = 0;
+    let blnRangeCheck = false;
+
+    for (let i = 0; i < vntControl.length; i++) {
+      if (vntControl[i][1] !== "Outputs" && vntControl[i][21] !== "") {
+        let rangeAddress = vntControl[i][21];
+
+        try {
+          let tempRange = await getRangeFromUsedRanges(vntControl[i][3], workbookData)
+          /// think about htis process to be fetched form used rnage 
+          ///);
+          let vntTempData = tempRange;
+
+          if (Array.isArray(vntTempData)) {
+            for (let r = 0; r < vntTempData.length; r++) {
+              vntSave[lngCounter][0] = vntControl[i][0]; // Store model field name
+
+              for (let j = 0; j < 15; j++) {
+                let controlValue = vntControl[i][j + 4];
+                vntSave[lngCounter][16] =vntControl[i][3];
+                vntSave[lngCounter][j + 1] = controlValue.startsWith("=") ? controlValue.slice(1) : controlValue;
+              }
+
+              for (let c = 0; c < vntTempData[r].length; c++) {
+                vntSave[lngCounter][c + 17] = vntTempData[r][c];
+              }
+
+              lngCounter++;
+            }
+          } else {
+            vntSave[lngCounter][18] = vntTempData;
+            vntSave[lngCounter][0] = vntControl[i][0];
+
+            for (let j = 0; j < 15; j++) {
+              let controlValue = vntControl[i][j + 4];
+              vntSave[lngCounter][16] =vntControl[i][3];
+              vntSave[lngCounter][j + 1] = controlValue.startsWith("=") ? controlValue.slice(1) : controlValue;
+            }
+
+            lngCounter++;
+          }
+        } catch (error) {
+          console.error("Invalid named range or worksheet missing:", rangeAddress);
+          blnRangeCheck = true;
+        }
+      }
+    }
+
+    //****************** Save data to "Input File" sheet ********************//
+    inputSheet.getUsedRange().clear();
+    let saveRange = inputSheet.getRangeByIndexes(intTableRowOffset, 0, vntSave.length, vntSave[0].length);
+    saveRange.values = vntSave;
+    await context.sync();
+
+    // console.log("Data saved successfully!");
+
+    if (blnRangeCheck) {
+      console.error("Some named ranges or worksheets were missing.");
+    }
+  }).catch((error) => {
+    console.error("Error in saveData:", error);
+  });
+}
+
+
+// export function parseRangeString(rangeStr) {
+//     let match = rangeStr.match(/^(.*?)!\s*([A-Z]+\d+)(?::([A-Z]+\d+))?$/);
+//     if (!match) {
+//         throw new Error("Invalid range format: " + rangeStr);
+//     }
+
+//     let sheetName = match[1].trim();
+//     let startCell = match[2];
+//     let endCell = match[3] || startCell; // If no endCell, it's a single-cell reference
+
+//     // ✅ Ensure surrounding single quotes are removed properly
+//     if (sheetName.startsWith("'") && sheetName.endsWith("'")) {
+//         sheetName = sheetName.slice(1, -1);
+//     }
+
+//     return { sheetName, startCell, endCell };
+// }
+
+
+
+// export function getRangeFromUsedRanges(rangeStr, workbookData) {
+//     try {
+//         let { sheetName, startCell, endCell } = parseRangeString(rangeStr);
+
+//         // console.log(`Extracted Sheet Name: '${sheetName}'`);
+//         // console.log("Available Sheets in workbookData:", Object.keys(workbookData));
+
+//         if (!workbookData[sheetName]) {
+//             let possibleMatches = Object.keys(workbookData).filter(name => name.toLowerCase() === sheetName.toLowerCase());
+//             if (possibleMatches.length > 0) {
+//                 sheetName = possibleMatches[0];
+//                 console.warn(`Corrected sheet name to '${sheetName}'`);
+//             } else {
+//                 console.error(`Sheet '${sheetName}' not found in preloaded data.`);
+//                 return [[]]; // ✅ Always return a 2D array
+//             }
+//         }
+
+//         let sheetData = workbookData[sheetName];
+
+//         function colToIndex(col) {
+//             let index = 0;
+//             for (let i = 0; i < col.length; i++) {
+//                 index = index * 26 + (col.charCodeAt(i) - 64);
+//             }
+//             return index - 1;
+//         }
+
+//         let startRow = parseInt(startCell.match(/\d+/)[0], 10) - 1;
+//         let endRow = parseInt(endCell.match(/\d+/)[0], 10) - 1;
+//         let startCol = colToIndex(startCell.match(/[A-Z]+/)[0]);
+//         let endCol = colToIndex(endCell.match(/[A-Z]+/)[0]);
+
+//         // ✅ Ensure data is within bounds
+//         if (!sheetData || sheetData.length <= startRow || !sheetData[startRow] || sheetData[startRow].length <= startCol) {
+//             console.warn(`Range '${rangeStr}' is out of bounds or empty.`);
+//             return [[]]; // ✅ Always return a 2D array
+//         }
+
+//         // ✅ Handle single-cell references by returning a 2D array
+//         if (startRow === endRow && startCol === endCol) {
+//             let singleValue = sheetData[startRow][startCol];
+//             // console.log(`Extracted Single Cell Data from '${sheetName}'!${startCell}:`, singleValue);
+//             return [[singleValue]]; // ✅ Convert single values to 2D array
+//         }
+
+//         let resultArray = sheetData.slice(startRow, endRow + 1)
+//             .map(row => row.slice(startCol, endCol + 1));
+
+//         // console.log(`Extracted Data from '${sheetName}'!${startCell}:${endCell}`, resultArray);
+//         return resultArray;
+//     } catch (error) {
+//         console.error("Error getting range data:", error);
+//         return [[]]; // ✅ Always return a 2D array on failure
+//     }
+// }
+
+
+async function filterArrayByMultipleCriteria(sourceArray, criteria, countRow, countCol) {
+  try {
+    let filteredArray = [];
+    let filteredRowCount = 0;
+
+    // console.log("🔍 Source Array:", sourceArray);
+    // console.log("🔍 Criteria:", criteria);
+
+    // Iterate through each row in the source array
+    for (let i = 0; i < sourceArray.length; i++) {
+      let isMatch = true;
+
+      // ✅ Ensure criteria comparison is correct
+      let matchResult = evaluateCriteria(sourceArray[i][0], criteria["1"]);
+      // console.log(`🔍 Checking row ${i + 1}: Value = ${sourceArray[i][0]}, Criteria = ${criteria["1"]}, Match = ${matchResult}`);
+
+      if (!matchResult) {
+        isMatch = false;
+      } else {
+        // ✅ Convert criteria keys to numbers before comparing
+        for (let col in criteria) {
+          let colNum = Number(col);
+          if (colNum > 1) {
+            let cellValue = sourceArray[i][colNum - 1];
+            let criteriaValue = criteria[colNum];
+
+            let colMatch = evaluateCriteria(cellValue, criteriaValue);
+            // console.log(`🔍 Checking col ${colNum}: Value = ${cellValue}, Criteria = ${criteriaValue}, Match = ${colMatch}`);
+
+            if (!colMatch) {
+              isMatch = false;
+              break;
+            }
+          }
+        }
+      }
+
+      // ✅ If all criteria match, add row to filtered array
+      if (isMatch) {
+        filteredArray.push(sourceArray[i]);
+        filteredRowCount++;
+      }
+    }
+
+    // console.log("✅ Filtered Rows Count:", filteredRowCount);
+    // console.log("✅ Filtered Data:", filteredArray);
+
+    // ✅ Initialize the final filtered output array
+    let vntFiltered = Array.from({ length: countRow }, () => Array(countCol).fill(""));
+
+    if (filteredRowCount > 0) {
+      for (let a = 0; a < filteredRowCount; a++) {
+        for (let b = 0; b < countCol; b++) {
+          vntFiltered[a][b] = filteredArray[a][b + 17]; // ✅ Fixed Offset to Start from Column 11
+        }
+      }
+    }
+
+    // console.log("✅ Final Output Array:", vntFiltered);
+    return vntFiltered;
+  } catch (error) {
+    console.error("❌ Error in filterArrayByMultipleCriteria:", error);
+    return [[]]; // Return empty array in case of error
+  }
+}
+
+// ✅ Fixed `evaluateCriteria()` function
+function evaluateCriteria(value, criteria) {
+  try {
+    if ((criteria === "" || criteria === null) && (value === "" || value === null)) {
+      return true;
+    }
+
+    if (typeof criteria === "string" && criteria.includes(",")) {
+      let parts = criteria.split(",");
+      let operator = parts[0].trim();
+      let target = parts[1].trim();
+
+      if (!isNaN(target)) {
+        target = parseFloat(target);
+      }
+
+      switch (operator) {
+        case ">":
+          return value > target;
+        case "<":
+          return value < target;
+        case "=":
+          return value == target;
+        case ">=":
+          return value >= target;
+        case "<=":
+          return value <= target;
+        case "<>":
+          return value != target;
+        default:
+          console.warn(`⚠️ Invalid operator: ${operator}`);
+          return false;
+      }
+    }
+
+    return value == criteria; // Default equality check
+  } catch (error) {
+    console.error("❌ Error in evaluateCriteria:", error);
+    return false;
+  }
+}
+
+
+/// import assumptions code 
+
+export async function exportData2() {
+  try {
+    await Excel.run(async (context) => {
+      const workbook = context.workbook;
+
+      // ✅ 1. Check if "Data Model" sheet exists
+      let dataModelSheet;
+      try {
+        dataModelSheet = workbook.worksheets.getItem("Data Model");
+      } catch (err) {
+        console.error("❌ Worksheet 'Data Model' not found.");
+        return;
+      }
+
+      // ✅ 2. Check if "Input File" sheet exists
+      let inputSheet;
+      try {
+        inputSheet = workbook.worksheets.getItem("Input File");
+      } catch (err) {
+        console.error("❌ Worksheet 'Input File' not found.");
+        return;
+      }
+
+      // ✅ 3. Unhide "Data Model" sheet if hidden
+      dataModelSheet.load("visibility");
+      await context.sync();
+      if (dataModelSheet.visibility === Excel.SheetVisibility.hidden) {
+        console.warn("⚠️ 'Data Model' sheet is hidden. Unhiding...");
+        dataModelSheet.visibility = Excel.SheetVisibility.visible;
+        await context.sync();
+      }
+
+      // ✅ 4. Try getting the Named Range (Check Workbook Level First)
+      let vntControlRange = workbook.names.getItemOrNullObject("DataModel");
+      await context.sync();
+
+      // ✅ 5. If Named Range is Missing, Check If It's a Table
+      if (vntControlRange.isNullObject) {
+        console.warn("⚠️ Named range 'DataModel' not found as a Named Range. Checking as a Table...");
+        try {
+          let table = workbook.tables.getItem("DataModel");
+          vntControlRange = table.getRange();
+        } catch (err) {
+          console.error("❌ Error: 'DataModel' is neither a Named Range nor a Table.");
+          return;
+        }
+      }
+
+      // ✅ 6. Load Named Range Values
+      let dataModelRange = vntControlRange.getRange();
+      dataModelRange.load("values");
+      await context.sync();
+
+      let vntControl = dataModelRange.values;
+      vntControl = vntControl.map(row => row.slice(0, -1));
+      vntControl = await appendColumns(vntControl, 3); // Append 3 extra columns
+
+      // console.log("✅ Named Range 'DataModel' successfully loaded!");
+
+      // ✅ 7. Compute max row & max col
+      let maxrow = sumColumn(vntControl, 19);
+      let maxcol = findMaxInColumn(vntControl, 20);
+
+      maxrow = isNaN(maxrow) || maxrow <= 0 ? 1 : maxrow;
+      maxcol = isNaN(maxcol) || maxcol <= 0 ? 1 : maxcol;
+
+      let vntSave = Array.from({ length: maxrow + 1 }, () => Array(maxcol + 11).fill(""));
+
+      // ✅ 8. Load Input File Data (Fixed `rowCount` error)
+      let usedRange = inputSheet.getUsedRange();
+      usedRange.load(["rowCount", "columnCount"]);
+      await context.sync();
+
+      let inputDataRange = inputSheet.getRange("A1").getResizedRange(usedRange.rowCount - 1, usedRange.columnCount - 1);
+      inputDataRange.load("values");
+      await context.sync();
+
+      let vnt_inputdata = inputDataRange.values;
+      if (!vnt_inputdata || vnt_inputdata.length === 0) {
+        console.warn("⚠️ Warning: No input data found in 'Input File'.");
+        return;
+      }
+
+      // ✅ 9. Process Control Table
+      let blnRangeCheck = false;
+      for (let i = 0; i < vntControl.length; i++) {
+        if (vntControl[i][1] !== "Outputs" && vntControl[i][21]) {
+          // Remove "=" from control table expressions
+          for (let j = 4; j < 19; j++) {
+            if (typeof vntControl[i][j] === "string" && vntControl[i][j].startsWith("=")) {
+              vntControl[i][j] = vntControl[i][j].slice(1);
+            }
+          }
+
+          let criteria = {};
+          criteria[1] = typeof vntControl[i][0] === "string" ? vntControl[i][0].replace(/^'/, "") : vntControl[i][0]; // Remove only leading quote
+
+          for (let j = 2; j <= 16; j++) {
+            criteria[j] = typeof vntControl[i][j + 2] === "string" ? vntControl[i][j + 2].replace(/^'/, "") : vntControl[i][j + 2]; // Remove only leading quote
+          }
+          criteria[17] = typeof vntControl[i][3] === "string" ? vntControl[i][3].replace(/^'/, "") : vntControl[i][3]; // Remove only leading quote
+
+          // ✅ 11. Filter Data
+          let vnt_filtereddata = await filterArrayByMultipleCriteria(
+            vnt_inputdata,
+            criteria,
+            vntControl[i][19],
+            vntControl[i][20]
+          );
+
+          // ✅ 12. Parse and Validate Target Range
+          let rangeStr = vntControl[i][21].trim();
+          let match = rangeStr.match(/^'?(.*?)'?!([A-Z]+\d+(:[A-Z]+\d+)?)$/);
+
+          if (!match) {
+            console.error(`❌ Invalid range format: ${rangeStr}`);
+            blnRangeCheck = true;
+            continue;
+          }
+
+          let sheetName = match[1].trim();
+          let rangeAddress = match[2].trim();
+
+          try {
+            let targetSheet = workbook.worksheets.getItem(sheetName);
+            let targetRange = targetSheet.getRange(rangeAddress);
+
+            // ✅ 13. Write Filtered Data to Excel
+            // targetRange = targetRange.getResizedRange(vntControl[i][14], vntControl[i][15]);
+            //   await validateAndWriteData(sheetName, rangeAddress, vnt_filtereddata);
+            targetRange.values = vnt_filtereddata;
+            await context.sync();
+          } catch (error) {
+            console.error(`❌ Error: Unable to access range '${rangeStr}'.`);
+            blnRangeCheck = true;
+            continue;
+          }
+        }
+      }
+
+      // console.log("✅ Inputs have been imported successfully!");
+
+      // ✅ 14. Error Logging
+      if (blnRangeCheck) {
+        console.error("⚠️ Some named ranges or worksheets were missing.");
+      }
+    });
+  } catch (error) {
+    console.error("❌ Error in exportData2:", error);
+  }
+}
+
+
+export async function protectAllSheets(password) {
+  try {
+    await Excel.run(async (context) => {
+      const workbook = context.workbook;
+      const worksheets = workbook.worksheets;
+
+      // Load all worksheet names
+      worksheets.load("items/name");
+
+      await context.sync();
+
+      worksheets.items.forEach(sheet => {
+        sheet.protection.protect({
+          allowInsertRows: false,
+          allowInsertColumns: false,
+          allowInsertHyperlinks: false,
+          allowDeleteRows: false,
+          allowDeleteColumns: false,
+          allowFormatCells: true,  // Users can format cells
+          allowFormatRows: false,  // Prevent row formatting
+          allowFormatColumns: false, // Prevent column formatting
+          allowSort: false,  // Prevent sorting
+          allowAutoFilter: false, // Prevent auto-filter changes
+          allowPivotTables: false  // Prevent pivot table modifications
+        }, password);
+      });
+
+      await context.sync();
+      // console.log("All sheets are protected with the specified restrictions.");
+    });
+  } catch (error) {
+    console.error("Error protecting sheets:", error);
+  }
+}
+
+async function validateAndWriteData(sheetName, rangeAddress, vnt_filtereddata) {
+  try {
+    await Excel.run(async (context) => {
+      let sheet = context.workbook.worksheets.getItem(sheetName);
+      let targetRange = sheet.getRange(rangeAddress);
+
+      // ✅ Load rowCount and columnCount explicitly before using them
+      targetRange.load(["rowCount", "columnCount"]);
+      await context.sync(); // Ensure the properties are loaded
+
+      // Get target range dimensions
+      let rowCount = targetRange.rowCount;
+      let colCount = targetRange.columnCount;
+      let rangeCellCount = rowCount * colCount;
+
+      // Get vnt_filtereddata dimensions
+      let dataRowCount = vnt_filtereddata.length;
+      let dataColCount = vnt_filtereddata[0]?.length || 0; // Handle potential empty arrays
+      let dataCellCount = dataRowCount * dataColCount;
+
+      // console.log(`📌 Target Range: ${rowCount} rows x ${colCount} cols = ${rangeCellCount} cells`);
+      // console.log(`📌 Data Size: ${dataRowCount} rows x ${dataColCount} cols = ${dataCellCount} cells`);
+
+      // ✅ Validation check
+      if (rangeCellCount !== dataCellCount) {
+        console.error(`❌ Mismatch! Target range has ${rangeCellCount} cells, but data has ${dataCellCount} cells.`);
+        return false;
+      }
+
+      // ✅ If validation passes, write data to Excel
+      targetRange.values = vnt_filtereddata;
+      await context.sync();
+      // console.log("✅ Data written successfully.");
+    });
+    return true;
+  } catch (error) {
+    console.error(`❌ Error in validateAndWriteData:`, error);
+    return false;
+  }
+}
+
+export async function refreshPivotTable(sheetName, pivotTableName) {
+  try {
+    await Excel.run(async (context) => {
+      // 1) Get the worksheet: either by name or default to active sheet
+      const sheet = sheetName
+        ? context.workbook.worksheets.getItem(sheetName)
+        : context.workbook.worksheets.getActiveWorksheet();
+
+      // 2) Get the pivot table by name
+      const pivot = sheet.pivotTables.getItem(pivotTableName);
+
+      // 3) Refresh it
+      pivot.refresh();
+
+      // 4) Sync back to Excel
+      await context.sync();
+    });
+    console.log(`Pivot "${pivotTableName}" refreshed!`);
+  } catch (error) {
+    console.error(`Error refreshing pivot "${pivotTableName}":`, error);
+  }
+}
+
+
+export async function MetaDataSyncwithoutheaders(apiResponse, sheetName, startRange) {
+  await Excel.run(async (context) => {
+    // Improve performance by switching to manual calculation
+    context.workbook.application.calculation = Excel.CalculationMode.manual;
+
+    try {
+      // Load worksheet names
+      const worksheets = context.workbook.worksheets;
+      worksheets.load('items/name');
+      await context.sync();
+
+      // Find the specified sheet
+      const sheet = worksheets.items.find(item => item.name === sheetName);
+      if (!sheet) {
+        throw new Error(`Sheet "${sheetName}" not found.`);
+      }
+
+      // Get the data array
+      const results = apiResponse.results1;
+      if (!Array.isArray(results) || results.length === 0) {
+        console.error('No data available to write.');
+        return;
+      }
+
+      // Determine column order from first object
+      const columns = Object.keys(results[0]);
+
+      // Build rows without headers
+      const dataRows = results.map(row =>
+        columns.map(col => row[col])
+      );
+
+      // Clear existing contents (adjust range if needed)
+      sheet.getRange('A2:Z1000').clear();
+
+      // Get starting cell
+      const startCell = sheet.getRange(startRange);
+
+      // Resize to match dataRows (rows x columns)
+      const writeRange = startCell.getResizedRange(
+        dataRows.length - 1,
+        columns.length - 1
+      );
+
+      // Write only the data rows
+      writeRange.values = dataRows;
+
+      // Autofit columns for readability
+      writeRange.format.autofitColumns();
+    } catch (error) {
+      console.error('Error writing to Excel:', error);
+    } finally {
+      // Restore automatic calculation and sync changes
+      context.workbook.application.calculation = Excel.CalculationMode.automatic;
+      await context.sync();
+    }
+  });
+}
+
+
+export async function calculateAndFetchColumnAN(sheetName) {
+  return Excel.run(async (context) => {
+    // Get the specified worksheet
+    const sheet = context.workbook.worksheets.getItem(sheetName);
+
+    // Trigger calculation for this sheet
+    sheet.calculate();
+    await context.sync();
+
+    // Determine used rows to limit the range
+    const used = sheet.getUsedRange();
+    used.load('rowCount');
+    await context.sync();
+
+    const rowCount = used.rowCount;
+    if (rowCount < 1) return [];
+
+    // Column AN is column index 39 (A=0, B=1, ...)
+    const rangeAN = sheet.getRangeByIndexes(0, 39, rowCount, 1);
+    rangeAN.load('values');
+    await context.sync();
+
+    // Flatten the values and remove blanks (null, undefined, or empty string)
+    const allValues = rangeAN.values.map(row => row[0]);
+    return allValues.filter(val => val !== null && val !== undefined && val !== "");
+  });
+}

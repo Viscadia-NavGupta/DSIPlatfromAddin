@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { FaArrowLeft } from "react-icons/fa";
-import { MdSaveAlt, MdOutlineSave } from "react-icons/md";
-import { CiLock } from "react-icons/ci";
+import { MdSaveAlt } from "react-icons/md";
 import { IoMdSync } from "react-icons/io";
-import { BsFileEarmarkBarGraph } from "react-icons/bs";
 import { DataFrame } from "dataframe-js";
 import * as Excelconnections from "../../Middleware/ExcelConnection";
 import * as AWSconnections from "../../Middleware/AWSConnections";
@@ -146,29 +144,32 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
   };
 
   const LoadAggModels = async () => {
-    setPageValue("LoadingCircleComponent", "0% | Loading Models...");
-    const Aggmodeldata = await Excelconnections.readNamedRangeToArray("Cloud_LoadModels_List");
-    const Sheetnames = Aggmodeldata.map((row) => row[0]);
-    const forecastIDs = Aggmodeldata.map((row) => row[6]);
-    await Excelconnections.setCalculationMode("manual");
-    await AWSconnections.service_orchestration(
-      "Agg_Load_Models",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      Sheetnames,
-      forecastIDs,
-      [],
-      setPageValue
-    );
-    await Excelconnections.setCalculationMode("automatic");
-    setPageValue("SaveForecastPageinterim", "Scenarios loaded.");
+
+    const ForecastIDS = await Excelconnections.calculateAndFetchColumnAN("Setup");
+    console.log("Forecast IDs:", ForecastIDS);
+    // setPageValue("LoadingCircleComponent", "0% | Loading Models...");
+    // const Aggmodeldata = await Excelconnections.readNamedRangeToArray("Cloud_LoadModels_List");
+    // const Sheetnames = Aggmodeldata.map((row) => row[0]);
+    // const forecastIDs = Aggmodeldata.map((row) => row[6]);
+    // await Excelconnections.setCalculationMode("manual");
+    // await AWSconnections.service_orchestration(
+    //   "Agg_Load_Models",
+    //   "",
+    //   "",
+    //   "",
+    //   "",
+    //   "",
+    //   "",
+    //   "",
+    //   "",
+    //   "",
+    //   Sheetnames,
+    //   forecastIDs,
+    //   [],
+    //   setPageValue
+    // );
+    // await Excelconnections.setCalculationMode("automatic");
+    // setPageValue("SaveForecastPageinterim", "Scenarios loaded.");
   };
 
   const buttons = [
@@ -176,30 +177,22 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
     { name: "Load Data", icon: <MdSaveAlt size={buttonSize.iconSize} />, action: LoadAggModels, disabled: false },
   ];
 
-  // const reportButtons = [
-  //   { name: "Report 1", icon: <BsFileEarmarkBarGraph size={buttonSize.iconSize} />, action: () => {}, disabled: false },
-  //   { name: "Report 2", icon: <BsFileEarmarkBarGraph size={buttonSize.iconSize} />, action: () => {}, disabled: false },
-  //   { name: "Report 3", icon: <BsFileEarmarkBarGraph size={buttonSize.iconSize} />, action: () => {}, disabled: false },
-  //   { name: "Report 4", icon: <BsFileEarmarkBarGraph size={buttonSize.iconSize} />, action: () => {}, disabled: false },
-  // ];
-
   return (
     <HomePageContainer>
       <ContentWrapper>
         <WelcomeContainer>
-          <BackButtonIcon as={FaArrowLeft} size={24} onClick={onBack} />
+          <BackButtonIcon as={FaArrowLeft} size={24} onClick={() => setPageValue("Home")} />
           <h1>Forecast Library</h1>
         </WelcomeContainer>
 
         {loading ? (
-          <p>Loading...</p>
+          <p style={{ color: '#B4322A' }}>Loading...</p>
         ) : modelIDError ? (
-          <p style={{ color: "red" }}>{modelIDError}</p>
+          <p style={{ color: '#B4322A' }}>{modelIDError}</p>
         ) : !isOutputSheet ? (
           <p>No output sheet found or model not authorized.</p>
         ) : (
           <>
-            {/* Top Action Buttons */}
             <ButtonsContainer style={{ gridTemplateColumns: "repeat(2, 1fr)", marginBottom: "12px" }}>
               {buttons.map((button, index) => (
                 <Button
@@ -215,31 +208,6 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
                 </Button>
               ))}
             </ButtonsContainer>
-
-            {/* Divider Line */}
-            {/* <div style={{ borderBottom: "2px solid #B4322A", width: "90%", marginBottom: "12px" }} /> */}
-
-            {/* Custom Reports Header */}
-            {/* <div style={{ textAlign: "center", color: "#B4322A", fontWeight: "bold", fontSize: "1rem", marginBottom: "10px" }}>
-              Custom Reports
-            </div> */}
-
-            {/* Custom Report Buttons */}
-            {/* <ButtonsContainer> */}
-              {/* {reportButtons.map((button, index) => (
-                <Button
-                  key={index}
-                  onClick={!button.disabled ? button.action : undefined}
-                  disabled={button.disabled}
-                >
-                  <IconWrapper disabled={button.disabled} size={buttonSize.iconSize}>
-                    {button.icon}
-                  </IconWrapper>
-                  <p>{button.name}</p>
-                  {button.disabled && <Tooltip className="tooltip">Feature not activated.</Tooltip>}
-                </Button>
-              ))} */}
-            {/* </ButtonsContainer> */}
           </>
         )}
       </ContentWrapper>

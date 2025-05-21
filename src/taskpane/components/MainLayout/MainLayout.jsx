@@ -27,7 +27,7 @@ const MainLayout = ({ children, setPageValue, currentPage, handleLogout }) => {
       <MainContentContainer>{children}</MainContentContainer>
 
       {/* Footer */}
-      <Footer />
+      <Footer setPageValue={setPageValue} />
     </LayoutContainer>
   );
 };

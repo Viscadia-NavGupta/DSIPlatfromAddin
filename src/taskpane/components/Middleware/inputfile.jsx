@@ -595,7 +595,7 @@ export async function exportData2() {
                           vntControl[i][j] = vntControl[i][j].slice(1);
                       }
                   }
-
+/// here i need to improve the logic to get the range from the data value column
                   let criteria = {};
                   criteria[1] = typeof vntControl[i][0] === "string" ? vntControl[i][0].replace(/^'/, "") : vntControl[i][0]; // Remove only leading quote
                   
@@ -604,7 +604,8 @@ export async function exportData2() {
                   }
                   
                   
-                  // ✅ 11. Filter Data
+                  // ✅ 11. Filter Data this will be used to filter the data 
+                  
                   let vnt_filtereddata = await filterArrayByMultipleCriteria(
                       vnt_inputdata,
                       criteria,
