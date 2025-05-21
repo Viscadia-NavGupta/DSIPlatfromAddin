@@ -471,7 +471,7 @@ export async function service_orchestration(
     const serviceorg_URL = secretsObject.ServOrch;
     const pollingUrl = secretsObject.Polling;
 
-    
+
     if (buttonname === "SAVE_FORECAST" || buttonname === "SAVE_LOCKED_FORECAST") {
       console.log("📤 Preparing forecast upload");
       // save_forecast is used to get the s3 objects to upload the lifes 
@@ -547,6 +547,8 @@ export async function service_orchestration(
       );
 
       const UploadS3SaveForecastURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["SAVE_FORECAST"][UUID_Generated[0]];
+      LongformData = await pivotUpFlatArrayToAC(LongformData);
+
       const [flag_flatfileupload, flat_inputfileupload, flag_outputbackend] = await Promise.all([
         uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL),
       ]);
@@ -641,7 +643,7 @@ export async function service_orchestration(
 
       // LongformData= await combineArrays(LongformData,matchedModel,scenarioname,cycleName,UUID_Generated,"Interim",getCurrentTime);
       // console.log(LongformData);
-
+      LongformData = await pivotUpFlatArrayToAC(LongformData);
       const [flag_flatfileupload, flat_inputfileupload] = await Promise.all([
         uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL),
         uploadFileToS3("Input File", UploadS3INPUTFILEURL),
@@ -1559,10 +1561,10 @@ export function pivotUpFlatArrayToAC(flatData) {
 // SAVE_FORECAST,SAVE_LOCKED_FORECAST, UNLOCK_FORECAST, LOCK_FORECAST, FETCH_ASSUMPTIONS, FETCH_METADATA, DELETE_FORECAST
 export async function ButtonAccess(buttonname) {
   // grab everything AuthorizationData needs:
-  const emailId    = localStorage.getItem('username');
-  const idToken    = localStorage.getItem('idToken');
+  const emailId = localStorage.getItem('username');
+  const idToken = localStorage.getItem('idToken');
   const secretName = CONFIG.AWS_SECRETS_NAME;
-  const UUID       = [ uuidv4()];               // wrap in array
+  const UUID = [uuidv4()];               // wrap in array
 
   // just call your working function:
   return AuthorizationData(buttonname, idToken, secretName, emailId, UUID);
