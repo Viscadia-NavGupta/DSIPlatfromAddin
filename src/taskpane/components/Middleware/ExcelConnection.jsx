@@ -628,13 +628,13 @@ export async function generateLongFormData(region, DataModelNameRange) {
       const chunkSize = 50000; // Adjust based on performance testing
       App.suspendScreenUpdatingUntilNextSync();
 
-      // let outputRange = flatFileSheet
-      //   .getRange("A1")
-      //   .getResizedRange(longFormData.length - 1, longFormData[0].length - 1);
-      // outputRange.values = longFormData;
-      // outputRange.format.autofitColumns();
-      // outputRange.format.autofitRows();
-      // await context.sync();
+      let outputRange = flatFileSheet
+        .getRange("A1")
+        .getResizedRange(longFormData.length - 1, longFormData[0].length - 1);
+      outputRange.values = longFormData;
+      outputRange.format.autofitColumns();
+      outputRange.format.autofitRows();
+      await context.sync();
       console.timeEnd("writing data");
       console.log(`Data processed successfully. Final row count: ${currentRow - 1}`);
       // Return the longFormData array from within Excel.run
@@ -1643,11 +1643,11 @@ export async function calculateAndFetchColumnAN(sheetName) {
     // Get the specified worksheet
     const sheet = context.workbook.worksheets.getItem(sheetName);
 
-    // Trigger calculation for this sheet
-    sheet.calculate();
+    // 🧮 Trigger calculation only for this sheet
+    sheet.calculate(); // Sheet-level calculation
     await context.sync();
 
-    // Determine used rows to limit the range
+    // Get used range to determine row count
     const used = sheet.getUsedRange();
     used.load('rowCount');
     await context.sync();
@@ -1655,12 +1655,12 @@ export async function calculateAndFetchColumnAN(sheetName) {
     const rowCount = used.rowCount;
     if (rowCount < 1) return [];
 
-    // Column AN is column index 39 (A=0, B=1, ...)
+    // 📌 Column AN is index 39 (0-based index)
     const rangeAN = sheet.getRangeByIndexes(0, 39, rowCount, 1);
     rangeAN.load('values');
     await context.sync();
 
-    // Flatten the values and remove blanks (null, undefined, or empty string)
+    // Flatten values and remove blanks
     const allValues = rangeAN.values.map(row => row[0]);
     return allValues.filter(val => val !== null && val !== undefined && val !== "");
   });

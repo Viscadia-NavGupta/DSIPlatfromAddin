@@ -48,7 +48,7 @@ const FLSyncData = ({ setPageValue }) => {
   }, []);
 
   useEffect(() => { checkCloudBackendSheet(); }, []);
-  useEffect(() => { if (modelIDValue) fetchDataFromLambda(); }, [modelIDValue]);
+  useEffect(() => { fetchDataFromLambda(); }, [modelIDValue]);
   useEffect(() => { if (fullData.length) updateDropdownOptions(); }, [fullData]);
 
   const checkCloudBackendSheet = async () => {
@@ -82,7 +82,7 @@ const FLSyncData = ({ setPageValue }) => {
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );
-      const data = Array.isArray(response.results1) ? response.results1.filter(r => r.model_id === modelIDValue) : [];
+      const data = Array.isArray(response.results1) ? response.results1 : [];
       setFullData(data);
     } catch (e) {
       console.error("Error fetching metadata:", e);
@@ -141,22 +141,47 @@ const FLSyncData = ({ setPageValue }) => {
         <>
           <Heading>{heading}</Heading>
           <DropdownContainer>
-            {['saveStatus','cycle','asset'].map(key => (
+            {['saveStatus', 'cycle', 'asset'].map(key => (
               <CustomDropdown key={key} ref={dropdownRefs[key]}>
-                <DropdownButton onClick={() => setDropdownOpen(prev => ({ ...prev, [key]: !prev[key] }))}
+                <DropdownButton
+                  onClick={() => setDropdownOpen(prev => ({ ...prev, [key]: !prev[key] }))}
                   style={warnings[key] ? { border: '1px solid #B4322A' } : {}}
                 >
-                  Select {key.charAt(0).toUpperCase()+key.slice(1)} ({
+                  Select {key.charAt(0).toUpperCase() + key.slice(1)} ({
                     { saveStatus: saveStatus.length, cycle: selectedCycle.length, asset: selectedAsset.length }[key]
                   } selected)
                   <DropdownArrow><RiArrowDropDownLine size={24} /></DropdownArrow>
                 </DropdownButton>
                 {dropdownOpen[key] && (
                   <DropdownList>
+                    <DropdownItem onClick={() => {
+                      const list = { saveStatus: filteredSaveStatus, cycle: filteredCycles, asset: filteredAssets }[key];
+                      const selected = { saveStatus, cycle: selectedCycle, asset: selectedAsset }[key];
+                      const setter = { saveStatus: setSaveStatus, cycle: setSelectedCycle, asset: setSelectedAsset }[key];
+                      if (selected.length === list.length) {
+                        setter([]);
+                      } else {
+                        setter([...list]);
+                      }
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={
+                          { saveStatus, cycle: selectedCycle, asset: selectedAsset }[key].length ===
+                          { saveStatus: filteredSaveStatus, cycle: filteredCycles, asset: filteredAssets }[key].length
+                        }
+                        readOnly
+                      /> Select All
+                    </DropdownItem>
+
                     {{ saveStatus: filteredSaveStatus, cycle: filteredCycles, asset: filteredAssets }[key]
-                      .map((item,i) => (
-                        <DropdownItem key={i} onClick={() => handleMultiSelect(key,item)}>
-                          <input type="checkbox" checked={{ saveStatus, cycle: selectedCycle, asset: selectedAsset }[key].includes(item)} readOnly /> {item}
+                      .map((item, i) => (
+                        <DropdownItem key={i} onClick={() => handleMultiSelect(key, item)}>
+                          <input
+                            type="checkbox"
+                            checked={{ saveStatus, cycle: selectedCycle, asset: selectedAsset }[key].includes(item)}
+                            readOnly
+                          /> {item}
                         </DropdownItem>
                       ))}
                   </DropdownList>
@@ -167,7 +192,7 @@ const FLSyncData = ({ setPageValue }) => {
           <SaveButton onClick={handleSyncData}>Sync Data</SaveButton>
         </>
       ) : (
-        <MessageBox>No Authorized model detected, please refresh the add-in.</MessageBox>
+        <MessageBox>No Authorized Forecast Library detected, please refresh the add-in.</MessageBox>
       )}
     </Container>
   );

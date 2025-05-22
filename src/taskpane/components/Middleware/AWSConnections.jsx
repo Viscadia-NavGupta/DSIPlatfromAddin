@@ -944,16 +944,20 @@ export async function downloadAndInsertDataFromExcel(s3Url, sheetName) {
  * @param {string} format - File format ("csv" or "xlsx").
  * @returns {Promise<boolean>} - Success status.
  */
+
 export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, format = "csv") {
   try {
     console.time("⏱️ Total array upload");
+
     if (!dataArray || dataArray.length === 0) {
       console.error("🚨 No data provided for upload");
       return false;
     }
+
     const rowCount = dataArray.length;
     const colCount = dataArray[0].length;
     console.log(`📊 Processing ${rowCount} rows × ${colCount} columns as ${format.toUpperCase()}`);
+
     let blob;
     let contentType;
 
@@ -972,7 +976,6 @@ export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, fo
             .map((cell) => {
               if (cell === null || cell === undefined) return "";
               const cellStr = String(cell);
-              // escape quotes and wrap in quotes if needed
               return cellStr.includes(",") || cellStr.includes('"') || cellStr.includes("\n")
                 ? `"${cellStr.replace(/"/g, '""')}"`
                 : cellStr;
@@ -984,38 +987,76 @@ export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, fo
         csvContent += chunkContent;
       }
 
-      // Prefix with the UTF-8 BOM so Excel and other tools recognize UTF-8
       const bom = "\uFEFF";
       blob = new Blob([bom, csvContent], { type: "text/csv;charset=utf-8;" });
       contentType = "text/csv";
       console.timeEnd("⏱️ CSV creation");
     } else {
-      // … (your existing Excel/worker branch unchanged) …
+      // handle other formats if applicable
+      return false;
     }
 
     console.log(`📤 Uploading ${(blob.size / (1024 * 1024)).toFixed(2)} MB to: ${uploadURL}`);
-    console.time("⏱️ Upload");
-    const response = await fetch(uploadURL, {
-      method: "PUT",
-      headers: {
-        "Content-Type": contentType,
-        "x-amz-acl": "bucket-owner-full-control",
-        "Cache-Control": "no-cache",
-      },
-      body: blob,
-    });
-    console.timeEnd("⏱️ Upload");
-    console.timeEnd("⏱️ Total array upload");
 
-    if (response.ok) {
-      console.log(`✅ File uploaded successfully. Size: ${(blob.size / (1024 * 1024)).toFixed(2)} MB`);
-      return true;
-    } else {
-      console.error(`❌ Error uploading file. Status: ${response.status}`, await response.text());
-      return false;
+    const MAX_RETRIES = 3;
+    const TIMEOUT_MS = 30000;
+    let attempt = 0;
+    let success = false;
+    let lastError = null;
+
+    while (attempt < MAX_RETRIES && !success) {
+      attempt++;
+      console.log(`⏳ Upload attempt ${attempt}`);
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => {
+        controller.abort();
+        console.warn(`⏱️ Upload attempt ${attempt} aborted after ${TIMEOUT_MS / 1000} seconds`);
+      }, TIMEOUT_MS);
+
+      try {
+        console.time("⏱️ Upload");
+        const response = await fetch(uploadURL, {
+          method: "PUT",
+          headers: {
+            "Content-Type": contentType,
+            "x-amz-acl": "bucket-owner-full-control",
+            "Cache-Control": "no-cache",
+          },
+          body: blob,
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        console.timeEnd("⏱️ Upload");
+
+        if (response.ok) {
+          console.log(`✅ File uploaded successfully on attempt ${attempt}`);
+          success = true;
+          break;
+        } else {
+          const errorText = await response.text();
+          console.error(`❌ Server returned status ${response.status}: ${errorText}`);
+          lastError = errorText;
+        }
+      } catch (err) {
+        clearTimeout(timeout);
+        if (err.name === 'AbortError') {
+          console.warn("⚠️ Upload timed out");
+        } else {
+          console.error(`🚨 Upload error on attempt ${attempt}:`, err);
+        }
+        lastError = err;
+      }
     }
+
+    console.timeEnd("⏱️ Total array upload");
+    if (success) return true;
+
+    console.error("❌ All upload attempts failed", lastError);
+    return false;
+
   } catch (error) {
-    console.error("🚨 Error in uploadFileToS3FromArray:", error);
+    console.error("🚨 Unexpected error in uploadFileToS3FromArray:", error);
     return false;
   } finally {
     if (typeof global !== "undefined" && global.gc) {
@@ -1023,6 +1064,91 @@ export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, fo
     }
   }
 }
+
+
+//////////////// this is start of working code ----------------------------------------------------------------------------
+// export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, format = "csv") {
+//   try {
+//     console.time("⏱️ Total array upload");
+//     if (!dataArray || dataArray.length === 0) {
+//       console.error("🚨 No data provided for upload");
+//       return false;
+//     }
+//     const rowCount = dataArray.length;
+//     const colCount = dataArray[0].length;
+//     console.log(`📊 Processing ${rowCount} rows × ${colCount} columns as ${format.toUpperCase()}`);
+//     let blob;
+//     let contentType;
+
+//     if (format.toLowerCase() === "csv") {
+//       console.time("⏱️ CSV creation");
+//       let csvContent = "";
+
+//       const chunkSize = CONFIG.UPLOAD.CHUNK_SIZE;
+//       for (let i = 0; i < rowCount; i += chunkSize) {
+//         const endRow = Math.min(i + chunkSize, rowCount);
+//         let chunkContent = "";
+
+//         for (let j = i; j < endRow; j++) {
+//           const row = dataArray[j];
+//           const rowString = row
+//             .map((cell) => {
+//               if (cell === null || cell === undefined) return "";
+//               const cellStr = String(cell);
+//               // escape quotes and wrap in quotes if needed
+//               return cellStr.includes(",") || cellStr.includes('"') || cellStr.includes("\n")
+//                 ? `"${cellStr.replace(/"/g, '""')}"`
+//                 : cellStr;
+//             })
+//             .join(",");
+//           chunkContent += rowString + "\n";
+//         }
+
+//         csvContent += chunkContent;
+//       }
+
+//       // Prefix with the UTF-8 BOM so Excel and other tools recognize UTF-8
+//       const bom = "\uFEFF";
+//       blob = new Blob([bom, csvContent], { type: "text/csv;charset=utf-8;" });
+//       contentType = "text/csv";
+//       console.timeEnd("⏱️ CSV creation");
+//     } else {
+//       // … (your existing Excel/worker branch unchanged) …
+//     }
+
+//     console.log(`📤 Uploading ${(blob.size / (1024 * 1024)).toFixed(2)} MB to: ${uploadURL}`);
+//     console.time("⏱️ Upload");
+//     const response = await fetch(uploadURL, {
+//       method: "PUT",
+//       headers: {
+//         "Content-Type": contentType,
+//         "x-amz-acl": "bucket-owner-full-control",
+//         "Cache-Control": "no-cache",
+//       },
+//       body: blob,
+//     });
+//     console.timeEnd("⏱️ Upload");
+//     console.timeEnd("⏱️ Total array upload");
+
+//     if (response.ok) {
+//       console.log(`✅ File uploaded successfully. Size: ${(blob.size / (1024 * 1024)).toFixed(2)} MB`);
+//       return true;
+//     } else {
+//       console.error(`❌ Error uploading file. Status: ${response.status}`, await response.text());
+//       return false;
+//     }
+//   } catch (error) {
+//     console.error("🚨 Error in uploadFileToS3FromArray:", error);
+//     return false;
+//   } finally {
+//     if (typeof global !== "undefined" && global.gc) {
+//       global.gc();
+//     }
+//   }
+// }
+/// this is end of working code------------------------------------------------------------------------
+
+
 
 // export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, format = "csv") {
 //   try {

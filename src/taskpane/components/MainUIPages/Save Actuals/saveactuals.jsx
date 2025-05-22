@@ -189,7 +189,11 @@ const SaveScenarioActuals = ({ setPageValue }) => {
         "",
         "",
         longformData,
-        outputbackend_data
+        outputbackend_data,
+        [],
+        [],
+        [],
+        setPageValue
       );
 
       setPageValue("LoadingCircleComponent", "100% | Saving your forecast...");
