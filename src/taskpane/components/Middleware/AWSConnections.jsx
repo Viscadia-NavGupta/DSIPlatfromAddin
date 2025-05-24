@@ -416,6 +416,59 @@ export async function servicerequest(
   }
 }
 
+//  Extract Dashbaord data fro Forecast Library service request to AWS
+
+export async function Extract_Service_Request(
+  serviceURL = "",
+  buttonName = "",
+  UUID = "",
+  idToken = "",
+  secretName = "",
+  userId = "",
+  constituent_ID = [],
+) {
+  try {
+    const headers = {
+      Authorization: `Bearer ${idToken}`,
+      "Content-Type": "application/json",
+      Connection: "keep-alive",
+    };
+    const body = {
+      request_id: UUID,
+      buttonName,
+      secret_name: secretName,
+      user_id: userId,
+      forecast_id: constituent_ID,
+    };
+    console.log("📤 Sending service request");
+    const response = await fetch(serviceURL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+    const data = await response.json();
+    console.log("✅ Service response received");
+    if (!response.ok) {
+      return data.message || `HTTP Error ${response.status}`;
+    }
+    return data.message || "Success (no message provided)";
+  } catch (error) {
+    console.error("🚨 Service request error:", error);
+    if (error.response) {
+      try {
+        const errorData = await error.response.json();
+        return errorData.message || `Error: ${error.response.status}`;
+      } catch {
+        return `Error: ${error.response.status}`;
+      }
+    }
+    return `Error: ${error.message}`;
+  }
+}
+
+// - end of fiucntion 
+
+
 /**
  * Orchestrates service requests with file handling.
  * @param {string} buttonname - Action to perform.
@@ -443,7 +496,8 @@ export async function service_orchestration(
   sheetNames_Agg = [],
   constituent_ID = [],
   matchedForecasts = [],
-  setPageValue
+  setPageValue,
+  ForecastIDS = []
 ) {
   console.log(`🚀 Service orchestration started: ${buttonname}`);
 
@@ -721,10 +775,47 @@ export async function service_orchestration(
           }
         }
 
+
         // If the original service request requires polling, handle that.
 
         return pollingResult;
       }
+    } else if (buttonname === "EXTRACT_DASHBOARD_DATA") {
+      console.log("📤 preparing for Forecast Liobrary Extract");
+      // sedning Extract request for Forecat library
+      let Service_Resut = await Extract_Service_Request(
+        serviceorg_URL,
+        buttonname,
+        UUID_Generated[0],
+        idToken,
+        CONFIG.AWS_SECRETS_NAME,
+        User_Id,
+        ForecastIDS
+
+      )
+      console.log("Service_Resut", Service_Resut);
+      console.log("sednign request for download link");
+
+      let pollingResult = Service_Resut;
+      if (Service_Resut === "Endpoint request timed out" || (Service_Resut && Service_Resut.status === "Poll")) {
+        console.log("⏱️ Service request requires polling");
+        pollingResult = await poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+      }
+      const Extract_download = await AuthorizationData(
+        "EXTRACT_DASHBOARD_DATA",
+        idToken,
+        CONFIG.AWS_SECRETS_NAME,
+        username,
+        UUID_Generated
+      );
+      console.log("Extract_download", Extract_download);
+
+      const ExtractS3_Downloadlink = Extract_download["presigned urls"]["DOWNLOAD"]["EXTRACT_DASHBOARD_DATA"][UUID_Generated[0]];
+      const downloadResult = await downloadAndInsertDataFromExcel(ExtractS3_Downloadlink, "Report Genie Backend");
+
+
+      console.log(ExtractS3_Downloadlink);
+      return { status: "success", message: "Aggregated models downloaded." };
     }
     return { status: "No operation performed" };
   } catch (error) {
@@ -855,84 +946,65 @@ export async function uploadFileToS3(sheetName, uploadURL) {
  * @returns {Promise<object>} - Success status and sheet name.
  */
 export async function downloadAndInsertDataFromExcel(s3Url, sheetName) {
-  const downloadURL = s3Url;
+  // 1️⃣ Fetch bytes
+  const buffer = await fetchData(s3Url);
+  console.time("⏱️ Total download execution");
 
-  async function fetchData() {
-    console.log("📥 Fetching file from S3");
-    const response = await fetch(downloadURL);
-    if (!response.ok) {
-      throw new Error(`❌ File fetch failed: ${response.statusText}`);
-    }
-    console.log("✅ File fetched successfully");
-    return response.arrayBuffer();
-  }
+  // 2️⃣ Parse CSV/XLSX into 2D array
+  const rows = parseCsvOrXlsx(buffer, s3Url);
+  if (!rows.length) throw new Error("❌ No data to insert");
 
-  async function processExcelFile(arrayBuffer, sheetName) {
-    console.log("⚙️ Processing Excel file");
-    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: "array" });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    let rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-    if (rows.length === 0) {
-      throw new Error("❌ Excel sheet is empty");
-    }
+  // 3️⃣ Bulk-write in one go
+  await Excel.run(async (ctx) => {
+    // a) get or create sheet
+    let sheet = ctx.workbook.worksheets.getItemOrNullObject(sheetName);
+    await ctx.sync();
+    if (sheet.isNullObject) sheet = ctx.workbook.worksheets.add(sheetName);
 
-    // Normalize rows to ensure each row has the same number of columns
-    const maxCols = rows.reduce((max, row) => Math.max(max, row.length), 0);
-    rows = rows.map((row) => {
-      if (row.length < maxCols) {
-        // Append empty strings until row length equals maxCols
-        return [...row, ...Array(maxCols - row.length).fill("")];
-      }
-      return row;
-    });
+    // b) clear old data
+    sheet.getUsedRangeOrNullObject().clear(Excel.ClearApplyTo.all);
 
-    await insertParsedData(rows, sheetName);
-  }
+    // c) suspend screen updating & manual calc
+    ctx.application.suspendScreenUpdatingUntilNextSync();
+    ctx.application.calculationMode = Excel.CalculationMode.manual;
+    await ctx.sync();
 
-  function getColumnLetter(index) {
-    let letter = "";
-    let tempIndex = index;
-    while (tempIndex >= 0) {
-      letter = String.fromCharCode((tempIndex % 26) + 65) + letter;
-      tempIndex = Math.floor(tempIndex / 26) - 1;
-    }
-    return letter;
-  }
+    // d) single large range write
+    const totalRows = rows.length;
+    const totalCols = rows[0].length;
+    const writeRange = sheet.getRangeByIndexes(0, 0, totalRows, totalCols);
+    writeRange.values = rows;
 
-  async function insertParsedData(rows, sheetName) {
-    await Excel.run(async (context) => {
-      const sheet = context.workbook.worksheets.getItemOrNullObject(sheetName);
-      await context.sync();
-      if (sheet.isNullObject) {
-        throw new Error(`❌ Sheet "${sheetName}" not found`);
-      }
-      sheet.getUsedRange().clear();
-      await context.sync();
-      // Recalculate max columns in case normalization adjusted the row lengths
-      const maxCols = rows[0].length;
-      const rangeAddress = `A1:${getColumnLetter(maxCols - 1)}${rows.length}`;
-      console.log(`📊 Target range: ${rangeAddress}`);
-      try {
-        const range = sheet.getRange(rangeAddress);
-        range.values = rows;
-        await context.sync();
-        console.log(`✅ Data inserted into "${sheetName}"`);
-      } catch (error) {
-        console.error("❌ Data insertion error:", error);
-        throw new Error("❌ Invalid range or sheet");
-      }
-    });
-  }
+    // e) final sync
+    await ctx.sync();
 
-  try {
-    console.log("🚀 Starting download and insertion process");
-    const arrayBuffer = await fetchData();
-    await processExcelFile(arrayBuffer, sheetName);
-    console.log("✅ Process completed successfully");
-    return { success: true, newSheetName: sheetName };
-  } catch (error) {
-    console.error("🚨 Download and insertion error:", error);
-    return { success: false, newSheetName: null };
+    // f) restore calc & (screen updating auto-resumes)
+    ctx.application.calculationMode = Excel.CalculationMode.automatic;
+    ctx.application.calculate(Excel.CalculationType.full);
+    await ctx.sync();
+    console.timeEnd("⏱️ Total download execution");
+  });
+
+  return { success: true, newSheetName: sheetName };
+}
+
+async function fetchData(url) {
+  const resp = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
+  if (!resp.ok) throw new Error(`Fetch failed: ${resp.statusText}`);
+  return resp.arrayBuffer();
+}
+
+function parseCsvOrXlsx(buffer, url) {
+  if (url.toLowerCase().endsWith(".csv")) {
+    const txt = new TextDecoder("utf-8").decode(buffer);
+    return txt
+      .split("\n")
+      .filter((l) => l.trim())
+      .map((l) => l.split(","));
+  } else {
+    const wb = XLSX.read(new Uint8Array(buffer), { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
   }
 }
 
@@ -948,6 +1020,7 @@ export async function downloadAndInsertDataFromExcel(s3Url, sheetName) {
 export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, format = "csv") {
   try {
     console.time("⏱️ Total array upload");
+
 
     if (!dataArray || dataArray.length === 0) {
       console.error("🚨 No data provided for upload");
@@ -1243,6 +1316,7 @@ export async function poll(request_id, secret_name, pollingUrl, idToken) {
     console.error("❌ Missing required polling parameters");
     return { request_id, result: false };
   }
+
   const maxAttempts = CONFIG.POLLING.MAX_ATTEMPTS;
   const delay = CONFIG.POLLING.DELAY_MS;
   let attempts = 0;
@@ -1269,27 +1343,29 @@ export async function poll(request_id, secret_name, pollingUrl, idToken) {
       }
 
       responseBody = await response.json();
-      console.log(`🔄 Polling attempt ${attempts + 1}: ${responseBody.status}`);
+      const status = responseBody?.status?.status;
 
-      if (responseBody.status === "DONE") {
+      console.log(`🔄 Polling attempt ${attempts + 1}: ${status}`);
+
+      if (status === "DONE") {
         console.log("✅ Operation completed successfully");
-        return { request_id, result: responseBody.status };
-      } else if (responseBody.status === "PENDING") {
+        return { request_id, result: status };
+      } else if (status === "PENDING") {
         console.log(`⏳ Operation still in progress, waiting ${delay / 1000}s`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         attempts++;
       } else {
-        console.error(`❌ Unexpected polling status: ${responseBody.status}`);
-        return { request_id, result: responseBody.status };
+        console.error(`❌ Unexpected polling status: ${status}`);
+        return { request_id, result: status };
       }
     } catch (error) {
       console.error("🚨 Polling error:", error);
-      return { request_id, result: responseBody?.status || "ERROR" };
+      return { request_id, result: responseBody?.status?.status || "ERROR" };
     }
   }
 
   console.error(`⏱️ Polling timed out after ${maxAttempts} attempts`);
-  return { request_id, result: responseBody?.status || "TIMEOUT" };
+  return { request_id, result: responseBody?.status?.status || "TIMEOUT" };
 }
 
 // =============================================================================

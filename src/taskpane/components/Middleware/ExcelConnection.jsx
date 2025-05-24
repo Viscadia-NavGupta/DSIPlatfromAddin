@@ -1640,14 +1640,13 @@ export async function MetaDataSyncwithoutheaders(apiResponse, sheetName, startRa
 
 export async function calculateAndFetchColumnAN(sheetName) {
   return Excel.run(async (context) => {
-    // Get the specified worksheet
     const sheet = context.workbook.worksheets.getItem(sheetName);
 
-    // 🧮 Trigger calculation only for this sheet
-    sheet.calculate(); // Sheet-level calculation
+    // 🧮 Sheet-level calculation (equivalent to VBA's Sheet.Calculate)
+    sheet.calculate(true); // true = force calculation even if not marked as dirty
     await context.sync();
 
-    // Get used range to determine row count
+    // Load used range properties in one go
     const used = sheet.getUsedRange();
     used.load('rowCount');
     await context.sync();
@@ -1655,13 +1654,12 @@ export async function calculateAndFetchColumnAN(sheetName) {
     const rowCount = used.rowCount;
     if (rowCount < 1) return [];
 
-    // 📌 Column AN is index 39 (0-based index)
+    // 📌 Get column AN (index 39) values
     const rangeAN = sheet.getRangeByIndexes(0, 39, rowCount, 1);
     rangeAN.load('values');
     await context.sync();
 
-    // Flatten values and remove blanks
-    const allValues = rangeAN.values.map(row => row[0]);
-    return allValues.filter(val => val !== null && val !== undefined && val !== "");
+    // Return filtered non-empty values
+    return rangeAN.values.flat().filter(val => val !== null && val !== undefined && val !== "");
   });
 }

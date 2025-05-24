@@ -93,7 +93,16 @@ const FLSyncData = ({ setPageValue }) => {
 
   const updateDropdownOptions = () => {
     setFilteredSaveStatus([...new Set(fullData.map(r => r.save_status).filter(Boolean))]);
-    setFilteredCycles([...new Set(fullData.map(r => r.cycle_name).filter(Boolean))]);
+
+    // 🚫 Exclude "ACTUALS" from cycle dropdown
+    setFilteredCycles([
+      ...new Set(
+        fullData
+          .map(r => r.cycle_name)
+          .filter(name => Boolean(name) && name.toUpperCase() !== "ACTUALS")
+      )
+    ]);
+
     setFilteredAssets([...new Set(fullData.map(r => r.asset).filter(Boolean))]);
   };
 
@@ -107,6 +116,7 @@ const FLSyncData = ({ setPageValue }) => {
     const warn = { saveStatus: !saveStatus.length, cycle: !selectedCycle.length, asset: !selectedAsset.length };
     setWarnings(warn);
     if (warn.saveStatus || warn.cycle || warn.asset) return;
+    setPageValue("LoadingCircleComponent", "Syncing data, please wait...");
 
     try {
       setLoading(true);

@@ -145,32 +145,28 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
 
   const LoadAggModels = async () => {
 
-    const ForecastIDS = await Excelconnections.calculateAndFetchColumnAN("Setup");
+    let ForecastIDS = await Excelconnections.calculateAndFetchColumnAN("Setup");
+    ForecastIDS = ForecastIDS.map(item => item.replace(/^forecast_/, ""));
     console.log("Forecast IDs:", ForecastIDS);
-    // setPageValue("LoadingCircleComponent", "0% | Loading Models...");
-    // const Aggmodeldata = await Excelconnections.readNamedRangeToArray("Cloud_LoadModels_List");
-    // const Sheetnames = Aggmodeldata.map((row) => row[0]);
-    // const forecastIDs = Aggmodeldata.map((row) => row[6]);
-    // await Excelconnections.setCalculationMode("manual");
-    // await AWSconnections.service_orchestration(
-    //   "Agg_Load_Models",
-    //   "",
-    //   "",
-    //   "",
-    //   "",
-    //   "",
-    //   "",
-    //   "",
-    //   "",
-    //   "",
-    //   Sheetnames,
-    //   forecastIDs,
-    //   [],
-    //   setPageValue
-    // );
-    // await Excelconnections.setCalculationMode("automatic");
-    // setPageValue("SaveForecastPageinterim", "Scenarios loaded.");
-  };
+    let Result = await AWSconnections.service_orchestration(
+      "EXTRACT_DASHBOARD_DATA",
+      "",
+      "",
+      "",
+      "",
+      "",
+      CONFIG.AWS_SECRETS_NAME,
+      "",
+      "",
+      [],
+      [],
+      [],
+      [],
+      setPageValue,
+      ForecastIDS
+    )
+    console.log("Result:", Result);
+  }
 
   const buttons = [
     { name: "Sync Data", icon: <IoMdSync size={buttonSize.iconSize} />, action: () => setPageValue("FLSyncData"), disabled: false },
