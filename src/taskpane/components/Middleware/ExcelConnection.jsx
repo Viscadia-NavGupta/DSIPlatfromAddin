@@ -444,6 +444,7 @@ export async function generateLongFormData(region, DataModelNameRange) {
   try {
     // Await the result from Excel.run and assign it to the variable 'data'
     const data = await Excel.run(async (context) => {
+      console.log("📊 Starting generateLongFormData function...");
       console.time("Flatfile generation");
       let App = context.workbook.application;
       let workbook = context.workbook;
@@ -621,20 +622,20 @@ export async function generateLongFormData(region, DataModelNameRange) {
       console.timeEnd("Flatfile generation");
       console.time("writing data");
 
-      flatFileSheet.getUsedRange().clear(); // Clears contents, formats, and hyperlinks
-      await context.sync();
+      // flatFileSheet.getUsedRange().clear(); // Clears contents, formats, and hyperlinks
+      // await context.sync();
       workbook = null;
       extractedData = null;
       const chunkSize = 50000; // Adjust based on performance testing
       App.suspendScreenUpdatingUntilNextSync();
 
-      let outputRange = flatFileSheet
-        .getRange("A1")
-        .getResizedRange(longFormData.length - 1, longFormData[0].length - 1);
-      outputRange.values = longFormData;
-      outputRange.format.autofitColumns();
-      outputRange.format.autofitRows();
-      await context.sync();
+      // let outputRange = flatFileSheet
+      //   .getRange("A1")
+      //   .getResizedRange(longFormData.length - 1, longFormData[0].length - 1);
+      // outputRange.values = longFormData;
+      // outputRange.format.autofitColumns();
+      // outputRange.format.autofitRows();
+      // await context.sync();
       console.timeEnd("writing data");
       console.log(`Data processed successfully. Final row count: ${currentRow - 1}`);
       // Return the longFormData array from within Excel.run

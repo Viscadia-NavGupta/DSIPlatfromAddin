@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+// SaveandLockScenario.jsx
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo
+} from "react";
 import {
   Container,
   Heading,
@@ -7,217 +13,216 @@ import {
   SelectDropdown,
   Input,
   SaveButton,
+  Overlay,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Button,
 } from "./SaveandLockPageStyles";
 import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
 import * as excelfucntions from "../../Middleware/ExcelConnection";
-import * as inputfiles from "../../Middleware/inputfile";
 import CONFIG from "../../Middleware/AWSConnections";
 
 const SaveandLockScenario = ({ setPageValue }) => {
-  // =============================================================================
-  //                              STATE VARIABLES
-  // =============================================================================
   const [selectedCycle, setSelectedCycle] = useState("");
   const [scenarioName, setScenarioName] = useState("");
   const [heading, setHeading] = useState("Active Sheet Name");
   const [isOutputSheet, setIsOutputSheet] = useState(false);
-  const storedUsername = useMemo(() => sessionStorage.getItem("username"), []);
   const [cycleItems, setCycleItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modelIDValue, setModelIDValue] = useState("");
-  // New state: modelType read from Excel cell B8
   const [modelType, setModelType] = useState("");
+  const [modelIDError, setModelIDError] = useState("");
 
-  // DataFrames state from Lambda fetch
   const [dataFrames, setDataFrames] = useState({
     dfResult1: null,
     dfResult2: null,
     dfResult3: null,
   });
 
-  // =============================================================================
-  //                       HELPER FUNCTIONS & CALLBACKS
-  // =============================================================================
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  // Checks if the provided combination already exists in the primary result set.
-  const checkScenarioExists = useCallback((modelId, cycleName, scenarioName) => {
-    const { dfResult1 } = dataFrames;
-    if (!dfResult1) {
-      console.warn("Result1 DataFrame is not loaded yet.");
-      return false;
-    }
-    const records = dfResult1.toCollection();
-    return records.some(
-      (record) =>
-        record.model_id === modelId &&
-        record.cycle_name === cycleName &&
-        record.scenario_name === scenarioName
+  const scenarioSet = useMemo(() => {
+    const df = dataFrames.dfResult1;
+    if (!df) return new Set();
+    return new Set(
+      df
+        .toCollection()
+        .map((r) => {
+          const id = (r.model_id ?? "").toString().trim();
+          const cycle = (r.cycle_name ?? "").toString().trim();
+          const scen = (r.scenario_name ?? "")
+            .toString()
+            .trim()
+            .toLowerCase();
+          return `${id}|${cycle}|${scen}`;
+        })
     );
-  }, [dataFrames]);
+  }, [dataFrames.dfResult1]);
 
-  // Reads Excel cell values from the "cloud_backend_md" sheet. Now also reads cell B8 for modelType.
+  const checkScenarioExists = useCallback(
+    (modelId, cycleName, scenarioName) => {
+      if (!dataFrames.dfResult1) return false;
+      const key = `${modelId}|${cycleName}|${scenarioName
+        .trim()
+        .toLowerCase()}`;
+      return scenarioSet.has(key);
+    },
+    [dataFrames.dfResult1, scenarioSet]
+  );
+
   const checkofCloudBackendSheet = useCallback(async () => {
     try {
-      console.log("📊 Checking for Output Sheet...");
-      if (typeof window.Excel === "undefined") {
-        console.error("🚨 Excel API is not available.");
-        return;
-      }
+      if (typeof window.Excel === "undefined") return;
       await Excel.run(async (context) => {
         const sheets = context.workbook.worksheets;
         sheets.load("items/name");
         await context.sync();
 
-        const MetaDataSheet = sheets.items.find(
-          (sheet) => sheet.name.toLowerCase() === "cloud_backend_md"
+        const mdSheet = sheets.items.find(
+          (s) => s.name.toLowerCase() === "cloud_backend_md"
         );
-
-        if (MetaDataSheet) {
-          const sheet = MetaDataSheet;
-          const ranges = {
-            ModelName: sheet.getRange("B5"),
-            ModelID: sheet.getRange("B7"),
-            ModelType: sheet.getRange("B8"),
-          };
-
-          // Load all ranges together.
-          Object.values(ranges).forEach(range => range.load("values"));
-          await context.sync();
-
-          const ModelNameValue = ranges.ModelName.values[0][0] || "";
-          const ModelIDValue = ranges.ModelID.values[0][0] || "";
-          const ModelTypeValue = ranges.ModelType.values[0][0] || "";
-
-          setHeading(`Save & Lock scenario for: ${ModelNameValue}`);
-          setIsOutputSheet(true);
-          setModelIDValue(ModelIDValue);
-          setModelType(ModelTypeValue);
-
-          console.log("✅ Output Sheet Found:", ModelNameValue, ModelIDValue, ModelTypeValue);
-        } else {
-          console.log("⚠️ No Output Sheet Found.");
+        if (!mdSheet) {
           setIsOutputSheet(false);
+          return;
+        }
+
+        const ranges = {
+          ModelName: mdSheet.getRange("B5"),
+          ModelID: mdSheet.getRange("B7"),
+          ModelType: mdSheet.getRange("B8"),
+        };
+        Object.values(ranges).forEach((r) => r.load("values"));
+        await context.sync();
+
+        const nameVal = (ranges.ModelName.values[0][0] ?? "")
+          .toString()
+          .trim();
+        const idVal = (ranges.ModelID.values[0][0] ?? "")
+          .toString()
+          .trim();
+        const typeVal = (ranges.ModelType.values[0][0] ?? "")
+          .toString()
+          .trim();
+
+        if (!nameVal || !idVal || !typeVal) {
+          setIsOutputSheet(false);
+          return;
+        }
+
+        setHeading(`Save & Lock Scenario for: ${nameVal}`);
+        setModelIDValue(idVal);
+        setModelType(typeVal);
+        setIsOutputSheet(true);
+
+        if (typeVal === "AGGREGATOR") {
+          setPageValue(
+            "AggSaveScenario",
+            "Loading scenario for Aggregator model..."
+          );
         }
       });
     } catch (error) {
-      console.error("🚨 Error checking for Outputs sheet:", error);
+      console.error("Error checking for Outputs sheet:", error);
       setIsOutputSheet(false);
     }
-  }, []);
+  }, [setPageValue]);
 
-  // Fetch metadata from Lambda and create DataFrames for further processing.
   const fetchDataFromLambda = useCallback(async () => {
     try {
-      console.log("📤 Fetching Data from Lambda...");
-      const responseBody = await AWSconnections.FetchMetaData(
+      const resp = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
         CONFIG.AWS_SECRETS_NAME,
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );
-
-      if (!responseBody || !responseBody.results1 || !responseBody.results2 || !responseBody.result3) {
-        throw new Error("❌ Missing one or more required results in Lambda response.");
+      if (!resp || !resp.results1 || !resp.results2 || !resp.result3) {
+        throw new Error("Missing one or more required results.");
       }
 
-      // Create DataFrames for each result.
-      const df1 = new DataFrame(responseBody.results1);
-      const df2 = new DataFrame(responseBody.results2);
-      const df3 = new DataFrame(responseBody.result3);
+      const df1 = new DataFrame(resp.results1);
+      const df2 = new DataFrame(resp.results2);
+      const df3 = new DataFrame(resp.result3);
+      setDataFrames({ dfResult1: df1, dfResult2: df2, dfResult3: df3 });
 
-      setDataFrames({
-        dfResult1: df1,
-        dfResult2: df2,
-        dfResult3: df3,
-      });
-
-      // Extract distinct cycle names from df2.
-      const cycleItemsArray = df2
-        .distinct("cycle_name")
-        .toArray()
-        .map((row) => row[0]);
-
-      console.log("Cycle Items:", cycleItemsArray);
-      setCycleItems(cycleItemsArray);
+      const cycles = df2.distinct("cycle_name").toArray().map((r) => r[0]);
+      setCycleItems(cycles);
     } catch (error) {
-      console.error("🚨 Error fetching data from Lambda:", error);
+      console.error("Error fetching data from Lambda:", error);
     }
   }, []);
 
-  // =============================================================================
-  //                      AUTHORIZATION CHECK (MODEL ID MATCH)
-  // =============================================================================
+  useEffect(() => {
+    (async () => {
+      try {
+        await Promise.all([
+          checkofCloudBackendSheet(),
+          fetchDataFromLambda(),
+        ]);
+      } catch (e) {
+        console.error("Initialization failed:", e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [checkofCloudBackendSheet, fetchDataFromLambda]);
 
-  // Once loading is complete and we have the metadata and the Excel model ID,
-  // check if the modelID from Excel (modelIDValue) is present in result3.
   useEffect(() => {
     if (!loading && modelIDValue && dataFrames.dfResult3) {
-      const models = dataFrames.dfResult3.toCollection(); // Array of objects from result3.
-      const authorized = models.some((model) => model.model_id === modelIDValue);
+      const authorized = dataFrames.dfResult3
+        .toCollection()
+        .some((m) => (m.model_id ?? "").toString() === modelIDValue);
       if (!authorized) {
-        console.warn("🚨 No authorized model detected");
+        setModelIDError("Model ID mismatch. The current model is not authorized.");
         setIsOutputSheet(false);
       } else {
-        console.log("✅ Authorized model detected");
+        setModelIDError("");
       }
     }
   }, [loading, modelIDValue, dataFrames.dfResult3]);
 
-  // =============================================================================
-  //                               USE EFFECTS
-  // =============================================================================
+  // stub – opens confirmation
+  const handleSaveClick = useCallback(() => {
+    setShowConfirm(true);
+  }, []);
 
-  useEffect(() => {
-    const initializePage = async () => {
-      try {
-        // Run initialization tasks concurrently.
-        await Promise.all([checkofCloudBackendSheet(), fetchDataFromLambda()]);
-      } catch (error) {
-        console.error("🚨 Initialization failed:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializePage();
-  }, [checkofCloudBackendSheet, fetchDataFromLambda]);
-
-  // =============================================================================
-  //                                EVENT HANDLERS
-  // =============================================================================
-
-  const handleSaveClick = useCallback(async () => {
+  // user clicks “Yes”
+  const handleSaveConfirmed = useCallback(async () => {
+    setShowConfirm(false);
     console.time("Total save time request");
-    setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
+    setPageValue("LoadingCircleComponent", "0% | Checking Access...");
 
-    console.log("📤 Saving Forecast:", {
-      cycle_name: selectedCycle,
-      scenario_name: scenarioName,
-    });
-    console.log("🔹 Using Model ID:", modelIDValue);
-    console.log("🔹 Using Model Type:", modelType);
+    const access = await AWSconnections.ButtonAccess("SAVE_FORECAST");
+    if (access?.message === "ACCESS DENIED") {
+      setPageValue(
+        "SaveForecastPageinterim",
+        "You do not have permission to save forecast."
+      );
+      console.timeEnd("Total save time request");
+      return;
+    }
 
     if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
-      console.log("This scenario combination already exists.");
-      setPageValue("SaveForecastPageinterim", "Scenario names already exist in the database. Please choose a different scenario name.");
+      setPageValue(
+        "SaveForecastPageinterim",
+        "Scenario names already exist… choose a different one."
+      );
       return;
     }
 
     try {
       await excelfucntions.setCalculationMode("manual");
-      console.time("Parallel processes");
-
-      const [longformData, _] = await Promise.all([
-        excelfucntions.generateLongFormData("US"),
-        inputfiles.saveData(),
+      setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
+      const [longformData, , outputbackend_data] = await Promise.all([
+        excelfucntions.generateLongFormData("US", "DataModel"),
+        excelfucntions.saveData(),
+        excelfucntions.readNamedRangeToArray("aggregator_data"),
       ]);
 
-      console.timeEnd("Parallel processes");
       setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
-
-      console.time("save forecast");
       const saveFlag = await AWSconnections.service_orchestration(
         "SAVE_LOCKED_FORECAST",
         "",
@@ -227,81 +232,109 @@ const SaveandLockScenario = ({ setPageValue }) => {
         "",
         "",
         "",
-        longformData
+        longformData,
+        outputbackend_data,
+        [],
+        [],
+        [],
+        setPageValue
       );
-      console.timeEnd("save forecast");
 
-      console.log("Save response:", saveFlag);
-      setPageValue("LoadingCircleComponent", "100% | Saving your forecast...");
+      const message = `Forecast scenario saved for
+Model: ${heading.replace("Save & Lock Scenario for:", "")}
+Cycle: ${selectedCycle}
+Scenario: ${scenarioName}`;
 
-      if (saveFlag === "Saved Locked Forecast" || (saveFlag && saveFlag.result === "DONE")) {
-        
-        const message = `Forecast scenario saved & locked for Model: ${heading.replace("Save & Lock Aggregator Scenario for: ", "")} | Cycle: ${selectedCycle} | Scenario: ${scenarioName}`;
-        
-        setPageValue("SaveForecastPageinterim", message);
-      } else if (
-        saveFlag ===
-        "A scenario of this name for the provided model and cycle details already exists, try with another one."
+      if (
+        saveFlag === "SUCCESS" ||
+        (saveFlag && saveFlag.result === "DONE")
       ) {
-        setPageValue("SaveForecastPageinterim", "Scenario names already exist in the database. Please choose a different scenario name.");
-      } else if (saveFlag && saveFlag.result === "ERROR") {
-        setPageValue("SaveForecastPageinterim", "Some Error Occurred, Please try again");
+        setPageValue("SaveForecastPageinterim", message);
+      } else {
+        setPageValue(
+          "SaveForecastPageinterim",
+          "Some Error Occurred, Please try again"
+        );
       }
     } catch (error) {
       console.error("Error during save process:", error);
       setPageValue("SaveForecastPageinterim", "An error occurred during save");
+    } finally {
+      console.timeEnd("Total save time request");
     }
+  }, [
+    modelIDValue,
+    selectedCycle,
+    scenarioName,
+    checkScenarioExists,
+    setPageValue,
+    heading,
+  ]);
 
-    console.timeEnd("Total save time request");
-  }, [selectedCycle, scenarioName, modelIDValue, modelType, checkScenarioExists, setPageValue]);
+  // user clicks “No”
+  const handleCancel = () => {
+    setShowConfirm(false);
+  };
 
-  // =============================================================================
-  //                                 RENDER
-  // =============================================================================
+  if (loading) {
+    return <MessageBox>Checking cloud compatibility, please wait...</MessageBox>;
+  }
+  if (modelIDError) {
+    return <MessageBox>{modelIDError}</MessageBox>;
+  }
+  if (!isOutputSheet) {
+    return (
+      <MessageBox>
+        No authorized output sheet or model found. Please refresh the add-in.
+      </MessageBox>
+    );
+  }
 
   return (
     <Container>
-      {loading ? (
-        <MessageBox>Loading, please wait...</MessageBox>
-      ) : isOutputSheet ? (
-        <>
-          <Heading>{heading}</Heading>
-          <DropdownContainer>
-            <SelectDropdown
-              value={selectedCycle}
-              onChange={(e) => setSelectedCycle(e.target.value)}
-            >
-              <option value="" disabled>
-                Select Cycle
-              </option>
-              {cycleItems.length > 0 ? (
-                cycleItems.map((item, idx) => (
-                  <option key={idx} value={item}>
-                    {item}
-                  </option>
-                ))
-              ) : (
-                <option disabled>No Cycles Available</option>
-              )}
-            </SelectDropdown>
-            <Input
-              type="text"
-              placeholder="Enter Scenario Name"
-              value={scenarioName}
-              onChange={(e) => setScenarioName(e.target.value)}
-            />
-          </DropdownContainer>
-          <SaveButton
-            onClick={handleSaveClick}
-            disabled={!selectedCycle || !scenarioName}
-          >
-            Save
-          </SaveButton>
-        </>
-      ) : (
-        <MessageBox>
-          No Authorised model detected, please refresh the addin
-        </MessageBox>
+      <Heading>{heading}</Heading>
+      <DropdownContainer>
+        <SelectDropdown
+          value={selectedCycle}
+          onChange={(e) => setSelectedCycle(e.target.value)}
+        >
+          <option value="" disabled>
+            Select Cycle
+          </option>
+          {cycleItems.map((c, i) => (
+            <option key={i} value={c}>
+              {c}
+            </option>
+          ))}
+        </SelectDropdown>
+        <Input
+          type="text"
+          placeholder="Enter Scenario Name"
+          value={scenarioName}
+          onChange={(e) => setScenarioName(e.target.value)}
+        />
+      </DropdownContainer>
+      <SaveButton
+        onClick={handleSaveClick}
+        disabled={!selectedCycle || !scenarioName}
+      >
+        Save
+      </SaveButton>
+
+      {showConfirm && (
+        <Overlay>
+          <Modal>
+            <ModalHeader>You are locking a scenario</ModalHeader>
+            <ModalBody>
+              Please confirm you want to lock “{scenarioName}” on cycle “
+              {selectedCycle}”.
+            </ModalBody>
+            <ModalFooter>
+              <Button onClick={handleCancel}>No</Button>
+              <Button onClick={handleSaveConfirmed}>Yes</Button>
+            </ModalFooter>
+          </Modal>
+        </Overlay>
       )}
     </Container>
   );
