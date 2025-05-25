@@ -247,6 +247,7 @@ const LoadScenario = ({ setPageValue }) => {
         // Step 2: Update message and begin increasing progress
         setPageValue("LoadingCircleComponent", "55% | Importing assumptions...");
         setImportProgress(55);
+        excelconnections.setCalculationMode("manual");
 
         const progressPromise = increaseProgressDuringExport();
 
@@ -258,7 +259,13 @@ const LoadScenario = ({ setPageValue }) => {
         setImportProgress(100);
         setPageValue("LoadingCircleComponent", "100% | Import completed");
 
-        const message = `Forecast scenario imported for Model: ${heading.replace("Import Scenario for: ", "")} | Cycle: ${selectedCycle} | Scenario: ${selectedScenario}`;
+        const modelNameOnly = heading.replace("Import Scenario for: ", "");
+        const message = [
+          `Forecast scenario imported for:`,
+          `Model: ${modelNameOnly}`,
+          `Cycle: ${selectedCycle}`,
+          `Scenario: ${selectedScenario}`,
+        ].join("\n");
         setPageValue("SaveForecastPageinterim", message);
         excelconnections.setCalculationMode("automatic");
 

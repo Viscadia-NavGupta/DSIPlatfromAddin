@@ -1,4 +1,3 @@
-// SaveandLockScenario.jsx
 import React, {
   useState,
   useEffect,
@@ -184,12 +183,10 @@ const SaveandLockScenario = ({ setPageValue }) => {
     }
   }, [loading, modelIDValue, dataFrames.dfResult3]);
 
-  // stub – opens confirmation
   const handleSaveClick = useCallback(() => {
     setShowConfirm(true);
   }, []);
 
-  // user clicks “Yes”
   const handleSaveConfirmed = useCallback(async () => {
     setShowConfirm(false);
     console.time("Total save time request");
@@ -271,7 +268,6 @@ Scenario: ${scenarioName}`;
     heading,
   ]);
 
-  // user clicks “No”
   const handleCancel = () => {
     setShowConfirm(false);
   };
@@ -285,7 +281,7 @@ Scenario: ${scenarioName}`;
   if (!isOutputSheet) {
     return (
       <MessageBox>
-        No authorized output sheet or model found. Please refresh the add-in.
+        No authorized model found. Please refresh the add-in.
       </MessageBox>
     );
   }
@@ -330,8 +326,8 @@ Scenario: ${scenarioName}`;
               {selectedCycle}”.
             </ModalBody>
             <ModalFooter>
-              <Button onClick={handleCancel}>No</Button>
               <Button onClick={handleSaveConfirmed}>Yes</Button>
+              <Button onClick={handleCancel}>No</Button>
             </ModalFooter>
           </Modal>
         </Overlay>

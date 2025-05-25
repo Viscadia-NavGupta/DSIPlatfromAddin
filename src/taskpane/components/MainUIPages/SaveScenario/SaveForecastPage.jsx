@@ -300,7 +300,7 @@ Scenario: ${scenarioName}`;
   if (!isOutputSheet) {
     return (
       <MessageBox>
-        No authorized output sheet or model found. Please refresh the add-in.
+        No authorized model found. Please refresh the add-in.
       </MessageBox>
     );
   }
