@@ -64,7 +64,7 @@ export const IconWrapper = styled("div")(({ disabled, size }) => ({
   color: disabled ? "#d3d3d3" : "#63666A",
   transition: "color 0.3s ease",
   "& svg": {
-    width: "90%",  // Adjusted for better responsiveness
+    width: "90%",
     height: "90%",
   },
   "&:hover": {
@@ -94,7 +94,7 @@ export const Button = styled("button")(({ disabled }) => ({
   cursor: disabled ? "not-allowed" : "pointer",
   textAlign: "center",
   position: "relative",
-  overflow: "visible", // Ensure overflow does not hide tooltip
+  overflow: "visible",
   padding: "3px",
   width: "100%",
   height: "75px",
@@ -136,7 +136,7 @@ export const Tooltip = styled("div")({
   visibility: "hidden",
   opacity: 0,
   position: "absolute",
-  bottom: "100%", // Position above the button
+  bottom: "100%",
   left: "50%",
   transform: "translateX(-50%)",
   backgroundColor: "rgba(0, 0, 0, 0.85)",
@@ -148,8 +148,8 @@ export const Tooltip = styled("div")({
   zIndex: 10,
   boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.2)",
   fontWeight: "bold",
-  marginBottom: "8px", // Add some space between tooltip and button
-  transition: "visibility 0s, opacity 0.3s ease", // Smooth transition
+  marginBottom: "8px",
+  transition: "visibility 0s, opacity 0.3s ease",
 
   "&::after": {
     content: "''",
@@ -163,5 +163,64 @@ export const Tooltip = styled("div")({
   },
 });
 
+// --- Modal / Overlay Styles ---
+export const Overlay = styled("div")({
+  position: "fixed",
+  top: 0,
+  left: 0,
+  width: "100vw",
+  height: "100vh",
+  backgroundColor: "rgba(0,0,0,0.4)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 1000,
+});
 
-// Removed DisabledOverlay component since we're not using it anymore
+export const Modal = styled("div")({
+  backgroundColor: "#FFFFFF",
+  borderRadius: "8px",
+  width: "90%",
+  maxWidth: "400px",
+  boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+  overflow: "hidden",
+});
+
+export const ModalHeader = styled("div")({
+  padding: "16px 24px",
+  borderBottom: "1px solid #E0E0E0",
+  fontSize: "18px",
+  fontWeight: 500,
+  color: "#333333",
+});
+
+export const ModalBody = styled("div")({
+  padding: "16px 24px",
+  fontSize: "14px",
+  color: "#4F4F4F",
+  lineHeight: "1.5",
+});
+
+export const ModalFooter = styled("div")({
+  padding: "12px 24px",
+  borderTop: "1px solid #E0E0E0",
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: "12px",
+});
+
+export const ConfirmButton = styled("button")({
+  padding: "8px 16px",
+  fontFamily: "Roboto, sans-serif",
+  fontWeight: 500,
+  fontSize: "14px",
+  borderRadius: "6px",
+  border: "none",
+  cursor: "pointer",
+  backgroundColor: "#BD302B",
+  color: "#FFFFFF",
+  transition: "background 0.2s ease-in-out",
+  "&:hover": {
+    backgroundColor: "#8A1F1A",
+  },
+});

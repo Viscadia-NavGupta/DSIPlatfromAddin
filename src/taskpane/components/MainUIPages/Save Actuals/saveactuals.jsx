@@ -37,22 +37,20 @@ const SaveScenarioActuals = ({ setPageValue }) => {
     dfResult3: null,
   });
 
-  // --- scenarioSet logic ---
+  // scenarioSet logic
   const scenarioSet = useMemo(() => {
     const df = dataFrames.dfResult1;
     if (!df) return new Set();
     return new Set(
-      df
-        .toCollection()
-        .map((r) => {
-          const id = (r.model_id ?? "").toString().trim();
-          const cycle = (r.cycle_name ?? "").toString().trim();
-          const scen = (r.scenario_name ?? "")
-            .toString()
-            .trim()
-            .toLowerCase();
-          return `${id}|${cycle}|${scen}`;
-        })
+      df.toCollection().map((r) => {
+        const id = (r.model_id ?? "").toString().trim();
+        const cycle = (r.cycle_name ?? "").toString().trim();
+        const scen = (r.scenario_name ?? "")
+          .toString()
+          .trim()
+          .toLowerCase();
+        return `${id}|${cycle}|${scen}`;
+      })
     );
   }, [dataFrames.dfResult1]);
 
@@ -67,11 +65,12 @@ const SaveScenarioActuals = ({ setPageValue }) => {
     [dataFrames.dfResult1, scenarioSet]
   );
 
-  // --- modal state & handlers ---
+  // modal state & handlers
   const [showConfirm, setShowConfirm] = useState(false);
   const actualsCycle = "ACTUALS";
 
   const handleInitialClick = useCallback(() => {
+    console.log("Opening confirmation modal");
     setShowConfirm(true);
   }, []);
 
@@ -101,7 +100,6 @@ const SaveScenarioActuals = ({ setPageValue }) => {
 
       setPageValue("LoadingCircleComponent", "75% | Saving your actuals...");
 
-      // read last actuals date & format
       const actualsLastDateRaw = await Excelconnections.readNamedRangeToArray(
         "actuals_last_month"
       );
@@ -152,7 +150,7 @@ const SaveScenarioActuals = ({ setPageValue }) => {
     setPageValue,
   ]);
 
-  // --- original sheet check & data fetch ---
+  // sheet check & data fetch
   const checkofCloudBackendSheet = useCallback(async () => {
     try {
       if (typeof window.Excel === "undefined") return;
@@ -177,24 +175,13 @@ const SaveScenarioActuals = ({ setPageValue }) => {
         Object.values(ranges).forEach((r) => r.load("values"));
         await context.sync();
 
-        const nameVal = ranges.ModelName.values[0][0] || "";
-        const idVal = ranges.ModelID.values[0][0] || "";
-        const typeVal = ranges.ModelType.values[0][0] || "";
-
-        setHeading(`Save Scenario for: ${nameVal}`);
+        setHeading(`Save Scenario for: ${ranges.ModelName.values[0][0]}`);
+        setModelIDValue(ranges.ModelID.values[0][0] || "");
+        setModelType(ranges.ModelType.values[0][0] || "");
         setIsOutputSheet(true);
-        setModelIDValue(idVal);
-        setModelType(typeVal);
-
-        if (typeVal === "AGGREGATOR") {
-          setPageValue(
-            "AggSaveScenario",
-            "Loading scenario for Aggregator model..."
-          );
-        }
       });
     } catch (error) {
-      console.error("Error checking for Outputs sheet:", error);
+      console.error(error);
       setIsOutputSheet(false);
     }
   }, [setPageValue]);
@@ -208,31 +195,23 @@ const SaveScenarioActuals = ({ setPageValue }) => {
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );
-      if (!resp || !resp.results1 || !resp.results2 || !resp.result3) {
-        throw new Error("Missing required results.");
-      }
       setDataFrames({
         dfResult1: new DataFrame(resp.results1),
         dfResult2: new DataFrame(resp.results2),
         dfResult3: new DataFrame(resp.result3),
       });
     } catch (error) {
-      console.error("Error fetching data from Lambda:", error);
+      console.error(error);
     }
   }, []);
 
   useEffect(() => {
     (async () => {
-      try {
-        await Promise.all([
-          checkofCloudBackendSheet(),
-          fetchDataFromLambda(),
-        ]);
-      } catch (e) {
-        console.error("Initialization failed:", e);
-      } finally {
-        setLoading(false);
-      }
+      await Promise.all([
+        checkofCloudBackendSheet(),
+        fetchDataFromLambda()
+      ]);
+      setLoading(false);
     })();
   }, [checkofCloudBackendSheet, fetchDataFromLambda]);
 
@@ -245,19 +224,20 @@ const SaveScenarioActuals = ({ setPageValue }) => {
     }
   }, [loading, modelIDValue, dataFrames.dfResult3]);
 
-  // --- date helpers ---
+  // date helpers
   function excelSerialToJSDate(serial) {
-    const epoch = new Date(1899, 11, 30);
-    return new Date(epoch.getTime() + serial * 24 * 60 * 60 * 1000);
+    return new Date(new Date(1899, 11, 30).getTime() + serial * 86400000);
   }
   function formatToMMMYY(date) {
-    const opts = { month: "short", year: "2-digit" };
-    return new Intl.DateTimeFormat("en-US", opts)
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      year: "2-digit",
+    })
       .format(date)
       .replace(" ", "-");
   }
 
-  // --- render ---
+  // render
   return (
     <Container>
       {loading ? (
@@ -286,7 +266,7 @@ const SaveScenarioActuals = ({ setPageValue }) => {
                 <ModalHeader>Submit Actuals?</ModalHeader>
                 <ModalBody>
                   Do you want to submit actuals for cycle “{actualsCycle}” and
-                  scenario “{scenarioName}”?
+                  scenario “{scenarioName}”? 
                 </ModalBody>
                 <ModalFooter>
                   <Button onClick={handleConfirm}>Yes</Button>
