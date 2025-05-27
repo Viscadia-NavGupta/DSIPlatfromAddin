@@ -1,8 +1,10 @@
+// src/pages/SaveandLockScenario.jsx
+
 import React, {
   useState,
   useEffect,
   useCallback,
-  useMemo
+  useMemo,
 } from "react";
 import {
   Container,
@@ -22,6 +24,7 @@ import {
 import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
 import * as excelfucntions from "../../Middleware/ExcelConnection";
+import { specialModelIds } from "../../Middleware/Model Config";
 import CONFIG from "../../Middleware/AWSConnections";
 
 const SaveandLockScenario = ({ setPageValue }) => {
@@ -34,6 +37,7 @@ const SaveandLockScenario = ({ setPageValue }) => {
   const [modelIDValue, setModelIDValue] = useState("");
   const [modelType, setModelType] = useState("");
   const [modelIDError, setModelIDError] = useState("");
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const [dataFrames, setDataFrames] = useState({
     dfResult1: null,
@@ -41,47 +45,40 @@ const SaveandLockScenario = ({ setPageValue }) => {
     dfResult3: null,
   });
 
-  const [showConfirm, setShowConfirm] = useState(false);
-
+  // build existence set
   const scenarioSet = useMemo(() => {
     const df = dataFrames.dfResult1;
     if (!df) return new Set();
     return new Set(
-      df
-        .toCollection()
-        .map((r) => {
-          const id = (r.model_id ?? "").toString().trim();
-          const cycle = (r.cycle_name ?? "").toString().trim();
-          const scen = (r.scenario_name ?? "")
-            .toString()
-            .trim()
-            .toLowerCase();
-          return `${id}|${cycle}|${scen}`;
-        })
+      df.toCollection().map(r => {
+        const id = (r.model_id ?? "").toString().trim();
+        const cycle = (r.cycle_name ?? "").toString().trim();
+        const scen = (r.scenario_name ?? "").toString().trim().toLowerCase();
+        return `${id}|${cycle}|${scen}`;
+      })
     );
   }, [dataFrames.dfResult1]);
 
   const checkScenarioExists = useCallback(
     (modelId, cycleName, scenarioName) => {
       if (!dataFrames.dfResult1) return false;
-      const key = `${modelId}|${cycleName}|${scenarioName
-        .trim()
-        .toLowerCase()}`;
+      const key = `${modelId}|${cycleName}|${scenarioName.trim().toLowerCase()}`;
       return scenarioSet.has(key);
     },
     [dataFrames.dfResult1, scenarioSet]
   );
 
+  // read CloudBackend sheet
   const checkofCloudBackendSheet = useCallback(async () => {
     try {
-      if (typeof window.Excel === "undefined") return;
-      await Excel.run(async (context) => {
+      if (!window.Excel) return;
+      await Excel.run(async context => {
         const sheets = context.workbook.worksheets;
         sheets.load("items/name");
         await context.sync();
 
         const mdSheet = sheets.items.find(
-          (s) => s.name.toLowerCase() === "cloud_backend_md"
+          s => s.name.toLowerCase() === "cloud_backend_md"
         );
         if (!mdSheet) {
           setIsOutputSheet(false);
@@ -93,18 +90,12 @@ const SaveandLockScenario = ({ setPageValue }) => {
           ModelID: mdSheet.getRange("B7"),
           ModelType: mdSheet.getRange("B8"),
         };
-        Object.values(ranges).forEach((r) => r.load("values"));
+        Object.values(ranges).forEach(r => r.load("values"));
         await context.sync();
 
-        const nameVal = (ranges.ModelName.values[0][0] ?? "")
-          .toString()
-          .trim();
-        const idVal = (ranges.ModelID.values[0][0] ?? "")
-          .toString()
-          .trim();
-        const typeVal = (ranges.ModelType.values[0][0] ?? "")
-          .toString()
-          .trim();
+        const nameVal = (ranges.ModelName.values[0][0] ?? "").toString().trim();
+        const idVal = (ranges.ModelID.values[0][0] ?? "").toString().trim();
+        const typeVal = (ranges.ModelType.values[0][0] ?? "").toString().trim();
 
         if (!nameVal || !idVal || !typeVal) {
           setIsOutputSheet(false);
@@ -124,11 +115,12 @@ const SaveandLockScenario = ({ setPageValue }) => {
         }
       });
     } catch (error) {
-      console.error("Error checking for Outputs sheet:", error);
+      console.error("Error checking Outputs sheet:", error);
       setIsOutputSheet(false);
     }
   }, [setPageValue]);
 
+  // fetch via Lambda
   const fetchDataFromLambda = useCallback(async () => {
     try {
       const resp = await AWSconnections.FetchMetaData(
@@ -138,22 +130,25 @@ const SaveandLockScenario = ({ setPageValue }) => {
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );
-      if (!resp || !resp.results1 || !resp.results2 || !resp.result3) {
+      if (!resp?.results1 || !resp?.results2 || !resp?.result3) {
         throw new Error("Missing one or more required results.");
       }
-
-      const df1 = new DataFrame(resp.results1);
-      const df2 = new DataFrame(resp.results2);
-      const df3 = new DataFrame(resp.result3);
-      setDataFrames({ dfResult1: df1, dfResult2: df2, dfResult3: df3 });
-
-      const cycles = df2.distinct("cycle_name").toArray().map((r) => r[0]);
+      setDataFrames({
+        dfResult1: new DataFrame(resp.results1),
+        dfResult2: new DataFrame(resp.results2),
+        dfResult3: new DataFrame(resp.result3),
+      });
+      const cycles = new DataFrame(resp.results2)
+        .distinct("cycle_name")
+        .toArray()
+        .map(r => r[0]);
       setCycleItems(cycles);
     } catch (error) {
-      console.error("Error fetching data from Lambda:", error);
+      console.error("Error fetching data:", error);
     }
   }, []);
 
+  // init
   useEffect(() => {
     (async () => {
       try {
@@ -169,12 +164,13 @@ const SaveandLockScenario = ({ setPageValue }) => {
     })();
   }, [checkofCloudBackendSheet, fetchDataFromLambda]);
 
+  // authorize
   useEffect(() => {
     if (!loading && modelIDValue && dataFrames.dfResult3) {
-      const authorized = dataFrames.dfResult3
+      const allowed = dataFrames.dfResult3
         .toCollection()
-        .some((m) => (m.model_id ?? "").toString() === modelIDValue);
-      if (!authorized) {
+        .some(m => (m.model_id ?? "").toString() === modelIDValue);
+      if (!allowed) {
         setModelIDError("Model ID mismatch. The current model is not authorized.");
         setIsOutputSheet(false);
       } else {
@@ -183,10 +179,12 @@ const SaveandLockScenario = ({ setPageValue }) => {
     }
   }, [loading, modelIDValue, dataFrames.dfResult3]);
 
+  // show confirmation modal
   const handleSaveClick = useCallback(() => {
     setShowConfirm(true);
   }, []);
 
+  // after user confirms
   const handleSaveConfirmed = useCallback(async () => {
     setShowConfirm(false);
     console.time("Total save time request");
@@ -213,13 +211,45 @@ const SaveandLockScenario = ({ setPageValue }) => {
     try {
       await excelfucntions.setCalculationMode("manual");
       setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
-      const [longformData, , outputbackend_data] = await Promise.all([
-        excelfucntions.generateLongFormData("US", "DataModel"),
-        excelfucntions.saveData(),
-        excelfucntions.readNamedRangeToArray("aggregator_data"),
-      ]);
+
+      let longformData;
+      // for lock page we don't use aggregator_data by default
+      let outputbackend_data = [];
+
+      if (specialModelIds.includes(modelIDValue)) {
+        // **special model**: only generate long form, skip saveData entirely
+        try {
+          [longformData] = await Promise.all([
+            excelfucntions.generateLongFormData("US", "DataModel"),
+            excelfucntions.saveData(),
+          ]);
+        } catch (err) {
+          console.error("Error in special flow:", err);
+          setPageValue(
+            "SaveForecastPageinterim",
+            "Some error occurred while saving, please try again"
+          );
+          return;
+        }
+      } else {
+        // **default**: generate + save
+        try {
+          [longformData] = await Promise.all([
+            excelfucntions.generateLongFormData("US", "DataModel"),
+            excelfucntions.saveData(),
+          ]);
+        } catch (err) {
+          console.error("Error in default flow:", err);
+          setPageValue(
+            "SaveForecastPageinterim",
+            "Some error occurred while saving, please try again"
+          );
+          return;
+        }
+      }
 
       setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
+
       const saveFlag = await AWSconnections.service_orchestration(
         "SAVE_LOCKED_FORECAST",
         "",
@@ -250,12 +280,15 @@ Scenario: ${scenarioName}`;
       } else {
         setPageValue(
           "SaveForecastPageinterim",
-          "Some Error Occurred, Please try again"
+          "Some error occurred while saving, please try again"
         );
       }
     } catch (error) {
-      console.error("Error during save process:", error);
-      setPageValue("SaveForecastPageinterim", "An error occurred during save");
+      console.error("Unhandled error:", error);
+      setPageValue(
+        "SaveForecastPageinterim",
+        "Some error occurred while saving, please try again"
+      );
     } finally {
       console.timeEnd("Total save time request");
     }
@@ -268,10 +301,9 @@ Scenario: ${scenarioName}`;
     heading,
   ]);
 
-  const handleCancel = () => {
-    setShowConfirm(false);
-  };
+  const handleCancel = () => setShowConfirm(false);
 
+  // render
   if (loading) {
     return <MessageBox>Checking cloud compatibility, please wait...</MessageBox>;
   }
@@ -292,7 +324,7 @@ Scenario: ${scenarioName}`;
       <DropdownContainer>
         <SelectDropdown
           value={selectedCycle}
-          onChange={(e) => setSelectedCycle(e.target.value)}
+          onChange={e => setSelectedCycle(e.target.value)}
         >
           <option value="" disabled>
             Select Cycle
@@ -307,14 +339,14 @@ Scenario: ${scenarioName}`;
           type="text"
           placeholder="Enter Scenario Name"
           value={scenarioName}
-          onChange={(e) => setScenarioName(e.target.value)}
+          onChange={e => setScenarioName(e.target.value)}
         />
       </DropdownContainer>
       <SaveButton
         onClick={handleSaveClick}
         disabled={!selectedCycle || !scenarioName}
       >
-        Save
+        Save & Lock
       </SaveButton>
 
       {showConfirm && (

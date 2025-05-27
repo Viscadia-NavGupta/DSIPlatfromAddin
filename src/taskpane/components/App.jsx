@@ -24,7 +24,7 @@ import ForecastLibrarypage from "./MainUIPages/Forecast Library/ForecastLibraryp
 import FLSyncData from "./MainUIPages/Forecast Library/SyncdataDropdown";
 import PasswordResetSuccess from "./ForgotPasswordPage/PasswordResetSuccess";
 import ResetPassword from "./ForgotPasswordPage/ResetPassword";
-
+import LoadScenarioAgg from "./MainUIPages/LoadScenarioPage/LoadSceanrioAgg";
 function App() {
   const [page, setPage] = useState("UserLogin");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -120,7 +120,7 @@ function App() {
   // Session initializer with refresh-token check and loading spinner
   useEffect(() => {
     (async () => {
-      const username     = localStorage.getItem("username");
+      const username = localStorage.getItem("username");
       const refreshToken = localStorage.getItem("refreshToken");
 
       if (!username || !refreshToken) {
@@ -239,6 +239,8 @@ function App() {
         return <FLSyncData setPageValue={setPageValue} />;
       case "PasswordResetSuccess":
         return <PasswordResetSuccess setPageValue={setPageValue} />;
+      case "LoadScenarioAgg":
+        return <LoadScenarioAgg setPageValue={setPageValue} />;
       case "ResetPassword":
         return (
           <ResetPassword

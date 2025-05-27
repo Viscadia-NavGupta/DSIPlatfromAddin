@@ -175,7 +175,7 @@ const SaveScenarioActuals = ({ setPageValue }) => {
         Object.values(ranges).forEach((r) => r.load("values"));
         await context.sync();
 
-        setHeading(`Save Scenario for: ${ranges.ModelName.values[0][0]}`);
+        setHeading(`Save Actuals for: ${ranges.ModelName.values[0][0]}`);
         setModelIDValue(ranges.ModelID.values[0][0] || "");
         setModelType(ranges.ModelType.values[0][0] || "");
         setIsOutputSheet(true);

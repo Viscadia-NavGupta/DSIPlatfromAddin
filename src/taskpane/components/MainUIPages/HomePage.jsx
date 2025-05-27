@@ -100,7 +100,7 @@ const HomePage = ({ userName, setPageValue }) => {
     {
       name: "Report Genie",
       icon: <ReportGenie width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-      action: () => ProdExcelConnections.generateLongFormData("US","DataModel"),
+      action: () => ProdExcelConnections.generateLongFormData("US","DataModel_Actuals"),
       disabled: false,
     },
   ];

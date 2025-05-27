@@ -1,9 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo
-} from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Container,
   Heading,
@@ -16,6 +11,7 @@ import {
 import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
 import * as excelfucntions from "../../Middleware/ExcelConnection";
+import { specialModelIds } from "../../Middleware/Model Config";
 import CONFIG from "../../Middleware/AWSConnections";
 
 const SaveScenario = ({ setPageValue }) => {
@@ -35,50 +31,31 @@ const SaveScenario = ({ setPageValue }) => {
     dfResult3: null,
   });
 
-  // ────────────────────────────────────────────────────────────────
-  // Build a Set of normalized keys once dfResult1 loads
-  // ────────────────────────────────────────────────────────────────
   const scenarioSet = useMemo(() => {
     const df = dataFrames.dfResult1;
     if (!df) return new Set();
-
     return new Set(
-      df
-        .toCollection()
-        .map((r) => {
-          const id = (r.model_id ?? "").toString().trim();
-          const cycle = (r.cycle_name ?? "").toString().trim();
-          const scen = (r.scenario_name ?? "").toString().trim().toLowerCase();
-          return `${id}|${cycle}|${scen}`;
-        })
+      df.toCollection().map((r) => {
+        const id = (r.model_id ?? "").toString().trim();
+        const cycle = (r.cycle_name ?? "").toString().trim();
+        const scen = (r.scenario_name ?? "").toString().trim().toLowerCase();
+        return `${id}|${cycle}|${scen}`;
+      })
     );
   }, [dataFrames.dfResult1]);
 
-  // ────────────────────────────────────────────────────────────────
-  // Fast existence check
-  // ────────────────────────────────────────────────────────────────
   const checkScenarioExists = useCallback(
     (modelId, cycleName, scenarioName) => {
-      if (!dataFrames.dfResult1) {
-        console.warn("Result1 DataFrame is not loaded yet.");
-        return false;
-      }
-      const id = (modelId ?? "").toString().trim();
-      const cycle = (cycleName ?? "").toString().trim();
-      const scen = scenarioName.trim().toLowerCase();
-      const key = `${id}|${cycle}|${scen}`;
+      if (!dataFrames.dfResult1) return false;
+      const key = `${modelId}|${cycleName}|${scenarioName.trim().toLowerCase()}`;
       return scenarioSet.has(key);
     },
-    [dataFrames.dfResult1, scenarioSet]
+    [scenarioSet]
   );
 
-  // ────────────────────────────────────────────────────────────────
-  // Read Excel to set ModelName, ModelID, ModelType
-  // ────────────────────────────────────────────────────────────────
   const checkofCloudBackendSheet = useCallback(async () => {
     try {
       if (typeof window.Excel === "undefined") return;
-
       await Excel.run(async (context) => {
         const sheets = context.workbook.worksheets;
         sheets.load("items/name");
@@ -100,19 +77,9 @@ const SaveScenario = ({ setPageValue }) => {
         Object.values(ranges).forEach((r) => r.load("values"));
         await context.sync();
 
-        const nameVal = (ranges.ModelName.values[0][0] ?? "")
-          .toString()
-          .trim();
+        const nameVal = (ranges.ModelName.values[0][0] ?? "").toString().trim();
         const idVal = (ranges.ModelID.values[0][0] ?? "").toString().trim();
-        const typeVal = (ranges.ModelType.values[0][0] ?? "")
-          .toString()
-          .trim();
-
-        if (!nameVal || !idVal || !typeVal) {
-          console.warn("One or more required model values are blank.");
-          setIsOutputSheet(false);
-          return;
-        }
+        const typeVal = (ranges.ModelType.values[0][0] ?? "").toString().trim();
 
         setHeading(`Save Scenario for: ${nameVal}`);
         setModelIDValue(idVal);
@@ -132,9 +99,6 @@ const SaveScenario = ({ setPageValue }) => {
     }
   }, [setPageValue]);
 
-  // ────────────────────────────────────────────────────────────────
-  // Fetch DataFrames from Lambda
-  // ────────────────────────────────────────────────────────────────
   const fetchDataFromLambda = useCallback(async () => {
     try {
       const resp = await AWSconnections.FetchMetaData(
@@ -148,12 +112,13 @@ const SaveScenario = ({ setPageValue }) => {
         throw new Error("Missing one or more required results.");
       }
 
-      const df1 = new DataFrame(resp.results1);
-      const df2 = new DataFrame(resp.results2);
-      const df3 = new DataFrame(resp.result3);
-      setDataFrames({ dfResult1: df1, dfResult2: df2, dfResult3: df3 });
+      setDataFrames({
+        dfResult1: new DataFrame(resp.results1),
+        dfResult2: new DataFrame(resp.results2),
+        dfResult3: new DataFrame(resp.result3),
+      });
 
-      const cycles = df2
+      const cycles = new DataFrame(resp.results2)
         .distinct("cycle_name")
         .toArray()
         .map((row) => row[0]);
@@ -163,9 +128,6 @@ const SaveScenario = ({ setPageValue }) => {
     }
   }, []);
 
-  // ────────────────────────────────────────────────────────────────
-  // Initialize on mount
-  // ────────────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
@@ -181,9 +143,6 @@ const SaveScenario = ({ setPageValue }) => {
     })();
   }, [checkofCloudBackendSheet, fetchDataFromLambda]);
 
-  // ────────────────────────────────────────────────────────────────
-  // Authorize modelID against dfResult3
-  // ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!loading && modelIDValue && dataFrames.dfResult3) {
       const authorized = dataFrames.dfResult3
@@ -200,9 +159,6 @@ const SaveScenario = ({ setPageValue }) => {
     }
   }, [loading, modelIDValue, dataFrames.dfResult3]);
 
-  // ────────────────────────────────────────────────────────────────
-  // Save button handler
-  // ────────────────────────────────────────────────────────────────
   const handleSaveClick = useCallback(async () => {
     console.time("Total save time request");
     setPageValue("LoadingCircleComponent", "0% | Checking Access...");
@@ -217,26 +173,64 @@ const SaveScenario = ({ setPageValue }) => {
       return;
     }
 
-    if (
-      checkScenarioExists(modelIDValue, selectedCycle, scenarioName)
-    ) {
+    if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
       setPageValue(
         "SaveForecastPageinterim",
         "Scenario names already exist… choose a different one."
       );
+      console.timeEnd("Total save time request");
       return;
     }
 
     try {
       await excelfucntions.setCalculationMode("manual");
-      setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
-      const [longformData, , outputbackend_data] = await Promise.all([
-        excelfucntions.generateLongFormData("US", "DataModel"),
-        excelfucntions.saveData(),
-        excelfucntions.readNamedRangeToArray("aggregator_data"),
-      ]);
+      setPageValue("LoadingCircleComponent", "0% | Saving your forecast…");
 
-      setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
+      let longformData;
+      let outputbackend_data;
+
+      if (specialModelIds.includes(modelIDValue)) {
+        try {
+          longformData = await excelfucntions.generateLongFormData(
+            "US",
+            "DataModel"
+          );
+          await excelfucntions.saveData();
+        } catch (err) {
+          console.error("Error in special data flow:", err);
+          setPageValue(
+            "SaveForecastPageinterim",
+            "Some error occurred while saving, please try again"
+          );
+          return;
+        }
+      } else {
+        try {
+          const [lf, , ob] = await Promise.all([
+            excelfucntions.generateLongFormData("US", "DataModel"),
+            excelfucntions.saveData(),
+            excelfucntions.readNamedRangeToArray("aggregator_data"),
+          ]);
+          longformData = lf;
+          outputbackend_data = ob;
+          if (
+            !Array.isArray(outputbackend_data) ||
+            outputbackend_data.length === 0
+          ) {
+            throw new Error("Named range 'aggregator_data' not found or empty");
+          }
+        } catch (err) {
+          console.error("Error in default data flow:", err);
+          setPageValue(
+            "SaveForecastPageinterim",
+            "Some error occurred while saving, please try again"
+          );
+          return;
+        }
+      }
+
+      setPageValue("LoadingCircleComponent", "75% | Saving your forecast…");
+
       const saveFlag = await AWSconnections.service_orchestration(
         "SAVE_FORECAST",
         "",
@@ -267,14 +261,14 @@ Scenario: ${scenarioName}`;
       } else {
         setPageValue(
           "SaveForecastPageinterim",
-          "Some Error Occurred, Please try again"
+          "Some error occurred while saving, please try again"
         );
       }
     } catch (error) {
-      console.error("Error during save process:", error);
+      console.error("Unhandled error during save process:", error);
       setPageValue(
         "SaveForecastPageinterim",
-        "An error occurred during save"
+        "Some error occurred while saving, please try again"
       );
     } finally {
       console.timeEnd("Total save time request");
@@ -288,23 +282,21 @@ Scenario: ${scenarioName}`;
     heading,
   ]);
 
-  // ────────────────────────────────────────────────────────────────
-  // Render
-  // ────────────────────────────────────────────────────────────────
   if (loading) {
     return <MessageBox>Checking cloud compatibility, please wait...</MessageBox>;
-  }
+  };
   if (modelIDError) {
     return <MessageBox>{modelIDError}</MessageBox>;
-  }
+  };
   if (!isOutputSheet) {
     return (
       <MessageBox>
         No authorized model found. Please refresh the add-in.
       </MessageBox>
     );
-  }
+  };
 
+  const isDisabled = !selectedCycle || !scenarioName;
   return (
     <Container>
       <Heading>{heading}</Heading>
@@ -331,7 +323,8 @@ Scenario: ${scenarioName}`;
       </DropdownContainer>
       <SaveButton
         onClick={handleSaveClick}
-        disabled={!selectedCycle || !scenarioName}
+        disabled={isDisabled}
+        style={isDisabled ? { backgroundColor: "#ccc", cursor: "not-allowed" } : {}}
       >
         Save
       </SaveButton>

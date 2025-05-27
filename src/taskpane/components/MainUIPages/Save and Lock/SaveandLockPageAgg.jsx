@@ -7,6 +7,12 @@ import {
   SelectDropdown,
   Input,
   SaveButton,
+  Overlay,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Button,
 } from "./SaveandLockPageStylesagg";
 import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
@@ -22,15 +28,13 @@ const AggLockScenario = ({ setPageValue }) => {
   const [scenarioName, setScenarioName] = useState("");
   const [heading, setHeading] = useState("Active Sheet Name");
   const [isOutputSheet, setIsOutputSheet] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const storedUsername = useMemo(() => sessionStorage.getItem("username"), []);
   const [cycleItems, setCycleItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modelIDValue, setModelIDValue] = useState("");
   const [modelType, setModelType] = useState("");
-  // NEW: State to store values from the "Cloud_LoadModels_List" named range.
   const [cloudLoadModelsList, setCloudLoadModelsList] = useState([]);
-
-  // DataFrames state from Lambda fetch
   const [dataFrames, setDataFrames] = useState({
     dfResult1: null,
     dfResult2: null,
@@ -41,91 +45,78 @@ const AggLockScenario = ({ setPageValue }) => {
   //                       HELPER FUNCTIONS & CALLBACKS
   // =============================================================================
 
-  // Checks if the provided combination already exists in the primary result set.
   const checkScenarioExists = useCallback(
     (modelId, cycleName, scenarioName) => {
       const { dfResult1 } = dataFrames;
-      if (!dfResult1) {
-        console.warn("Result1 DataFrame is not loaded yet.");
-        return false;
-      }
-      const records = dfResult1.toCollection();
-      return records.some(
-        (record) =>
-          record.model_id === modelId &&
-          record.cycle_name === cycleName &&
-          record.scenario_name === scenarioName
-      );
+      if (!dfResult1) return false;
+      const key = `${modelId}|${cycleName}|${scenarioName.trim().toLowerCase()}`;
+      return new Set(
+        dfResult1
+          .toCollection()
+          .map(r =>
+            `${(r.model_id ?? "").toString()}|${(r.cycle_name ?? "").toString()}|${(r.scenario_name ?? "")
+              .toString()
+              .trim()
+              .toLowerCase()}`
+          )
+      ).has(key);
     },
     [dataFrames]
   );
 
-  // Reads Excel cell values from the "cloud_backend_md" sheet.
-  // Also reads the named range "Cloud_LoadModels_List" and stores its values in state.
   const checkofCloudBackendSheet = useCallback(async () => {
     try {
-      console.log("📊 Checking for Output Sheet...");
-      if (typeof window.Excel === "undefined") {
-        console.error("🚨 Excel API is not available.");
-        return;
-      }
-      await Excel.run(async (context) => {
+      if (typeof window.Excel === "undefined") return;
+      await Excel.run(async context => {
         const sheets = context.workbook.worksheets;
         sheets.load("items/name");
         await context.sync();
 
         const MetaDataSheet = sheets.items.find(
-          (sheet) => sheet.name.toLowerCase() === "cloud_backend_md"
+          sheet => sheet.name.toLowerCase() === "cloud_backend_md"
         );
-
-        if (MetaDataSheet) {
-          const sheet = MetaDataSheet;
-          const ranges = {
-            ModelName: sheet.getRange("B5"),
-            ModelID: sheet.getRange("B7"),
-            ModelType: sheet.getRange("B8"),
-          };
-
-          // Load all ranges together.
-          Object.values(ranges).forEach((range) => range.load("values"));
-
-          // Get the named range "Cloud_LoadModels_List" and load its values.
-          const cloudLoadModelsName = context.workbook.names.getItem("Cloud_LoadModels_List");
-          const cloudLoadModelsRange = cloudLoadModelsName.getRange();
-          cloudLoadModelsRange.load("values");
-
-          await context.sync();
-
-          const ModelNameValue = ranges.ModelName.values[0][0] || "";
-          const ModelIDValue = ranges.ModelID.values[0][0] || "";
-          const ModelTypeValue = ranges.ModelType.values[0][0] || "";
-          // The named range returns a 2D array.
-          const loadedCloudLoadModelsList = cloudLoadModelsRange.values;
-
-          setHeading(`Save & Lock Aggregator Scenario for: ${ModelNameValue}`);
-          setIsOutputSheet(true);
-          setModelIDValue(ModelIDValue);
-          setModelType(ModelTypeValue);
-          setCloudLoadModelsList(loadedCloudLoadModelsList);
-
-          console.log("✅ Output Sheet Found:", ModelNameValue, ModelIDValue, ModelTypeValue);
-          console.log("✅ Cloud_LoadModels_List:", loadedCloudLoadModelsList);
-        } else {
-          console.log("⚠️ No Output Sheet Found.");
+        if (!MetaDataSheet) {
           setIsOutputSheet(false);
+          return;
         }
+
+        const ranges = {
+          ModelName: MetaDataSheet.getRange("B5"),
+          ModelID: MetaDataSheet.getRange("B7"),
+          ModelType: MetaDataSheet.getRange("B8"),
+        };
+        Object.values(ranges).forEach(r => r.load("values"));
+
+        const cloudLoadModelsName = context.workbook.names.getItem(
+          "Cloud_LoadModels_List"
+        );
+        const cloudLoadModelsRange = cloudLoadModelsName.getRange();
+        cloudLoadModelsRange.load("values");
+
+        await context.sync();
+
+        const ModelNameValue = ranges.ModelName.values[0][0] || "";
+        const ModelIDValue = ranges.ModelID.values[0][0] || "";
+        const ModelTypeValue = ranges.ModelType.values[0][0] || "";
+        const loadedCloudLoadModelsList = cloudLoadModelsRange.values;
+
+        setHeading(
+          `Save & Lock Aggregator Scenario for: ${ModelNameValue}`
+        );
+        setModelIDValue(ModelIDValue);
+        setModelType(ModelTypeValue);
+        setCloudLoadModelsList(loadedCloudLoadModelsList);
+        setIsOutputSheet(true);
       });
     } catch (error) {
-      console.error("🚨 Error checking for Outputs sheet:", error);
+      console.error(error);
       setIsOutputSheet(false);
     }
   }, []);
 
-  // Fetch metadata from Lambda and create DataFrames for further processing.
   const fetchDataFromLambda = useCallback(async () => {
     try {
-      console.log("📤 Fetching Data from Lambda...");
-      const responseBody = await AWSconnections.FetchMetaData(
+      const resp = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
         CONFIG.AWS_SECRETS_NAME,
@@ -133,127 +124,117 @@ const AggLockScenario = ({ setPageValue }) => {
         localStorage.getItem("username")
       );
 
-      if (
-        !responseBody ||
-        !responseBody.results1 ||
-        !responseBody.results2 ||
-        !responseBody.result3
-      ) {
-        throw new Error("❌ Missing one or more required results in Lambda response.");
+      if (!resp || !resp.results1 || !resp.results2 || !resp.result3) {
+        throw new Error("Incomplete metadata");
       }
 
-      // Create DataFrames for each result.
-      const df1 = new DataFrame(responseBody.results1);
-      const df2 = new DataFrame(responseBody.results2);
-      const df3 = new DataFrame(responseBody.result3);
+      const df1 = new DataFrame(resp.results1);
+      const df2 = new DataFrame(resp.results2);
+      const df3 = new DataFrame(resp.result3);
 
-      setDataFrames({
-        dfResult1: df1,
-        dfResult2: df2,
-        dfResult3: df3,
-      });
-
-      // Extract distinct cycle names from df2.
-      const cycleItemsArray = df2
-        .distinct("cycle_name")
-        .toArray()
-        .map((row) => row[0]);
-
-      console.log("Cycle Items:", cycleItemsArray);
-      setCycleItems(cycleItemsArray);
+      setDataFrames({ dfResult1: df1, dfResult2: df2, dfResult3: df3 });
+      setCycleItems(
+        df2.distinct("cycle_name").toArray().map(r => r[0])
+      );
     } catch (error) {
-      console.error("🚨 Error fetching data from Lambda:", error);
+      console.error(error);
     }
   }, []);
 
   // =============================================================================
-  //                      AUTHORIZATION CHECK (MODEL ID MATCH)
+  //                          AUTHORIZATION CHECK EFFECT
   // =============================================================================
 
-  // Once loading is complete and we have the metadata and the Excel model ID,
-  // check if the modelID from Excel (modelIDValue) is present in result3.
   useEffect(() => {
     if (!loading && modelIDValue && dataFrames.dfResult3) {
-      const models = dataFrames.dfResult3.toCollection(); // Array of objects from result3.
-      const authorized = models.some((model) => model.model_id === modelIDValue);
+      const authorized = dataFrames.dfResult3
+        .toCollection()
+        .some(m => m.model_id === modelIDValue);
       if (!authorized) {
-        console.warn("🚨 No authorized model detected");
         setIsOutputSheet(false);
-      } else {
-        console.log("✅ Authorized model detected");
       }
     }
-  }, [loading, modelIDValue, dataFrames.dfResult3]);
+  }, [loading, modelIDValue, dataFrames]);
 
   // =============================================================================
-  //                               USE EFFECTS
+  //                                INIT
   // =============================================================================
 
   useEffect(() => {
-    const initializePage = async () => {
-      try {
-        // Run initialization tasks concurrently.
-        await Promise.all([checkofCloudBackendSheet(), fetchDataFromLambda()]);
-      } catch (error) {
-        console.error("🚨 Initialization failed:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializePage();
+    (async () => {
+      await Promise.all([checkofCloudBackendSheet(), fetchDataFromLambda()]);
+      setLoading(false);
+    })();
   }, [checkofCloudBackendSheet, fetchDataFromLambda]);
 
   // =============================================================================
-  //                                EVENT HANDLERS
+  //                      SAVE CLICK → SHOW MODAL
   // =============================================================================
 
-  const handleSaveClick = useCallback(async () => {
+  const handleSaveClick = useCallback(() => {
+    setShowConfirm(true);
+  }, []);
+
+  // =============================================================================
+  //                   AFTER USER CONFIRMS → ACTUAL SAVE LOGIC
+  // =============================================================================
+
+  const handleSaveConfirmed = useCallback(async () => {
+    setShowConfirm(false);
     console.time("Total save time request");
+
+    // ── CHECK ACCESS ─────────────────────────────────────────────────────────
+    setPageValue("LoadingCircleComponent", "0% | Checking Access...");
+    const access = await AWSconnections.ButtonAccess("SAVE_LOCKED_FORECAST");
+    if (access?.message === "ACCESS DENIED") {
+      setPageValue(
+        "SaveForecastPageinterim",
+        "You do not have permission to save forecast."
+      );
+      console.timeEnd("Total save time request");
+      return;
+    }
+
+    // ── SCENARIO‐EXISTS GUARD ───────────────────────────────────────────────
+    if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
+      console.log("This scenario combination already exists.");
+      setPageValue(
+        "SaveForecastPageinterim",
+        "Scenario names already exist in the database. Please choose a different scenario name."
+      );
+      console.timeEnd("Total save time request");
+      return;
+    }
+
+    // ── ORIGINAL SAVE LOGIC ────────────────────────────────────────────────
     setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
 
-    // Access df1 from the dataFrames state (retrieved from fetchDataFromLambda)
     const df1 = dataFrames.dfResult1;
     if (!df1) {
       console.error("DataFrame df1 is not loaded yet.");
       return;
     }
-    // Log the DataFrame contents.
     console.log("DataFrame df1 contents:", df1.toCollection());
 
-    // -------------------------------------------------------------------
-    // NEW LOGIC: Prefix each element from cloudLoadModelsList with "forecast_"
-    // and then match these prefixed values against the forecast_id in df1.
-    // For each match, store the model_id and forecast_id in a new array.
-    // -------------------------------------------------------------------
-    // Assume we use the first column of each row from cloudLoadModelsList for the prefix.
-    const prefixedForecastIds = cloudLoadModelsList.map((row) => `forecast_${row[6]}`);
+    const prefixedForecastIds = cloudLoadModelsList.map(
+      row => `forecast_${row[6]}`
+    );
     console.log("Prefixed Forecast IDs:", prefixedForecastIds);
 
-    // Get the collection of df1 records.
     const df1Records = df1.toCollection();
-
-    // Initialize an array to hold matching objects.
     const matchedForecasts = [];
-
-    // For each prefixed forecast ID, check for a match in df1 (using the forecast_id key).
-    prefixedForecastIds.forEach((forecastId) => {
-      // In case there are multiple matches, filter all that match.
-      const matchingRecords = df1Records.filter(
-        (record) => record.forecast_id === forecastId
+    prefixedForecastIds.forEach(forecastId => {
+      const matches = df1Records.filter(
+        record => record.forecast_id === forecastId
       );
-      matchingRecords.forEach((record) => {
+      matches.forEach(record => {
         matchedForecasts.push({
           model_id: record.model_id,
           forecast_id: record.forecast_id,
         });
       });
     });
-
     console.log("Matched Forecasts:", matchedForecasts);
-    // -------------------------------------------------------------------
-    // END NEW LOGIC
-    // -------------------------------------------------------------------
 
     console.log("📤 Saving Forecast:", {
       cycle_name: selectedCycle,
@@ -263,25 +244,13 @@ const AggLockScenario = ({ setPageValue }) => {
     console.log("🔹 Using Model Type:", modelType);
 
     let concatenatedArray;
-    // Concatenate column 1 and column 7 from cloudLoadModelsList with a hyphen in between.
     if (cloudLoadModelsList && cloudLoadModelsList.length > 0) {
-      concatenatedArray = cloudLoadModelsList.map((row) => {
-        // Assuming the named range returns a 2D array and using 1-indexed columns:
-        // Column 1 -> index 0 and Column 7 -> index 6.
-        if (row.length >= 7) {
-          return `${row[0]} - ${row[6]}`;
-        }
-        return "";
-      });
+      concatenatedArray = cloudLoadModelsList.map(row =>
+        row.length >= 7 ? `${row[0]} - ${row[6]}` : ""
+      );
       console.log("Concatenated Columns (1 & 7):", concatenatedArray);
     } else {
       console.log("No Cloud_LoadModels_List data available.");
-    }
-
-    if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
-      console.log("This scenario combination already exists.");
-      setPageValue("SaveForecastPageinterim", "Scenario names already exist in the database. Please choose a different scenario name.");
-      return;
     }
 
     try {
@@ -318,8 +287,14 @@ const AggLockScenario = ({ setPageValue }) => {
       console.log("Save response:", saveFlag);
       setPageValue("LoadingCircleComponent", "100% | Saving your forecast...");
 
-      if (saveFlag === "Saved Locked Forecast" || (saveFlag && saveFlag.result === "DONE")) {
-        const message = `Forecast scenario saved & locked for model: ${heading.replace("Save & Lock Aggregator Scenario for: ", "")} | Cycle: ${selectedCycle} | Scenario: ${scenarioName}`;
+      if (
+        saveFlag === "SUCCESS" ||
+        (saveFlag && saveFlag.result === "DONE")
+      ) {
+        const message = `Forecast scenario saved & locked for model: ${heading.replace(
+          "Save & Lock Aggregator Scenario for: ",
+          ""
+        )} | Cycle: ${selectedCycle} | Scenario: ${scenarioName}`;
         await AWSconnections.sync_MetaData_AGG(setPageValue);
         excelfucntions.setCalculationMode("automatic");
         setPageValue("SaveForecastPageinterim", message);
@@ -327,9 +302,20 @@ const AggLockScenario = ({ setPageValue }) => {
         saveFlag ===
         "A scenario of this name for the provided model and cycle details already exists, try with another one."
       ) {
-        setPageValue("SaveForecastPageinterim", "Scenario names already exist in the database. Please choose a different scenario name.");
+        setPageValue(
+          "SaveForecastPageinterim",
+          "Scenario names already exist in the database. Please choose a different scenario name."
+        );
       } else if (saveFlag && saveFlag.result === "ERROR") {
-        setPageValue("SaveForecastPageinterim", "Some Error Occurred, Please try again");
+        setPageValue(
+          "SaveForecastPageinterim",
+          "Some Error Occurred, Please try again"
+        );
+      } else {
+        setPageValue(
+          "SaveForecastPageinterim",
+          "Some Error Occurred, Please try again"
+        );
       }
     } catch (error) {
       console.error("Error during save process:", error);
@@ -346,23 +332,28 @@ const AggLockScenario = ({ setPageValue }) => {
     checkScenarioExists,
     setPageValue,
     dataFrames,
+    heading,
   ]);
 
+  const handleCancel = () => setShowConfirm(false);
+
   // =============================================================================
-  //                                 RENDER
+  //                                RENDER
   // =============================================================================
+
+  const isDisabled = !selectedCycle || !scenarioName;
 
   return (
     <Container>
       {loading ? (
-        <MessageBox>Loading, please wait...</MessageBox>
+        <MessageBox>Checking cloud compatibility, please wait...</MessageBox>
       ) : isOutputSheet ? (
         <>
           <Heading>{heading}</Heading>
           <DropdownContainer>
             <SelectDropdown
               value={selectedCycle}
-              onChange={(e) => setSelectedCycle(e.target.value)}
+              onChange={e => setSelectedCycle(e.target.value)}
             >
               <option value="" disabled>
                 Select Cycle
@@ -381,15 +372,41 @@ const AggLockScenario = ({ setPageValue }) => {
               type="text"
               placeholder="Enter Scenario Name"
               value={scenarioName}
-              onChange={(e) => setScenarioName(e.target.value)}
+              onChange={e => setScenarioName(e.target.value)}
             />
           </DropdownContainer>
-          <SaveButton onClick={handleSaveClick} disabled={!selectedCycle || !scenarioName}>
+          <SaveButton
+            onClick={handleSaveClick}
+            disabled={isDisabled}
+            style={
+              isDisabled
+                ? { backgroundColor: "#ccc", cursor: "not-allowed" }
+                : {}
+            }
+          >
             Save
           </SaveButton>
+
+          {showConfirm && (
+            <Overlay>
+              <Modal>
+                <ModalHeader>Lock this scenario?</ModalHeader>
+                <ModalBody>
+                  Please confirm you want to lock “{scenarioName}” on cycle “
+                  {selectedCycle}”.
+                </ModalBody>
+                <ModalFooter>
+                  <Button onClick={handleSaveConfirmed}>Yes</Button>
+                  <Button onClick={handleCancel}>No</Button>
+                </ModalFooter>
+              </Modal>
+            </Overlay>
+          )}
         </>
       ) : (
-        <MessageBox>No Authorised model detected, please refresh the addin</MessageBox>
+        <MessageBox>
+          No Authorised model detected, please refresh the add-in
+        </MessageBox>
       )}
     </Container>
   );

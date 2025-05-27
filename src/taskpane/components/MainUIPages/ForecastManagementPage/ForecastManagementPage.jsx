@@ -30,7 +30,7 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
   const allowedDF = useMemo(() => {
     return new DataFrame([
       { model_id: "f4e9582c-9c85-4b21-ae66-4137a1ed1ec5" }, // IDXD Model ID
-      { model_id: "f4e9582c-9c85-4b21-ae66-4137a1ed1ec7" },// her3 Model ID
+      { model_id: "04608048-f59c-4e1a-8921-0eec8b56249b" },// her3 Model ID
     ]);
   }, []);
 

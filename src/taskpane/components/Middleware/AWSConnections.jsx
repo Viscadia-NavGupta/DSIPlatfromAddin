@@ -469,6 +469,64 @@ export async function Extract_Service_Request(
 // - end of fiucntion 
 
 
+// service request fro constituent id for load agg 
+export async function ServiceRequest_Fetch_Constituent_ID(
+  serviceURL = "",
+  buttonName = "FETCH_AGG_CONSTITUENTS",
+  UUID = "",
+  idToken = "",
+  secretName = "",
+  userId = "",
+  constituent_ID = "",
+  Model_id,
+) {
+  try {
+    const headers = {
+      Authorization: `Bearer ${idToken}`,
+      "Content-Type": "application/json",
+      Connection: "keep-alive",
+    };
+    const body = {
+      request_id: UUID,
+      buttonName,
+      secret_name: secretName,
+      user_id: userId,
+      forecast_id: constituent_ID,
+      model_id: Model_id,
+    };
+    console.log("📤 Sending service request");
+    const response = await fetch(serviceURL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+    const data = await response.json();
+    console.log("✅ Service response received");
+    if (!response.ok) {
+      return data.message || `HTTP Error ${response.status}`;
+    }
+    return data.constituent_forecast_ids || "Success (no message provided)";
+  } catch (error) {
+    console.error("🚨 Service request error:", error);
+    if (error.response) {
+      try {
+        const errorData = await error.response.json();
+        return errorData.message || `Error: ${error.response.status}`;
+      } catch {
+        return `Error: ${error.response.status}`;
+      }
+    }
+    return `Error: ${error.message}`;
+  }
+}
+
+
+
+
+// end of fucntion 
+
+
+
 /**
  * Orchestrates service requests with file handling.
  * @param {string} buttonname - Action to perform.
@@ -656,7 +714,7 @@ export async function service_orchestration(
       for (let i = 0; i < keys.length; i++) {
         const constituentID = keys[i];
         const url = Downloadconstituent_ID_URL[constituentID];
-        const sheetName = sheetNames_Agg[i] || `Sheet_${i + 1}`; // Fallback in case name is missing
+        const sheetName = sheetNames_Agg[i] || `Sheet_${i + 1}`; // Fallback name
 
         try {
           await AggDownloadS3(url, sheetName);
@@ -665,49 +723,72 @@ export async function service_orchestration(
           console.log(`✅ Downloaded: ${sheetName}`);
         } catch (error) {
           console.error(`❌ Error downloading ${sheetName}:`, error);
+          // Immediately return an error response
+          return {
+            status: "error",
+            message: `Failed to download ${sheetName}: ${error.message}`
+          };
         }
       }
 
-      await pasteArrayToNamedRange(constituent_ID, "Imported_model_List");
+      await writeArrayToNamedRange(constituent_ID, "Imported_model_List");
 
       console.log("✅ All downloads completed.");
-      return { status: "success", message: "Aggregated models downloaded." };
+      return { status: "SUCCESS", message: "Aggregated models downloaded." };
     } else if (buttonname === "SAVE_FORECAST_AGG" || buttonname === "SAVE_LOCKED_FORECAST_AGG") {
       const buttonMapping = {
         SAVE_FORECAST_AGG: "SAVE_FORECAST",
         SAVE_LOCKED_FORECAST_AGG: "SAVE_LOCKED_FORECAST",
       };
-      // Derive the mapped button name
       const mappedButtonName = buttonMapping[buttonname] || buttonname;
-      console.log("Forecast Aggregation Button Mapping:", buttonMapping);
-      console.log("Mapped Button Name:", mappedButtonName);
 
-      // (Assume earlier code prepares S3 upload URLs)
-      const S3Uploadobejct = await AuthorizationData(
-        "SAVE_FORECAST",
-        idToken,
-        CONFIG.AWS_SECRETS_NAME,
-        username,
-        UUID_Generated
-      );
+      // 1) Fetch upload URLs
+      let S3Uploadobject;
+      try {
+        S3Uploadobject = await AuthorizationData(
+          "SAVE_FORECAST",
+          idToken,
+          CONFIG.AWS_SECRETS_NAME,
+          username,
+          UUID_Generated
+        );
+      } catch (err) {
+        console.error("❌ Failed to fetch S3 upload URLs:", err);
+        return { status: "error", message: err.message };
+      }
 
-      const UploadS3SaveForecastURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["SAVE_FORECAST"][UUID_Generated[0]];
-      const UploadS3INPUTFILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["INPUT_FILE"][UUID_Generated[0]];
-      // const getCurrentTime = () => new Date().toISOString().replace('T', ' ').slice(0, 23);
+      const UploadS3SaveForecastURL = S3Uploadobject["presigned urls"]["UPLOAD"]["SAVE_FORECAST"][UUID_Generated[0]];
+      const UploadS3INPUTFILEURL = S3Uploadobject["presigned urls"]["UPLOAD"]["INPUT_FILE"][UUID_Generated[0]];
 
-      // LongformData= await combineArrays(LongformData,matchedModel,scenarioname,cycleName,UUID_Generated,"Interim",getCurrentTime);
-      // console.log(LongformData);
-      LongformData = await pivotUpFlatArrayToAC(LongformData);
-      const [flag_flatfileupload, flat_inputfileupload] = await Promise.all([
-        uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL),
-        uploadFileToS3("Input File", UploadS3INPUTFILEURL),
-      ]);
+      // 2) Pivot / prepare the data
+      try {
+        LongformData = await pivotUpFlatArrayToAC(LongformData);
+      } catch (err) {
+        console.error("❌ Error pivoting data:", err);
+        return { status: "error", message: err.message };
+      }
 
-      console.log(`🟢 Uploads completed - Forecast: ${flag_flatfileupload}, Input: ${flat_inputfileupload}`);
+      // 3) Upload both files in parallel
+      let flag_flatfileupload, flat_inputfileupload;
+      try {
+        [flag_flatfileupload, flat_inputfileupload] = await Promise.all([
+          uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL),
+          uploadFileToS3("Input File", UploadS3INPUTFILEURL)
+        ]);
+      } catch (err) {
+        console.error("❌ Upload exception:", err);
+        return { status: "error", message: err.message };
+      }
+      // 4) Ensure at least one succeeded
+      if (!flag_flatfileupload && !flat_inputfileupload) {
+        console.error("❌ Both uploads failed");
+        return { status: "error", message: "Failed to upload forecast and input files." };
+      }
 
-      if (flag_flatfileupload || flat_inputfileupload) {
-        // Original service request call
-        const servicestatus = await servicerequest(
+      // 5) Call the service endpoint
+      let servicestatus;
+      try {
+        servicestatus = await servicerequest(
           serviceorg_URL,
           mappedButtonName,
           UUID_Generated[0],
@@ -719,68 +800,80 @@ export async function service_orchestration(
           scenarioname,
           constituent_ID
         );
-        console.log("Service status:", servicestatus);
-        let pollingResult = servicestatus;
-        if (servicestatus === "Endpoint request timed out" || (servicestatus && servicestatus.status === "Poll")) {
-          console.log("⏱️ Service request requires polling");
-          pollingResult = await poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+      } catch (err) {
+        console.error("❌ Service request error:", err);
+        return { status: "error", message: err.message };
+      }
+
+      // 6) Handle polling if needed
+      let pollingResult = servicestatus;
+      if (
+        servicestatus === "Endpoint request timed out" ||
+        (servicestatus && servicestatus.status === "Poll")
+      ) {
+        console.log("⏱️ Service request requires polling");
+        try {
+          pollingResult = await poll(
+            UUID_Generated[0],
+            CONFIG.AWS_SECRETS_NAME,
+            pollingUrl,
+            idToken
+          );
+        } catch (err) {
+          console.error("❌ Polling error:", err);
+          return { status: "error", message: err.message };
         }
-        // Now, for each element in matchedForecasts, send a service request
-        if (buttonname === "SAVE_LOCKED_FORECAST_AGG") {
-          let completedCount = 0;
-          const totalCount = matchedForecasts?.length || 0;
+      }
 
-          for (const [index, match] of matchedForecasts.entries()) {
-            try {
-              const newUUID = match.forecast_id.replace("forecast_", "");
-              const newModelUUID = match.model_id;
-              const UUID_Generated = [uuidv4()];
+      // 7) If locking multiple forecasts, propagate any errors there too
+      if (buttonname === "SAVE_LOCKED_FORECAST_AGG") {
+        const totalCount = matchedForecasts?.length || 0;
+        let completedCount = 0;
 
-              const matchStatus = await servicerequest(
-                serviceorg_URL,
-                "LOCK_FORECAST",
-                UUID_Generated[0],
-                "",
-                idToken,
-                CONFIG.AWS_SECRETS_NAME,
-                User_Id,
-                "",
-                "",
-                [],
-                newUUID
-              );
+        for (const match of matchedForecasts) {
+          try {
+            const newUUID = match.forecast_id.replace("forecast_", "");
+            const lockStatus = await servicerequest(
+              serviceorg_URL,
+              "LOCK_FORECAST",
+              uuidv4(),
+              "",
+              idToken,
+              CONFIG.AWS_SECRETS_NAME,
+              User_Id,
+              "",
+              "",
+              [],
+              newUUID
+            );
 
-              console.log(`Service status for matched forecast ${match.forecast_id}:`, matchStatus);
-
-              let success = false;
-
-              if (matchStatus === "Forecast is already locked" || matchStatus === "Forecast locked successfully") {
-                success = true;
-              }
-
-              if (matchStatus === "Endpoint request timed out" || (matchStatus && matchStatus.status === "Poll")) {
-                console.log("⏱️ Service request requires polling");
+            // check for success conditions
+            if (
+              lockStatus === "Forecast is already locked" ||
+              lockStatus === "Forecast locked successfully" ||
+              lockStatus === "SUCCESS" ||
+              (lockStatus && lockStatus.status === "Poll")
+            ) {
+              if (lockStatus.status === "Poll" || lockStatus.status === "Endpoint request timed out") {
                 await poll(newUUID, CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
-                success = true;
               }
-
-              if (success) {
-                completedCount++;
-                const progressPercent = 60 + Math.round((completedCount / totalCount) * 30); // max 90%
-                setPageValue("LoadingCircleComponent", `${progressPercent}% | Saving your forecast...`);
-              }
-            } catch (error) {
-              console.error("Error processing matched forecast", match, error);
+              completedCount++;
+              const pct = 60 + Math.round((completedCount / totalCount) * 30);
+              setPageValue("LoadingCircleComponent", `${pct}% | Saving your forecast...`);
+            } else {
+              throw new Error(`Unexpected lock response: ${JSON.stringify(lockStatus)}`);
             }
+          } catch (err) {
+            console.error("❌ Error locking forecast", match.forecast_id, err);
+            return { status: "error", message: err.message };
           }
         }
-
-
-        // If the original service request requires polling, handle that.
-
-        return pollingResult;
       }
-    } else if (buttonname === "EXTRACT_DASHBOARD_DATA") {
+
+      // 8) If we get here, everything succeeded
+      return pollingResult;
+    }
+    else if (buttonname === "EXTRACT_DASHBOARD_DATA") {
       console.log("📤 preparing for Forecast Liobrary Extract");
       // sedning Extract request for Forecat library
       let Service_Resut = await Extract_Service_Request(
@@ -811,11 +904,91 @@ export async function service_orchestration(
       console.log("Extract_download", Extract_download);
 
       const ExtractS3_Downloadlink = Extract_download["presigned urls"]["DOWNLOAD"]["EXTRACT_DASHBOARD_DATA"][UUID_Generated[0]];
-      const downloadResult = await downloadAndInsertDataFromExcel(ExtractS3_Downloadlink, "Report Genie Backend");
+      // const downloadResult = await downloadAndInsertDataFromExcel(ExtractS3_Downloadlink, "Report Genie Backend");
+      let downloadResult = await downloadFileToArray(ExtractS3_Downloadlink);
+      downloadResult = await insertFlagColumn(downloadResult);
+      console.log("downloadResult", downloadResult);
+      await writeArrayToSheet(downloadResult,"Report Genie Backend");
 
 
       console.log(ExtractS3_Downloadlink);
       return { status: "success", message: "Aggregated models downloaded." };
+    } else if (buttonname === "IMPORT_ASSUMPTIONS_AGG") {
+
+      let CONSTITUENT_AGG_ID = await ServiceRequest_Fetch_Constituent_ID(
+        serviceorg_URL, "FETCH_AGG_CONSTITUENTS", UUID_Generated[0], idToken, CONFIG.AWS_SECRETS_NAME, User_Id, Forecast_UUID[0], Model_UUID);
+      const prefixes = [];
+      const Download_uuids = [];
+
+      CONSTITUENT_AGG_ID.forEach(str => {
+        // split on " - "
+        const parts = str.split(" - ");
+        // parts[0] is the prefix, parts[1] is the UUID
+        prefixes.push(parts[0]?.trim());
+        Download_uuids.push(parts[1]?.trim());
+      });
+
+
+      const S3downloadobject_OutputBackend = await AuthorizationData(
+        "IMPORT_ASSUMPTIONS",
+        idToken,
+        CONFIG.AWS_SECRETS_NAME,
+        username,
+        Download_uuids
+      );
+
+      const Downloadconstituent_ID_URL = S3downloadobject_OutputBackend?.["presigned urls"]?.["DOWNLOAD"]?.["OUTPUT_FILE"];
+      if (!Downloadconstituent_ID_URL) {
+        console.error("❌ No download URLs received");
+        return { status: "error", message: "No download URLs received" };
+      }
+
+      const keys = Object.keys(Downloadconstituent_ID_URL);
+      const totalFiles = keys.length;
+
+      if (totalFiles === 0) {
+        console.warn("⚠️ No models found to download.");
+        return { status: "warning", message: "No models to download." };
+      }
+
+      for (let i = 0; i < keys.length; i++) {
+        const Download_uuids = keys[i];
+        const url = Downloadconstituent_ID_URL[Download_uuids];
+        const sheetName = prefixes[i] || `Sheet_${i + 1}`; // Fallback name
+
+        try {
+          await AggDownloadS3(url, sheetName);
+          const progress = Math.round(((i + 1) / totalFiles) * 100);
+          setPageValue("LoadingCircleComponent", `${progress}% | Loading Models...`);
+          console.log(`✅ Downloaded: ${sheetName}`);
+        } catch (error) {
+          console.error(`❌ Error downloading ${sheetName}:`, error);
+          // Immediately return an error response
+          return {
+            status: "error",
+            message: `Failed to download ${sheetName}: ${error.message}`
+          };
+        }
+      }
+
+      await writeArrayToNamedRangeMatching(prefixes,Download_uuids, "Imported_model_List");
+
+      console.log("✅ All downloads completed.");
+
+      const S3downloadobject = await AuthorizationData(
+        "IMPORT_ASSUMPTIONS",
+        idToken,
+        CONFIG.AWS_SECRETS_NAME,
+        username,
+        Forecast_UUID
+      );
+
+      const DownloadS3INPUTFILEURL = S3downloadobject["presigned urls"]["DOWNLOAD"]["INPUT_FILE"][Forecast_UUID[0]];
+      const downloadResult = await downloadAndInsertDataFromExcel(DownloadS3INPUTFILEURL, "Input File");
+      if (downloadResult.success === true) {
+        return { status: "Scenario Imported" };
+      }
+      /// import and save the forecast
     }
     return { status: "No operation performed" };
   } catch (error) {
@@ -877,67 +1050,93 @@ export async function postToServiceOrchestration(buttonName, secretName, userId,
  * @returns {Promise<boolean>} - Success status.
  */
 export async function uploadFileToS3(sheetName, uploadURL) {
-  try {
-    return await Excel.run(async (context) => {
-      console.time("⏱️ Total upload execution");
-      const sheet = context.workbook.worksheets.getItem(sheetName);
-      const range = sheet.getUsedRange();
-      range.load("values");
-      console.time("⏱️ Data loading");
-      await context.sync();
-      console.timeEnd("⏱️ Data loading");
+  return Excel.run(async (context) => {
+    console.time("⏱️ Total upload execution");
 
-      const values = range.values;
-      if (!values || values.length === 0) {
-        console.error("🚨 No data found in the worksheet");
-        return false;
+    // 1) Load data from the sheet
+    const sheet = context.workbook.worksheets.getItem(sheetName);
+    const range = sheet.getUsedRange();
+    range.load("values");
+    console.time("⏱️ Data loading");
+    await context.sync();
+    console.timeEnd("⏱️ Data loading");
+
+    const values = range.values;
+    if (!values || values.length === 0) {
+      throw new Error("No data found in the worksheet");
+    }
+    console.log(`📊 Processing ${values.length} rows × ${values[0].length} columns`);
+
+    // 2) Build CSV blob with UTF-8 BOM
+    console.time("⏱️ CSV creation");
+    const csvLines = values.map(row =>
+      row.map(cell => {
+        if (cell === null || cell === undefined) return "";
+        const s = String(cell);
+        return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      }).join(",")
+    );
+    const csvContent = csvLines.join("\n");
+    console.timeEnd("⏱️ CSV creation");
+
+    const utf8BOM = "\uFEFF";
+    const blob = new Blob([utf8BOM + csvContent], { type: "text/csv;charset=utf-8" });
+    console.log(`📦 Blob size: ${(blob.size / (1024 * 1024)).toFixed(2)} MB`);
+
+    // 3) Attempt upload up to 3 times with 15s timeout each
+    let lastError;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      // create controller to abort after 15s
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15_000);
+
+      try {
+        console.time(`⏱️ Upload attempt ${attempt}`);
+        const response = await fetch(uploadURL, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "text/csv",
+            "x-amz-acl": "bucket-owner-full-control",
+            "Cache-Control": "no-cache",
+          },
+          body: blob,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        console.timeEnd(`⏱️ Upload attempt ${attempt}`);
+
+        if (response.ok) {
+          console.log(`✅ File uploaded successfully on attempt ${attempt}`);
+          console.timeEnd("⏱️ Total upload execution");
+          return true;
+        } else {
+          const text = await response.text();
+          console.error(`❌ Upload failed (status ${response.status}) on attempt ${attempt}: ${text}`);
+          lastError = new Error(`Upload failed with status ${response.status}`);
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (err.name === "AbortError") {
+          console.error(`❌ Upload attempt ${attempt} aborted after 15s`);
+          lastError = new Error("Upload aborted after timeout");
+        } else {
+          console.error(`❌ Upload error on attempt ${attempt}:`, err);
+          lastError = err;
+        }
       }
-      console.log(`📊 Processing ${values.length} rows × ${values[0].length} columns`);
 
-      console.time("⏱️ CSV creation");
-      const csvLines = values.map((row) =>
-        row
-          .map((cell) => {
-            if (cell === null || cell === undefined) return "";
-            const cellStr = String(cell);
-            return /[,"\n]/.test(cellStr) ? `"${cellStr.replace(/"/g, '""')}"` : cellStr;
-          })
-          .join(",")
-      );
-      const csvContent = csvLines.join("\n");
-      console.timeEnd("⏱️ CSV creation");
-
-      const utf8BOM = "\uFEFF";
-      const blob = new Blob([utf8BOM + csvContent], { type: "text/csv;charset=utf-8" });
-
-      console.log(`📦 Blob size: ${(blob.size / (1024 * 1024)).toFixed(2)} MB`);
-
-      console.time("⏱️ Upload");
-      const response = await fetch(uploadURL, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "text/csv",
-          "x-amz-acl": "bucket-owner-full-control",
-          "Cache-Control": "no-cache",
-        },
-        body: blob,
-      });
-      console.timeEnd("⏱️ Upload");
-      console.timeEnd("⏱️ Total upload execution");
-
-      if (response.ok) {
-        console.log("✅ File uploaded successfully");
-        return true;
-      } else {
-        console.error("❌ Upload failed:", response.status, await response.text());
-        return false;
+      // if not last attempt, wait 15s before retrying
+      if (attempt < 3) {
+        console.log(`🔄 Retrying upload in 15 seconds (attempt ${attempt + 1}/3)`);
+        await new Promise(res => setTimeout(res, 15_000));
       }
-    });
-  } catch (error) {
-    console.error("🚨 Upload error:", error);
-    return false;
-  }
+    }
+
+    // all three attempts failed
+    throw lastError;
+  });
 }
+
 
 /**
  * Downloads an Excel file from S3 and inserts its data into a target Excel sheet.
@@ -1456,29 +1655,63 @@ function createExcelBlobInWorker(dataArray, sheetName) {
  */
 export async function AggDownloadS3(s3Url, sheetName, startCell = "B4") {
   const downloadURL = s3Url;
+  const MAX_ATTEMPTS = 3;
+  const TIMEOUT_MS = 15000; // 15 seconds
 
-  async function fetchData() {
-    console.log("📥 Fetching file from S3");
-    const response = await fetch(downloadURL);
-    if (!response.ok) {
-      throw new Error(`❌ File fetch failed: ${response.statusText}`);
+  // Fetch with timeout & abort
+  async function fetchWithTimeout(url, timeout) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      console.log("📥 Fetching file from S3");
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(id);
+
+      if (!response.ok) {
+        throw new Error(`❌ File fetch failed: ${response.statusText}`);
+      }
+      console.log("✅ File fetched successfully");
+      return await response.arrayBuffer();
+    } catch (err) {
+      clearTimeout(id);
+      throw err;
     }
-    console.log("✅ File fetched successfully");
-    return response.arrayBuffer();
   }
 
+  // Attempt fetch up to MAX_ATTEMPTS
+  async function fetchData() {
+    let lastError;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        return await fetchWithTimeout(downloadURL, TIMEOUT_MS);
+      } catch (err) {
+        lastError = err;
+        console.warn(`Attempt ${attempt} failed: ${err.message}`);
+        if (attempt === MAX_ATTEMPTS) {
+          throw new Error(`❌ Failed after ${MAX_ATTEMPTS} attempts: ${lastError.message}`);
+        }
+      }
+    }
+  }
+
+  // Process Excel with UTF-8 BOM support
   async function processExcelFile(arrayBuffer, sheetName, startCell) {
     console.log("⚙️ Processing Excel file");
-    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: "array" });
+    // ensure UTF-8 BOM (codepage 65001) for text contents
+    const workbook = XLSX.read(new Uint8Array(arrayBuffer), {
+      type: "array",
+      codepage: 65001
+    });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    let rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    let rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
     if (rows.length === 0) {
       throw new Error("❌ Excel sheet is empty");
     }
 
     // Normalize rows so each row has the same number of columns
     const maxCols = rows.reduce((max, row) => Math.max(max, row.length), 0);
-    rows = rows.map((row) => {
+    rows = rows.map(row => {
       if (row.length < maxCols) {
         return [...row, ...Array(maxCols - row.length).fill("")];
       }
@@ -1494,52 +1727,44 @@ export async function AggDownloadS3(s3Url, sheetName, startCell = "B4") {
     if (!match) {
       throw new Error(`Invalid cell reference: ${cellReference}`);
     }
-    const columnLetter = match[1];
-    const rowNumber = parseInt(match[2], 10);
-
-    // Convert column letter to zero-indexed column index
+    const [, columnLetter, rowStr] = match;
+    const rowIndex = parseInt(rowStr, 10) - 1;
     let columnIndex = 0;
     for (let i = 0; i < columnLetter.length; i++) {
       columnIndex = columnIndex * 26 + (columnLetter.charCodeAt(i) - 65 + 1);
     }
-
-    return { columnIndex: columnIndex - 1, rowIndex: rowNumber - 1 };
+    return { columnIndex: columnIndex - 1, rowIndex };
   }
 
   function getColumnLetter(index) {
     let letter = "";
-    let tempIndex = index;
-    while (tempIndex >= 0) {
-      letter = String.fromCharCode((tempIndex % 26) + 65) + letter;
-      tempIndex = Math.floor(tempIndex / 26) - 1;
+    let temp = index;
+    while (temp >= 0) {
+      letter = String.fromCharCode((temp % 26) + 65) + letter;
+      temp = Math.floor(temp / 26) - 1;
     }
     return letter;
   }
 
   async function insertParsedData(rows, sheetName, startCell) {
-    await Excel.run(async (context) => {
+    await Excel.run(async context => {
       const sheet = context.workbook.worksheets.getItemOrNullObject(sheetName);
       await context.sync();
       if (sheet.isNullObject) {
         throw new Error(`❌ Sheet "${sheetName}" not found`);
       }
 
-      // Parse startCell (e.g., B4) into zero-indexed row and column
       const { columnIndex, rowIndex } = parseCellReference(startCell);
       const maxCols = rows[0].length;
-      const endColumnIndex = columnIndex + maxCols - 1;
-      const endRowIndex = rowIndex + rows.length - 1;
+      const endCol = columnIndex + maxCols - 1;
+      const endRow = rowIndex + rows.length - 1;
+      const rangeAddress = `${startCell}:${getColumnLetter(endCol)}${endRow + 1}`;
 
-      // Construct the target range address (Excel row numbers are 1-indexed)
-      const rangeAddress = `${startCell}:${getColumnLetter(endColumnIndex)}${endRowIndex + 1}`;
       console.log(`📊 Target range: ${rangeAddress}`);
-
-      // Get the target range and clear only the cell contents (values)
       const targetRange = sheet.getRange(rangeAddress);
       targetRange.clear(Excel.ClearApplyTo.contents);
       await context.sync();
 
-      // Now insert the data
       targetRange.values = rows;
       await context.sync();
       console.log(`✅ Data inserted into "${sheetName}" starting from ${startCell}`);
@@ -1558,41 +1783,6 @@ export async function AggDownloadS3(s3Url, sheetName, startCell = "B4") {
   }
 }
 
-async function pasteArrayToNamedRange(arrayData, namedRangeName) {
-  await Excel.run(async (context) => {
-    // Get the named range
-    const namedRange = context.workbook.names.getItem(namedRangeName).getRange();
-    namedRange.load(["rowCount", "columnCount"]);
-    await context.sync();
-
-    const expectedRows = namedRange.rowCount;
-    const expectedCols = namedRange.columnCount;
-
-    // Auto-convert 1D array to 2D (Nx1) if needed
-    if (!Array.isArray(arrayData[0])) {
-      arrayData = arrayData.map((item) => [item]);
-    }
-
-    const inputRows = arrayData.length;
-    const inputCols = arrayData[0]?.length || 0;
-
-    // Check if dimensions match
-    if (inputRows !== expectedRows || inputCols !== expectedCols) {
-      console.error(
-        `Input array dimensions (${inputRows}x${inputCols}) do not match named range dimensions (${expectedRows}x${expectedCols}).`
-      );
-      return;
-    }
-
-    // Paste values
-    namedRange.values = arrayData;
-    await context.sync();
-
-    console.log(`✅ Data successfully pasted into named range "${namedRangeName}".`);
-  }).catch((error) => {
-    console.error("❌ Error: " + error);
-  });
-}
 
 export const sync_MetaData_AGG = async (setPageValue) => {
   console.log("Update Actuals button clicked");
@@ -1602,7 +1792,7 @@ export const sync_MetaData_AGG = async (setPageValue) => {
     const responseBody = await FetchMetaData(
       "FETCH_METADATA",
       localStorage.getItem("idToken"),
-      "dsivis-dev-remaining-secret",
+      CONFIG.AWS_SECRETS_NAME,
       localStorage.getItem("User_ID"),
       localStorage.getItem("username")
     );
@@ -1771,4 +1961,352 @@ export async function ButtonAccess(buttonname) {
 
   // just call your working function:
   return AuthorizationData(buttonname, idToken, secretName, emailId, UUID);
+}
+
+
+async function writeArrayToNamedRange(arrayData, rangeName) {
+  return Excel.run(async (context) => {
+    // 1) Validate input is at least a non-empty array
+    if (!Array.isArray(arrayData) || arrayData.length === 0) {
+      throw new Error("writeArrayToNamedRange: arrayData must be a non-empty array");
+    }
+    // 2) If it's 1D, convert to Nx1
+    if (!Array.isArray(arrayData[0])) {
+      arrayData = arrayData.map(item => [item]);
+    }
+    const rowCount = arrayData.length;
+    const colCount = arrayData[0].length;
+    if (colCount === 0) {
+      throw new Error("writeArrayToNamedRange: inner arrays must be non-empty");
+    }
+
+    // 3) Locate the named range (workbook or sheet scope)
+    const wbNames = context.workbook.names;
+    const wbItem = wbNames.getItemOrNullObject(rangeName);
+    await context.sync();
+
+    let baseRange;
+    if (!wbItem.isNullObject) {
+      baseRange = wbItem.getRange();
+    } else {
+      const sheets = context.workbook.worksheets;
+      sheets.load("items/name");
+      await context.sync();
+      for (const sheet of sheets.items) {
+        const sheetItem = sheet.names.getItemOrNullObject(rangeName);
+        await context.sync();
+        if (!sheetItem.isNullObject) {
+          baseRange = sheetItem.getRange();
+          break;
+        }
+      }
+      if (!baseRange) {
+        throw new Error(`Named range "${rangeName}" not found.`);
+      }
+    }
+
+    // 4) Anchor at top-left cell of that range
+    const anchor = baseRange.getCell(0, 0);
+    // 5) Resize from that single cell to exactly rowCount×colCount
+    const target = anchor.getResizedRange(rowCount - 1, colCount - 1);
+
+    // 6) Finally write
+    target.values = arrayData;
+
+    await context.sync();
+  });
+}
+
+
+async function writeArrayToNamedRangeMatching(matchKeys, newValues, rangeName) {
+  if (!Array.isArray(matchKeys) || !Array.isArray(newValues))
+    throw new Error("Both inputs must be arrays");
+  if (matchKeys.length !== newValues.length)
+    throw new Error("matchKeys and newValues must be same length");
+  if (matchKeys.length === 0)
+    throw new Error("Arrays must be non-empty");
+
+  return Excel.run(async (context) => {
+    // 1) Locate the named range
+    const wbItem = context.workbook.names.getItemOrNullObject(rangeName);
+    await context.sync();
+
+    let baseRange;
+    if (!wbItem.isNullObject) {
+      baseRange = wbItem.getRange();
+    } else {
+      const sheets = context.workbook.worksheets;
+      sheets.load("items/name");
+      await context.sync();
+      for (const sheet of sheets.items) {
+        const sheetItem = sheet.names.getItemOrNullObject(rangeName);
+        await context.sync();
+        if (!sheetItem.isNullObject) {
+          baseRange = sheetItem.getRange();
+          break;
+        }
+      }
+      if (!baseRange) {
+        throw new Error(`Named range "${rangeName}" not found.`);
+      }
+    }
+
+    // 2) Load its rowCount
+    baseRange.load("rowCount");
+    await context.sync();
+    const rowCount = baseRange.rowCount;
+
+    // 3) Build the left-hand column range
+    const leftRange = baseRange
+      .getOffsetRange(0, -1)
+      .getResizedRange(rowCount - 1, 0);
+
+    // 4) Load both columns' values
+    leftRange.load("values");
+    baseRange.load("values");
+    await context.sync();
+
+    const leftVals = leftRange.values;    // [[key1],[key2],...]
+    const outVals = baseRange.values;     // [[oldVal1],[oldVal2],...]
+
+    // 5) Match & replace
+    matchKeys.forEach((key, i) => {
+      const trimmedKey = ("" + key).trim();
+      for (let r = 0; r < leftVals.length; r++) {
+        if (("" + leftVals[r][0]).trim() === trimmedKey) {
+          outVals[r][0] = newValues[i];
+          break;
+        }
+      }
+    });
+
+    // 6) Write back
+    baseRange.values = outVals;
+    await context.sync();
+  });
+}
+
+
+//// forecast library download s3 fucniton 
+
+
+/**
+ * Fetches the given URL with retry and a 1-minute timeout per attempt.
+ * @param {string} url       - The URL to fetch.
+ * @param {number} retries   - Number of retry attempts (default: 3).
+ * @param {number} timeoutMs - Timeout per attempt in milliseconds (default: 60000).
+ * @returns {Promise<ArrayBuffer>}
+ */
+async function fetchDataWithRetry(url, retries = 3, timeoutMs = 60000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const resp = await fetch(url, {
+        headers: { "Cache-Control": "no-cache" },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (!resp.ok) {
+        throw new Error(`Fetch failed (status ${resp.status})`);
+      }
+      return await resp.arrayBuffer();
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (attempt === retries) {
+        throw new Error(`Failed to fetch after ${retries} attempts: ${err.message}`);
+      }
+      console.warn(`Fetch attempt ${attempt} failed, retrying…`);
+      await new Promise(res => setTimeout(res, 500));
+    }
+  }
+}
+
+/**
+ * Parses a CSV or XLSX ArrayBuffer into a 2D array of strings,
+ * handling UTF-8-SIG (BOM) for CSV.
+ *
+ * @param {ArrayBuffer} buffer
+ * @param {string} url  - Used to detect .csv vs .xlsx
+ * @returns {string[][]}
+ */
+function parseCsvOrXlsx1(buffer, url) {
+  if (url.toLowerCase().endsWith(".csv")) {
+    let txt = new TextDecoder("utf-8").decode(buffer);
+    // Strip BOM if present
+    if (txt.charCodeAt(0) === 0xFEFF) {
+      txt = txt.slice(1);
+    }
+    return txt
+      .split("\n")
+      .filter(line => line.trim() !== "")
+      .map(line => line.split(","));
+  } else {
+    const wb = XLSX.read(new Uint8Array(buffer), { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+  }
+}
+
+/**
+ * Downloads a CSV or XLSX file from S3 (with retry & timeout),
+ * parses it into a UTF-8-SIG–aware 2D array, and returns that array.
+ *
+ * @param {string} s3Url
+ * @returns {Promise<string[][]>}
+ */
+export async function downloadFileToArray(s3Url) {
+  // 1) Download bytes
+  const buffer = await fetchDataWithRetry(s3Url, 3, 60000);
+
+  // 2) Parse to 2D array
+  const rows = parseCsvOrXlsx1(buffer, s3Url);
+  if (!rows.length) {
+    throw new Error("No data found in the downloaded file.");
+  }
+
+  // 3) Return the array
+  return rows;
+}
+
+// end of fucntion 
+
+// column flag fucntion 
+
+/**
+ * Inserts a “flag” column at position 31 (index 30) based on the
+ * metric→flag mapping, matching row[12] → mapping[row[12]].
+ *
+ * @param {any[][]} data  - your original 2D array
+ * @returns {any[][]}     - a new 2D array with one extra column
+ */
+function insertFlagColumn(data) {
+  // 1) Hard-coded metric→flag list
+  const metricFlags = {
+    "Incident Patients": 35,
+    "Compliance Rate": 11,
+    "Abandonment Rate": 11,
+    "Access Calibration": 11,
+    "Vials per Patient-Month": 21,
+    "Gross Price per Vial": 41,
+    "GTN %": 11,
+    "Net Price per Vial": 41,
+    "% Non-Squamous": 11,
+    "Bolus Usage Assumptions": 0,
+    "Event Assumptions": 3,
+    "Bump up factor": 12,
+    "LOE Assumptions": 0,
+    "Uptake Curves": 16,
+    "Product Launch Date": 62,
+    "Early Stage patients treated as Metastatic": 12,
+    "Testing Rate": 11,
+    "Persistency Assumptions": 4,
+    "Positivity Rate": 11,
+    "Treatment Rate": 11,
+    "Persistency Curves": 16,
+    "Actual Data End Date": 62,
+    "New Patient Starts | Unevented": 31,
+    "Patients Switching to Enhertu": 31,
+    "Patients Re-initiating with Enhertu": 31,
+    "New Patient Starts | Evented": 35,
+    "Product Share": 15,
+    "Active Patients": 35,
+    "Progressing Patients": 35,
+    "Active Patients | Calibrated": 35,
+    "Demand Vials": 35,
+    "Abandoned Vials": 35,
+    "Total Vials": 35,
+    "Gross Revenue": 55,
+    "Net Revenue": 55,
+    "Eligible Incident Patients": 35,
+    "Patients Switching to HER3-Dxd": 31,
+    "Patients Re-initiating with HER3-Dxd": 31,
+    "Gross-to-Net": 11,
+    "Ex-Factory Sales": 55,
+    "Ex-Factory Vials": 35,
+    "Patients Switching to Datroway": 31,
+    "Patients Re-initiating with Datroway": 31,
+    "Non-Squamous Population across Segments": 0,
+    "Patient Split in 1L": 0,
+    "Segment Split in AGA Patients": 0,
+    "EAP Usage Assumptions": 0,
+    "% Non-Squamous": 0,  // later override if needed
+    "Treated Patients": 31,
+    "Baseline Shares": 11,
+    "Patients Switching to I-DXd": 31,
+    "Patients Re-initiating with I-DXd": 31,
+    "LOE Impact": 31,
+    "New Patient Starts": 35,
+    "Enhertu Share %": 15,
+    "Vials": 35,
+    "Demand Sales": 35,
+    "Total Adjusted Demand": 35,
+    "SD Demand (Calculated)": 35,
+    "Ex-Factory Vials (Calculated)": 35,
+    "Segment Split (For Calculating Bolus Patients)": 0
+  };
+
+  return data.map(row => {
+    // 2) lookup key from col 13 (index 12)
+    const metric = row[12];
+    const flag = metricFlags.hasOwnProperty(metric)
+      ? metricFlags[metric]
+      : null;
+
+    // 3) copy & splice in at index 30 (31st column)
+    const newRow = row.slice();
+    newRow.splice(30, 0, flag);
+
+    return newRow;
+  });
+}
+
+
+// end of column flag fucntion
+
+
+/**
+ * Writes a 2D JavaScript array into the given worksheet.
+ * - Creates the sheet if it doesn’t exist
+ * - Clears any old contents
+ * - Suspends screen-updating and sets manual calc
+ * - Writes all values in one big range
+ * - Restores automatic calculation
+ *
+ * @param {any[][]} rows       2D array of values (must be at least 1×1)
+ * @param {string} sheetName   Name of the worksheet to write into
+ */
+export async function writeArrayToSheet(rows, sheetName) {
+  if (!Array.isArray(rows) || rows.length === 0 || !Array.isArray(rows[0])) {
+    throw new Error("writeArrayToSheet: rows must be a non-empty 2D array");
+  }
+
+  await Excel.run(async (context) => {
+    // 1️⃣ Get or create the worksheet
+    let sheet = context.workbook.worksheets.getItemOrNullObject(sheetName);
+    await context.sync();
+    if (sheet.isNullObject) {
+      sheet = context.workbook.worksheets.add(sheetName);
+    }
+
+    // 2️⃣ Clear old data
+    sheet.getUsedRangeOrNullObject().clear(Excel.ClearApplyTo.all);
+
+    // 3️⃣ Suspend screen updating & manual calc
+    context.application.suspendScreenUpdatingUntilNextSync();
+    context.application.calculationMode = Excel.CalculationMode.manual;
+    await context.sync();
+
+    // 4️⃣ Write the entire array in one go
+    const rowCount = rows.length;
+    const colCount = rows[0].length;
+    const writeRange = sheet.getRangeByIndexes(0, 0, rowCount, colCount);
+    writeRange.values = rows;
+    await context.sync();
+
+    // 5️⃣ Restore calculation mode (screen-updating auto-resumes)
+    context.application.calculationMode = Excel.CalculationMode.automatic;
+    context.application.calculate(Excel.CalculationType.full);
+    await context.sync();
+  });
 }
