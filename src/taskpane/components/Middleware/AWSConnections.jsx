@@ -914,7 +914,7 @@ export async function service_orchestration(
       console.timeEnd("flag insertion");
       console.time("Download and insert data from Excel");
       // await writeLargeArrayToTable(downloadResult, "Report Genie Backend");
-       await overwriteViaSheetUltraOptimized(downloadResult);
+       await overwriteUltraTuned(downloadResult);
       console.timeEnd("Download and insert data from Excel");
 
       console.log(ExtractS3_Downloadlink);
@@ -2250,110 +2250,168 @@ function insertFlagColumn(data) {
 
 
 // end of column flag fucntion
-export async function overwriteViaSheetUltraOptimized(
-  rows,
-  sheetName = "Report Genie Backend",
-  tableName = "Table7"
-) {
-  const startTime = performance.now();
-  const bodyRows = rows.slice(1);
-  const totalRows = bodyRows.length;
-  const totalCols = bodyRows[0]?.length || 0;
-  const totalCells = totalRows * totalCols;
+// export async function overwriteViaSheetUltraOptimized(
+//   rows,
+//   sheetName = "Report Genie Backend",
+//   tableName = "Table7"
+// ) {
+//   const startTime = performance.now();
+//   const bodyRows = rows.slice(1);
+//   const totalRows = bodyRows.length;
+//   const totalCols = bodyRows[0]?.length || 0;
+//   const totalCells = totalRows * totalCols;
   
-  console.log(`🚀 ULTRA-OPTIMIZED: ${totalRows} rows × ${totalCols} cols = ${totalCells.toLocaleString()} cells`);
+//   console.log(`🚀 ULTRA-OPTIMIZED: ${totalRows} rows × ${totalCols} cols = ${totalCells.toLocaleString()} cells`);
   
-  await Excel.run(async ctx => {
-    let stepTime = performance.now();
+//   await Excel.run(async ctx => {
+//     let stepTime = performance.now();
     
-    // STEP 1: Maximum performance settings FIRST
-    console.log(`⚡ Setting maximum performance mode...`);
+//     // STEP 1: Maximum performance settings FIRST
+//     console.log(`⚡ Setting maximum performance mode...`);
+//     ctx.application.suspendScreenUpdatingUntilNextSync();
+//     ctx.application.calculationMode = Excel.CalculationMode.manual;
+//     ctx.application.suspendApiCalculationUntilNextSync();
+    
+//     // STEP 2: Load ALL references in ONE sync
+//     console.log(`📋 Loading all Excel references...`);
+//     let ws = ctx.workbook.worksheets.getItemOrNullObject(sheetName);
+//     ws.load("isNullObject");
+    
+//     const table = ctx.workbook.tables.getItem(tableName);
+//     const header = table.getHeaderRowRange();
+//     const bodyRange = table.getDataBodyRange();
+    
+//     header.load(["rowIndex", "columnIndex"]);
+//     bodyRange.load("isNullObject");
+    
+//     await ctx.sync(); // SINGLE sync for all loads
+//     console.log(`⏱️  Load sync: ${(performance.now() - stepTime).toFixed(2)}ms`);
+//     stepTime = performance.now();
+    
+//     // Create sheet if needed (no additional sync needed)
+//     if (ws.isNullObject) {
+//       ws = ctx.workbook.worksheets.add(sheetName);
+//       console.log(`➕ Created worksheet: ${sheetName}`);
+//     }
+    
+//     // STEP 3: Clear existing data (no sync yet)
+//     if (!bodyRange.isNullObject) {
+//       bodyRange.clear(Excel.ClearApplyTo.contents);
+//       console.log(`🗑️  Marked existing data for clearing`);
+//     }
+    
+//     // STEP 4: Prepare write coordinates
+//     const R0 = header.rowIndex + 1;
+//     const C0 = header.columnIndex;
+//     console.log(`📍 Write coordinates: R${R0}C${C0}`);
+    
+//     // STEP 5: Choose strategy based on data size
+//     const MAX_SINGLE_WRITE = 10_000_000; // 10M cells
+    
+//     if (totalCells <= MAX_SINGLE_WRITE) {
+//       // SINGLE MEGA-WRITE for smaller datasets
+//       console.log(`💥 SINGLE WRITE: All ${totalRows} rows in one operation`);
+//       ws.getRangeByIndexes(R0, C0, totalRows, totalCols).values = bodyRows;
+      
+//     } else {
+//       // OPTIMIZED CHUNKING for very large datasets
+//       const OPTIMAL_CHUNK_SIZE = Math.min(5000, Math.floor(MAX_SINGLE_WRITE / totalCols));
+//       const chunks = Math.ceil(totalRows / OPTIMAL_CHUNK_SIZE);
+      
+//       console.log(`📦 CHUNKED WRITE: ${chunks} chunks of ${OPTIMAL_CHUNK_SIZE} rows`);
+      
+//       // Pre-allocate all ranges and data (no syncs in loop)
+//       for (let i = 0; i < chunks; i++) {
+//         const startRow = i * OPTIMAL_CHUNK_SIZE;
+//         const chunkSize = Math.min(OPTIMAL_CHUNK_SIZE, totalRows - startRow);
+//         const chunkData = bodyRows.slice(startRow, startRow + chunkSize);
+        
+//         ws.getRangeByIndexes(R0 + startRow, C0, chunkSize, totalCols).values = chunkData;
+//       }
+//     }
+    
+//     // STEP 6: Resize table (no sync yet)
+//     console.log(`📏 Resizing table...`);
+//     const newTableRange = ws.getRangeByIndexes(header.rowIndex, C0, totalRows + 1, totalCols);
+//     table.resize(newTableRange);
+    
+//     console.log(`⏱️  All operations queued: ${(performance.now() - stepTime).toFixed(2)}ms`);
+//     stepTime = performance.now();
+    
+//     // STEP 7: SINGLE MASSIVE SYNC - This is where all the work happens
+//     console.log(`🔄 EXECUTING ALL OPERATIONS (this is the big one)...`);
+//     await ctx.sync();
+    
+//     console.log(`⏱️  💥 MAIN SYNC: ${(performance.now() - stepTime).toFixed(2)}ms`);
+//     stepTime = performance.now();
+    
+//     // STEP 8: Restore settings
+//     ctx.application.calculationMode = Excel.CalculationMode.automatic;
+    
+//     const totalTime = performance.now() - startTime;
+//     const cellsPerSecond = totalCells / (totalTime / 1000);
+    
+//     console.log(`\n🎉 ULTRA-OPTIMIZED COMPLETED!`);
+//     console.log(`⏱️  TOTAL TIME: ${(totalTime / 1000).toFixed(2)} seconds`);
+//     console.log(`⚡ Performance: ${cellsPerSecond.toLocaleString()} cells/second`);
+//     console.log(`🎯 Target achieved: ${totalTime < 15000 ? '✅ YES' : '❌ NO'} (under 15s)`);
+//   });
+// }
+
+
+export async function overwriteUltraTuned(rows, sheetName = "Report Genie Backend", tableName = "Table7") {
+  // 1) Pre-compute everything outside Excel.run
+  const bodyRows = rows.slice(1);
+  const [totalRows, totalCols] = [bodyRows.length, bodyRows[0]?.length || 0];
+  const totalCells = totalRows * totalCols;
+
+  // calibrate chunk so each takes ~600ms
+  const msPerCell = await measureMsPerCell(); // implement a one-time probe
+  const cellsPerBatch = 600 / msPerCell;
+  const optimalRows = Math.max(1, Math.floor(cellsPerBatch / totalCols));
+
+  await Excel.run(async ctx => {
+    // 2) Maximize host performance
     ctx.application.suspendScreenUpdatingUntilNextSync();
     ctx.application.calculationMode = Excel.CalculationMode.manual;
     ctx.application.suspendApiCalculationUntilNextSync();
-    
-    // STEP 2: Load ALL references in ONE sync
-    console.log(`📋 Loading all Excel references...`);
-    let ws = ctx.workbook.worksheets.getItemOrNullObject(sheetName);
-    ws.load("isNullObject");
-    
+
+    // 3) Single load
+    const ws = ctx.workbook.worksheets.getItemOrNullObject(sheetName);        
     const table = ctx.workbook.tables.getItem(tableName);
-    const header = table.getHeaderRowRange();
-    const bodyRange = table.getDataBodyRange();
-    
-    header.load(["rowIndex", "columnIndex"]);
-    bodyRange.load("isNullObject");
-    
-    await ctx.sync(); // SINGLE sync for all loads
-    console.log(`⏱️  Load sync: ${(performance.now() - stepTime).toFixed(2)}ms`);
-    stepTime = performance.now();
-    
-    // Create sheet if needed (no additional sync needed)
-    if (ws.isNullObject) {
-      ws = ctx.workbook.worksheets.add(sheetName);
-      console.log(`➕ Created worksheet: ${sheetName}`);
-    }
-    
-    // STEP 3: Clear existing data (no sync yet)
-    if (!bodyRange.isNullObject) {
+    const header = table.getHeaderRowRange().load(["rowIndex","columnIndex"]);
+    const bodyRange = table.getDataBodyRange().load(["rowCount"]);
+    await ctx.sync();
+
+    // 4) Create sheet if missing
+    if (ws.isNullObject) ctx.workbook.worksheets.add(sheetName);
+
+    // 5) Only clear if sizes match
+    if (!bodyRange.isNullObject && bodyRange.rowCount === totalRows) {
       bodyRange.clear(Excel.ClearApplyTo.contents);
-      console.log(`🗑️  Marked existing data for clearing`);
     }
-    
-    // STEP 4: Prepare write coordinates
-    const R0 = header.rowIndex + 1;
-    const C0 = header.columnIndex;
-    console.log(`📍 Write coordinates: R${R0}C${C0}`);
-    
-    // STEP 5: Choose strategy based on data size
-    const MAX_SINGLE_WRITE = 10_000_000; // 10M cells
-    
-    if (totalCells <= MAX_SINGLE_WRITE) {
-      // SINGLE MEGA-WRITE for smaller datasets
-      console.log(`💥 SINGLE WRITE: All ${totalRows} rows in one operation`);
+
+    // 6) Write in one shot if small, else in calibrated chunks
+    const [R0, C0] = [header.rowIndex+1, header.columnIndex];
+    if (totalCells <= cellsPerBatch) {
       ws.getRangeByIndexes(R0, C0, totalRows, totalCols).values = bodyRows;
-      
     } else {
-      // OPTIMIZED CHUNKING for very large datasets
-      const OPTIMAL_CHUNK_SIZE = Math.min(5000, Math.floor(MAX_SINGLE_WRITE / totalCols));
-      const chunks = Math.ceil(totalRows / OPTIMAL_CHUNK_SIZE);
-      
-      console.log(`📦 CHUNKED WRITE: ${chunks} chunks of ${OPTIMAL_CHUNK_SIZE} rows`);
-      
-      // Pre-allocate all ranges and data (no syncs in loop)
-      for (let i = 0; i < chunks; i++) {
-        const startRow = i * OPTIMAL_CHUNK_SIZE;
-        const chunkSize = Math.min(OPTIMAL_CHUNK_SIZE, totalRows - startRow);
-        const chunkData = bodyRows.slice(startRow, startRow + chunkSize);
-        
-        ws.getRangeByIndexes(R0 + startRow, C0, chunkSize, totalCols).values = chunkData;
+      for (let i = 0; i < totalRows; i += optimalRows) {
+        const chunkSize = Math.min(optimalRows, totalRows - i);
+        ws.getRangeByIndexes(R0 + i, C0, chunkSize, totalCols).values = bodyRows.slice(i, i + chunkSize);
       }
     }
-    
-    // STEP 6: Resize table (no sync yet)
-    console.log(`📏 Resizing table...`);
-    const newTableRange = ws.getRangeByIndexes(header.rowIndex, C0, totalRows + 1, totalCols);
-    table.resize(newTableRange);
-    
-    console.log(`⏱️  All operations queued: ${(performance.now() - stepTime).toFixed(2)}ms`);
-    stepTime = performance.now();
-    
-    // STEP 7: SINGLE MASSIVE SYNC - This is where all the work happens
-    console.log(`🔄 EXECUTING ALL OPERATIONS (this is the big one)...`);
+
+    // 7) Resize only if needed
+    if (bodyRange.rowCount !== totalRows) {
+      const newRange = ws.getRangeByIndexes(header.rowIndex, C0, totalRows + 1, totalCols);
+      table.resize(newRange);
+    }
+
+    // 8) Single final sync
     await ctx.sync();
     
-    console.log(`⏱️  💥 MAIN SYNC: ${(performance.now() - stepTime).toFixed(2)}ms`);
-    stepTime = performance.now();
-    
-    // STEP 8: Restore settings
+    // 9) Restore
     ctx.application.calculationMode = Excel.CalculationMode.automatic;
-    
-    const totalTime = performance.now() - startTime;
-    const cellsPerSecond = totalCells / (totalTime / 1000);
-    
-    console.log(`\n🎉 ULTRA-OPTIMIZED COMPLETED!`);
-    console.log(`⏱️  TOTAL TIME: ${(totalTime / 1000).toFixed(2)} seconds`);
-    console.log(`⚡ Performance: ${cellsPerSecond.toLocaleString()} cells/second`);
-    console.log(`🎯 Target achieved: ${totalTime < 15000 ? '✅ YES' : '❌ NO'} (under 15s)`);
   });
 }
