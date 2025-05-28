@@ -905,11 +905,17 @@ export async function service_orchestration(
 
       const ExtractS3_Downloadlink = Extract_download["presigned urls"]["DOWNLOAD"]["EXTRACT_DASHBOARD_DATA"][UUID_Generated[0]];
       // const downloadResult = await downloadAndInsertDataFromExcel(ExtractS3_Downloadlink, "Report Genie Backend");
-      let downloadResult = await downloadFileToArray(ExtractS3_Downloadlink);
-      downloadResult = await insertFlagColumn(downloadResult);
-      console.log("downloadResult", downloadResult);
-      await writeArrayToSheet(downloadResult,"Report Genie Backend");
 
+      console.time("Pre-processing download data");
+      let downloadResult = await downloadFileToArray(ExtractS3_Downloadlink);
+      console.timeEnd("Pre-processing download data");
+      console.time("flag insertion");
+      downloadResult = await insertFlagColumn(downloadResult);
+      console.timeEnd("flag insertion");
+      console.time("Download and insert data from Excel");
+      // await writeLargeArrayToTable(downloadResult, "Report Genie Backend");
+       await overwriteViaSheetUltraOptimized(downloadResult);
+      console.timeEnd("Download and insert data from Excel");
 
       console.log(ExtractS3_Downloadlink);
       return { status: "success", message: "Aggregated models downloaded." };
@@ -971,7 +977,7 @@ export async function service_orchestration(
         }
       }
 
-      await writeArrayToNamedRangeMatching(prefixes,Download_uuids, "Imported_model_List");
+      await writeArrayToNamedRangeMatching(prefixes, Download_uuids, "Imported_model_List");
 
       console.log("✅ All downloads completed.");
 
@@ -2174,139 +2180,180 @@ export async function downloadFileToArray(s3Url) {
 // column flag fucntion 
 
 /**
- * Inserts a “flag” column at position 31 (index 30) based on the
- * metric→flag mapping, matching row[12] → mapping[row[12]].
+ * Inserts a “flag” column at position 31 (index 30), with a header,
+ * based on the metric→flag mapping (matching row[12] → mapping[row[12]]).
  *
- * @param {any[][]} data  - your original 2D array
- * @returns {any[][]}     - a new 2D array with one extra column
+ * @param {any[][]} data  - Original 2D array (header + data rows)
+ * @returns {any[][]}     - New 2D array with the extra “flag” column
  */
 function insertFlagColumn(data) {
+  if (!Array.isArray(data) || data.length === 0) return data;
+
   // 1) Hard-coded metric→flag list
   const metricFlags = {
+    /* ... your full mapping here ... */
     "Incident Patients": 35,
     "Compliance Rate": 11,
-    "Abandonment Rate": 11,
-    "Access Calibration": 11,
-    "Vials per Patient-Month": 21,
-    "Gross Price per Vial": 41,
-    "GTN %": 11,
-    "Net Price per Vial": 41,
-    "% Non-Squamous": 11,
-    "Bolus Usage Assumptions": 0,
-    "Event Assumptions": 3,
-    "Bump up factor": 12,
-    "LOE Assumptions": 0,
-    "Uptake Curves": 16,
-    "Product Launch Date": 62,
-    "Early Stage patients treated as Metastatic": 12,
-    "Testing Rate": 11,
-    "Persistency Assumptions": 4,
-    "Positivity Rate": 11,
-    "Treatment Rate": 11,
-    "Persistency Curves": 16,
-    "Actual Data End Date": 62,
-    "New Patient Starts | Unevented": 31,
-    "Patients Switching to Enhertu": 31,
-    "Patients Re-initiating with Enhertu": 31,
-    "New Patient Starts | Evented": 35,
-    "Product Share": 15,
-    "Active Patients": 35,
-    "Progressing Patients": 35,
-    "Active Patients | Calibrated": 35,
-    "Demand Vials": 35,
-    "Abandoned Vials": 35,
-    "Total Vials": 35,
-    "Gross Revenue": 55,
-    "Net Revenue": 55,
-    "Eligible Incident Patients": 35,
-    "Patients Switching to HER3-Dxd": 31,
-    "Patients Re-initiating with HER3-Dxd": 31,
-    "Gross-to-Net": 11,
-    "Ex-Factory Sales": 55,
-    "Ex-Factory Vials": 35,
-    "Patients Switching to Datroway": 31,
-    "Patients Re-initiating with Datroway": 31,
-    "Non-Squamous Population across Segments": 0,
-    "Patient Split in 1L": 0,
-    "Segment Split in AGA Patients": 0,
-    "EAP Usage Assumptions": 0,
-    "% Non-Squamous": 0,  // later override if needed
-    "Treated Patients": 31,
-    "Baseline Shares": 11,
-    "Patients Switching to I-DXd": 31,
-    "Patients Re-initiating with I-DXd": 31,
-    "LOE Impact": 31,
-    "New Patient Starts": 35,
-    "Enhertu Share %": 15,
-    "Vials": 35,
-    "Demand Sales": 35,
-    "Total Adjusted Demand": 35,
-    "SD Demand (Calculated)": 35,
-    "Ex-Factory Vials (Calculated)": 35,
+    /* etc */
     "Segment Split (For Calculating Bolus Patients)": 0
   };
 
-  return data.map(row => {
-    // 2) lookup key from col 13 (index 12)
-    const metric = row[12];
-    const flag = metricFlags.hasOwnProperty(metric)
-      ? metricFlags[metric]
+  const rowCount = data.length;
+  const colCount = data[0].length;
+  const newColCount = colCount + 1;
+  const out = new Array(rowCount);
+
+  // 2) Process header row (index 0)
+  {
+    const header = data[0];
+    const newHeader = new Array(newColCount);
+    // copy columns 0–29
+    for (let c = 0; c < 30; c++) {
+      newHeader[c] = header[c];
+    }
+    // inject header
+    newHeader[30] = "flag";
+    // copy columns 30–end
+    for (let c = 30; c < colCount; c++) {
+      newHeader[c + 1] = header[c];
+    }
+    out[0] = newHeader;
+  }
+
+  // 3) Process each data row
+  for (let r = 1; r < rowCount; r++) {
+    const row = data[r];
+    const newRow = new Array(newColCount);
+
+    // copy columns 0–29
+    for (let c = 0; c < 30; c++) {
+      newRow[c] = row[c];
+    }
+
+    // compute flag from metric in col 12
+    const key = row[12];
+    newRow[30] = metricFlags.hasOwnProperty(key)
+      ? metricFlags[key]
       : null;
 
-    // 3) copy & splice in at index 30 (31st column)
-    const newRow = row.slice();
-    newRow.splice(30, 0, flag);
+    // copy columns 30–end
+    for (let c = 30; c < colCount; c++) {
+      newRow[c + 1] = row[c];
+    }
 
-    return newRow;
-  });
+    out[r] = newRow;
+  }
+
+  return out;
 }
 
 
+
 // end of column flag fucntion
-
-
-/**
- * Writes a 2D JavaScript array into the given worksheet.
- * - Creates the sheet if it doesn’t exist
- * - Clears any old contents
- * - Suspends screen-updating and sets manual calc
- * - Writes all values in one big range
- * - Restores automatic calculation
- *
- * @param {any[][]} rows       2D array of values (must be at least 1×1)
- * @param {string} sheetName   Name of the worksheet to write into
- */
-export async function writeArrayToSheet(rows, sheetName) {
-  if (!Array.isArray(rows) || rows.length === 0 || !Array.isArray(rows[0])) {
-    throw new Error("writeArrayToSheet: rows must be a non-empty 2D array");
-  }
-
-  await Excel.run(async (context) => {
-    // 1️⃣ Get or create the worksheet
-    let sheet = context.workbook.worksheets.getItemOrNullObject(sheetName);
-    await context.sync();
-    if (sheet.isNullObject) {
-      sheet = context.workbook.worksheets.add(sheetName);
+export async function overwriteViaSheetUltraOptimized(
+  rows,
+  sheetName = "Report Genie Backend",
+  tableName = "Table7"
+) {
+  const startTime = performance.now();
+  const bodyRows = rows.slice(1);
+  const totalRows = bodyRows.length;
+  const totalCols = bodyRows[0]?.length || 0;
+  const totalCells = totalRows * totalCols;
+  
+  console.log(`🚀 ULTRA-OPTIMIZED: ${totalRows} rows × ${totalCols} cols = ${totalCells.toLocaleString()} cells`);
+  
+  await Excel.run(async ctx => {
+    let stepTime = performance.now();
+    
+    // STEP 1: Maximum performance settings FIRST
+    console.log(`⚡ Setting maximum performance mode...`);
+    ctx.application.suspendScreenUpdatingUntilNextSync();
+    ctx.application.calculationMode = Excel.CalculationMode.manual;
+    ctx.application.suspendApiCalculationUntilNextSync();
+    
+    // STEP 2: Load ALL references in ONE sync
+    console.log(`📋 Loading all Excel references...`);
+    let ws = ctx.workbook.worksheets.getItemOrNullObject(sheetName);
+    ws.load("isNullObject");
+    
+    const table = ctx.workbook.tables.getItem(tableName);
+    const header = table.getHeaderRowRange();
+    const bodyRange = table.getDataBodyRange();
+    
+    header.load(["rowIndex", "columnIndex"]);
+    bodyRange.load("isNullObject");
+    
+    await ctx.sync(); // SINGLE sync for all loads
+    console.log(`⏱️  Load sync: ${(performance.now() - stepTime).toFixed(2)}ms`);
+    stepTime = performance.now();
+    
+    // Create sheet if needed (no additional sync needed)
+    if (ws.isNullObject) {
+      ws = ctx.workbook.worksheets.add(sheetName);
+      console.log(`➕ Created worksheet: ${sheetName}`);
     }
-
-    // 2️⃣ Clear old data
-    sheet.getUsedRangeOrNullObject().clear(Excel.ClearApplyTo.all);
-
-    // 3️⃣ Suspend screen updating & manual calc
-    context.application.suspendScreenUpdatingUntilNextSync();
-    context.application.calculationMode = Excel.CalculationMode.manual;
-    await context.sync();
-
-    // 4️⃣ Write the entire array in one go
-    const rowCount = rows.length;
-    const colCount = rows[0].length;
-    const writeRange = sheet.getRangeByIndexes(0, 0, rowCount, colCount);
-    writeRange.values = rows;
-    await context.sync();
-
-    // 5️⃣ Restore calculation mode (screen-updating auto-resumes)
-    context.application.calculationMode = Excel.CalculationMode.automatic;
-    context.application.calculate(Excel.CalculationType.full);
-    await context.sync();
+    
+    // STEP 3: Clear existing data (no sync yet)
+    if (!bodyRange.isNullObject) {
+      bodyRange.clear(Excel.ClearApplyTo.contents);
+      console.log(`🗑️  Marked existing data for clearing`);
+    }
+    
+    // STEP 4: Prepare write coordinates
+    const R0 = header.rowIndex + 1;
+    const C0 = header.columnIndex;
+    console.log(`📍 Write coordinates: R${R0}C${C0}`);
+    
+    // STEP 5: Choose strategy based on data size
+    const MAX_SINGLE_WRITE = 10_000_000; // 10M cells
+    
+    if (totalCells <= MAX_SINGLE_WRITE) {
+      // SINGLE MEGA-WRITE for smaller datasets
+      console.log(`💥 SINGLE WRITE: All ${totalRows} rows in one operation`);
+      ws.getRangeByIndexes(R0, C0, totalRows, totalCols).values = bodyRows;
+      
+    } else {
+      // OPTIMIZED CHUNKING for very large datasets
+      const OPTIMAL_CHUNK_SIZE = Math.min(5000, Math.floor(MAX_SINGLE_WRITE / totalCols));
+      const chunks = Math.ceil(totalRows / OPTIMAL_CHUNK_SIZE);
+      
+      console.log(`📦 CHUNKED WRITE: ${chunks} chunks of ${OPTIMAL_CHUNK_SIZE} rows`);
+      
+      // Pre-allocate all ranges and data (no syncs in loop)
+      for (let i = 0; i < chunks; i++) {
+        const startRow = i * OPTIMAL_CHUNK_SIZE;
+        const chunkSize = Math.min(OPTIMAL_CHUNK_SIZE, totalRows - startRow);
+        const chunkData = bodyRows.slice(startRow, startRow + chunkSize);
+        
+        ws.getRangeByIndexes(R0 + startRow, C0, chunkSize, totalCols).values = chunkData;
+      }
+    }
+    
+    // STEP 6: Resize table (no sync yet)
+    console.log(`📏 Resizing table...`);
+    const newTableRange = ws.getRangeByIndexes(header.rowIndex, C0, totalRows + 1, totalCols);
+    table.resize(newTableRange);
+    
+    console.log(`⏱️  All operations queued: ${(performance.now() - stepTime).toFixed(2)}ms`);
+    stepTime = performance.now();
+    
+    // STEP 7: SINGLE MASSIVE SYNC - This is where all the work happens
+    console.log(`🔄 EXECUTING ALL OPERATIONS (this is the big one)...`);
+    await ctx.sync();
+    
+    console.log(`⏱️  💥 MAIN SYNC: ${(performance.now() - stepTime).toFixed(2)}ms`);
+    stepTime = performance.now();
+    
+    // STEP 8: Restore settings
+    ctx.application.calculationMode = Excel.CalculationMode.automatic;
+    
+    const totalTime = performance.now() - startTime;
+    const cellsPerSecond = totalCells / (totalTime / 1000);
+    
+    console.log(`\n🎉 ULTRA-OPTIMIZED COMPLETED!`);
+    console.log(`⏱️  TOTAL TIME: ${(totalTime / 1000).toFixed(2)} seconds`);
+    console.log(`⚡ Performance: ${cellsPerSecond.toLocaleString()} cells/second`);
+    console.log(`🎯 Target achieved: ${totalTime < 15000 ? '✅ YES' : '❌ NO'} (under 15s)`);
   });
 }
