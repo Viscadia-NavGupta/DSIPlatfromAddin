@@ -1,3 +1,5 @@
+// src/pages/ForecastLibrarypage.jsx
+
 import React, { useState, useEffect } from "react";
 import { FaArrowLeft } from "react-icons/fa";
 import { MdSaveAlt } from "react-icons/md";
@@ -6,6 +8,7 @@ import { DataFrame } from "dataframe-js";
 import * as Excelconnections from "../../Middleware/ExcelConnection";
 import * as AWSconnections from "../../Middleware/AWSConnections";
 import CONFIG from "../../Middleware/AWSConnections";
+
 import {
   HomePageContainer,
   ContentWrapper,
@@ -15,19 +18,32 @@ import {
   Tooltip,
   BackButtonIcon,
   IconWrapper,
+  Overlay,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ConfirmButton,
 } from "./ForecastLibrarypageStyles";
 
 const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
-  const [buttonSize, setButtonSize] = useState({ width: 90, height: 75, fontSize: "0.7rem", iconSize: 32 });
+  const [buttonSize, setButtonSize] = useState({
+    width: 90,
+    height: 75,
+    fontSize: "0.7rem",
+    iconSize: 32,
+  });
   const [loading, setLoading] = useState(true);
   const [modelIDValue, setModelIDValue] = useState("");
   const [modelType, setModelType] = useState("");
   const [modelIDError, setModelIDError] = useState("");
   const [isOutputSheet, setIsOutputSheet] = useState(false);
-  const [dataFrames, setDataFrames] = useState({
-    dfResult3: null,
-  });
+  const [dataFrames, setDataFrames] = useState({ dfResult3: null });
 
+  // Modal for “Load Data” confirmation
+  const [showConfirmLoad, setShowConfirmLoad] = useState(false);
+
+  // Responsive sizing
   const updateSize = () => {
     const availableWidth = window.innerWidth - 130;
     const availableHeight = window.innerHeight - 180;
@@ -38,175 +54,237 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
     const iconSize = newSize * 0.4;
     setButtonSize({ width: newSize, height: newSize * 0.8, fontSize, iconSize });
   };
-
   useEffect(() => {
     updateSize();
     window.addEventListener("resize", updateSize);
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
+  // Check cloud backend metadata sheet
   const checkModelAuthorization = async () => {
     try {
       if (typeof window.Excel === "undefined") return;
-
-      await Excel.run(async (context) => {
-        const sheets = context.workbook.worksheets;
+      await Excel.run(async (ctx) => {
+        const sheets = ctx.workbook.worksheets;
         sheets.load("items/name");
-        await context.sync();
+        await ctx.sync();
 
-        const MetaDataSheet = sheets.items.find((sheet) => sheet.name.toLowerCase() === "cloud_backend_md");
-        if (MetaDataSheet) {
-          const ranges = {
-            ModelName: MetaDataSheet.getRange("B5"),
-            ModelID: MetaDataSheet.getRange("B7"),
-            ModelType: MetaDataSheet.getRange("B8"),
-          };
-
-          Object.values(ranges).forEach((r) => r.load("values"));
-          await context.sync();
-
-          const modelID = ranges.ModelID.values[0][0]?.toString().trim() || "";
-          const modelType = ranges.ModelType.values[0][0]?.toString().trim() || "";
-
-          setModelIDValue(modelID);
-          setModelType(modelType);
-
-          if (!modelID || !modelType) {
-            setIsOutputSheet(false);
-            return;
-          }
-
-          setIsOutputSheet(true);
-        } else {
+        const md = sheets.items.find(
+          (s) => s.name.toLowerCase() === "cloud_backend_md"
+        );
+        if (!md) {
           setIsOutputSheet(false);
+          return;
         }
+
+        const ranges = {
+          ModelID: md.getRange("B7"),
+          ModelType: md.getRange("B8"),
+        };
+        Object.values(ranges).forEach((r) => r.load("values"));
+        await ctx.sync();
+
+        const id = ranges.ModelID.values[0][0]?.toString().trim() || "";
+        const type = ranges.ModelType.values[0][0]?.toString().trim() || "";
+        setModelIDValue(id);
+        setModelType(type);
+        setIsOutputSheet(!!(id && type));
       });
-    } catch (error) {
-      console.error("Model Auth Error:", error);
+    } catch (err) {
+      console.error("Model Auth Error:", err);
       setIsOutputSheet(false);
     }
   };
 
+  // Fetch authorization list
   const fetchAuthorizationData = async () => {
     try {
-      const responseBody = await AWSconnections.FetchMetaData(
+      const resp = await AWSconnections.FetchMetaData(
         "FETCH_METADATA",
         localStorage.getItem("idToken"),
         CONFIG.AWS_SECRETS_NAME,
         localStorage.getItem("User_ID"),
         localStorage.getItem("username")
       );
-      const df3 = new DataFrame(responseBody.result3);
-      setDataFrames({ dfResult3: df3 });
-    } catch (error) {
-      console.error("Authorization Data Fetch Error:", error);
+      setDataFrames({ dfResult3: new DataFrame(resp.result3) });
+    } catch (err) {
+      console.error("Authorization Data Fetch Error:", err);
     }
   };
 
+  // On mount
   useEffect(() => {
-    const init = async () => {
+    (async () => {
       await Promise.all([checkModelAuthorization(), fetchAuthorizationData()]);
       setLoading(false);
-    };
-    init();
+    })();
   }, []);
 
+  // Final authorization check: require both model_id AND model_type match
   useEffect(() => {
-    if (!loading && modelIDValue && dataFrames.dfResult3) {
-      const models = dataFrames.dfResult3.toCollection();
-      const authorized = models.some((model) => model.model_id === modelIDValue);
-      if (!authorized) {
-        setModelIDError("This model is not authorized.");
+    if (!loading && modelIDValue && modelType && dataFrames.dfResult3) {
+      const allowed = dataFrames.dfResult3
+        .toCollection()
+        .some(
+          (m) =>
+            m.model_id === modelIDValue &&
+            (m.model_type?.toString().trim() || "") === modelType
+        );
+      if (!allowed) {
+        setModelIDError("No Authorized Forecast Library Found");
         setIsOutputSheet(false);
       } else {
         setModelIDError("");
       }
     }
-  }, [loading, modelIDValue, dataFrames.dfResult3]);
+  }, [loading, modelIDValue, modelType, dataFrames.dfResult3]);
 
-  const sync_MetaData_AGG = async () => {
-    setPageValue("LoadingCircleComponent", "Syncing data...");
-    try {
-      const responseBody = await AWSconnections.FetchMetaData(
-        "FETCH_METADATA",
-        localStorage.getItem("idToken"),
-        CONFIG.AWS_SECRETS_NAME,
-        localStorage.getItem("User_ID"),
-        localStorage.getItem("username")
+  // Core load function with progress updates
+  const LoadAggModels = async () => {
+    const access = await AWSconnections.ButtonAccess("EXTRACT_DASHBOARD_DATA");
+    if (access?.message === "ACCESS DENIED") {
+      setPageValue(
+        "SaveForecastPageinterim",
+        "You do not have permission to save forecast."
       );
-      await Excelconnections.setCalculationMode("manual");
-      await Excelconnections.apiResponseToExcel(responseBody, "cloud_backend_ds", "A1");
-      await Excelconnections.setCalculationMode("automatic");
-      setPageValue("SaveForecastPageinterim", "Dropdowns synced successfully.");
-    } catch (error) {
-      console.error("Sync MetaData Error:", error);
+      return;
+    }
+
+    let progress = 0;
+    setPageValue("LoadingCircleComponent", `${progress}% | Loading Data...`);
+    const intervalId = setInterval(() => {
+      progress = Math.min(progress + 3, 95);
+      setPageValue("LoadingCircleComponent", `${progress}% | Loading Data...`);
+    }, 2000);
+
+    try {
+      let ForecastIDS = await Excelconnections.calculateAndFetchColumnAN("Setup");
+      ForecastIDS = ForecastIDS.map((item) => item.replace(/^forecast_/, ""));
+      const result = await AWSconnections.service_orchestration(
+        "EXTRACT_DASHBOARD_DATA",
+        "",
+        "",
+        "",
+        "",
+        "",
+        CONFIG.AWS_SECRETS_NAME,
+        "",
+        "",
+        [],
+        [],
+        [],
+        [],
+        setPageValue,
+        ForecastIDS
+      );
+
+      clearInterval(intervalId);
+      setPageValue("LoadingCircleComponent", `100% | Loading Data...`);
+      await new Promise((r) => setTimeout(r, 300));
+
+      if (result?.status === "SUCCESS") {
+        setPageValue(
+          "SaveForecastPageinterim",
+          "Selected Data is loaded and refreshed"
+        );
+      } else {
+        const errMsg =
+          result?.message || "Some error occurred during load, please try again";
+        setPageValue("SaveForecastPageinterim", errMsg);
+      }
+    } catch (err) {
+      clearInterval(intervalId);
+      console.error("LoadAggModels error:", err);
+      setPageValue(
+        "SaveForecastPageinterim",
+        "Some error occurred during load, please try again"
+      );
     }
   };
 
-  const LoadAggModels = async () => {
-
-    let ForecastIDS = await Excelconnections.calculateAndFetchColumnAN("Setup");
-    ForecastIDS = ForecastIDS.map(item => item.replace(/^forecast_/, ""));
-    console.log("Forecast IDs:", ForecastIDS);
-    let Result = await AWSconnections.service_orchestration(
-      "EXTRACT_DASHBOARD_DATA",
-      "",
-      "",
-      "",
-      "",
-      "",
-      CONFIG.AWS_SECRETS_NAME,
-      "",
-      "",
-      [],
-      [],
-      [],
-      [],
-      setPageValue,
-      ForecastIDS
-    )
-    console.log("Result:", Result);
-  }
+  // Modal handlers
+  const handleLoadClick = () => setShowConfirmLoad(true);
+  const handleConfirmLoad = async () => {
+    setShowConfirmLoad(false);
+    await LoadAggModels();
+  };
+  const handleCancelLoad = () => setShowConfirmLoad(false);
 
   const buttons = [
-    { name: "Sync Data", icon: <IoMdSync size={buttonSize.iconSize} />, action: () => setPageValue("FLSyncData"), disabled: false },
-    { name: "Load Data", icon: <MdSaveAlt size={buttonSize.iconSize} />, action: LoadAggModels, disabled: false },
+    {
+      name: "Sync Data",
+      icon: <IoMdSync size={buttonSize.iconSize} />,
+      action: () => setPageValue("FLSyncData"),
+      disabled: false,
+    },
+    {
+      name: "Load Data",
+      icon: <MdSaveAlt size={buttonSize.iconSize} />,
+      action: handleLoadClick,
+      disabled: false,
+    },
   ];
 
   return (
     <HomePageContainer>
       <ContentWrapper>
         <WelcomeContainer>
-          <BackButtonIcon as={FaArrowLeft} size={24} onClick={() => setPageValue("Home")} />
+          <BackButtonIcon
+            as={FaArrowLeft}
+            size={24}
+            onClick={() => setPageValue("Home")}
+          />
           <h1>Forecast Library</h1>
         </WelcomeContainer>
 
         {loading ? (
-          <p style={{ color: '#B4322A' }}>Loading...</p>
+          <p style={{ color: "#B4322A" }}>Loading...</p>
         ) : modelIDError ? (
-          <p style={{ color: '#B4322A' }}>{modelIDError}</p>
+          <p style={{ color: "#B4322A" }}>{modelIDError}</p>
         ) : !isOutputSheet ? (
-          <p>No output sheet found or model not authorized.</p>
+          <p style={{ color: "#B4322A" }}>No output sheet found or model not authorized.</p>
+        ) : modelType !== "FORECAST_LIBRARY" ? (
+          <p style={{ color: "#B4322A" }}>Not a authorized forecast Library.</p>
         ) : (
-          <>
-            <ButtonsContainer style={{ gridTemplateColumns: "repeat(2, 1fr)", marginBottom: "12px" }}>
-              {buttons.map((button, index) => (
-                <Button
-                  key={index}
-                  onClick={!button.disabled ? button.action : undefined}
-                  disabled={button.disabled}
-                >
-                  <IconWrapper disabled={button.disabled} size={buttonSize.iconSize}>
-                    {button.icon}
-                  </IconWrapper>
-                  <p>{button.name}</p>
-                  {button.disabled && <Tooltip className="tooltip">Feature not activated.</Tooltip>}
-                </Button>
-              ))}
-            </ButtonsContainer>
-          </>
+          <ButtonsContainer>
+            {buttons.map((btn, idx) => (
+              <Button
+                key={idx}
+                onClick={!btn.disabled ? btn.action : undefined}
+                disabled={btn.disabled}
+              >
+                <IconWrapper size={buttonSize.iconSize}>
+                  {btn.icon}
+                </IconWrapper>
+                <p>{btn.name}</p>
+                {btn.disabled && <Tooltip>Feature not activated.</Tooltip>}
+              </Button>
+            ))}
+          </ButtonsContainer>
         )}
       </ContentWrapper>
+
+      {showConfirmLoad && (
+        <Overlay>
+          <Modal>
+            <ModalHeader style={{ color: "#B4322A" }}>
+              Confirm Data Load
+            </ModalHeader>
+            <ModalBody>
+              This will fetch and write all dashboard data. Proceed?
+            </ModalBody>
+            <ModalFooter>
+              <ConfirmButton onClick={handleConfirmLoad}>Yes</ConfirmButton>
+              <ConfirmButton
+                style={{ backgroundColor: "#63666A" }}
+                onClick={handleCancelLoad}
+              >
+                No
+              </ConfirmButton>
+            </ModalFooter>
+          </Modal>
+        </Overlay>
+      )}
     </HomePageContainer>
   );
 };

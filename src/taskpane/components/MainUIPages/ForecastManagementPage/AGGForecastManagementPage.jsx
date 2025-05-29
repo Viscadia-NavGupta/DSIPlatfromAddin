@@ -26,63 +26,77 @@ import {
 } from "./AGGForecastManagementPageStyles";
 
 const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
-  const [buttonSize, setButtonSize] = useState({
-    width: 90,
-    height: 75,
-    fontSize: "0.7rem",
-    iconSize: 32,
-  });
+  const [buttonSize, setButtonSize] = useState({ width: 90, height: 75, fontSize: "0.7rem", iconSize: 32 });
   const [modelIDValue, setModelIDValue] = useState("");
+  const [modelTypeValue, setModelTypeValue] = useState("");
   const [showLoadConfirm, setShowLoadConfirm] = useState(false);
+
+  // auth states
+  const [authorized, setAuthorized] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [authError, setAuthError] = useState("");
 
   // Responsive sizing
   const updateSize = useCallback(() => {
-    const availableWidth = window.innerWidth - 130;
-    const availableHeight = window.innerHeight - 180;
-    const columns = Math.max(2, Math.floor(availableWidth / 110));
-    const rows = Math.max(2, Math.floor(availableHeight / 110));
-    const newSize = Math.min(
-      availableWidth / columns,
-      availableHeight / rows,
-      90
-    );
-    setButtonSize({
-      width: newSize,
-      height: newSize * 0.8,
-      fontSize: `${Math.max(0.7, newSize / 10)}rem`,
-      iconSize: newSize * 0.4,
-    });
+    const aw = window.innerWidth - 130;
+    const ah = window.innerHeight - 180;
+    const cols = Math.max(2, Math.floor(aw / 110));
+    const rows = Math.max(2, Math.floor(ah / 110));
+    const sz = Math.min(aw / cols, ah / rows, 90);
+    setButtonSize({ width: sz, height: sz * 0.8, fontSize: `${Math.max(0.7, sz/10)}rem`, iconSize: sz*0.4 });
   }, []);
+  useEffect(() => { updateSize(); window.addEventListener("resize", updateSize); return () => window.removeEventListener("resize", updateSize); }, [updateSize]);
 
+  // Read model info and authorize
   useEffect(() => {
-    updateSize();
-    window.addEventListener("resize", updateSize);
-    return () => window.removeEventListener("resize", updateSize);
-  }, [updateSize]);
-
-  // Fetch Model ID
-  useEffect(() => {
-    const checkModelType = async () => {
+    const checkAuth = async () => {
       try {
         if (!window.Excel) return;
-        await Excel.run(async (context) => {
-          const sheets = context.workbook.worksheets;
+        await Excel.run(async (ctx) => {
+          const sheets = ctx.workbook.worksheets;
           sheets.load("items/name");
-          await context.sync();
-          const mdSheet = sheets.items.find(
-            (s) => s.name.toLowerCase() === "cloud_backend_md"
+          await ctx.sync();
+          const md = sheets.items.find(s => s.name.toLowerCase() === "cloud_backend_md");
+          if (!md) {
+            setAuthError("No authorized model found. Please refresh the add-in.");
+            setAuthChecked(true);
+            return;
+          }
+          const ranges = { ModelID: md.getRange("B7"), ModelType: md.getRange("B8") };
+          ranges.ModelID.load("values"); ranges.ModelType.load("values");
+          await ctx.sync();
+          const id = ranges.ModelID.values[0][0]?.toString().trim()||"";
+          const type = ranges.ModelType.values[0][0]?.toString().trim()||"";
+          setModelIDValue(id);
+          setModelTypeValue(type);
+          if (type !== "AGGREGATOR") {
+            setAuthError("No authorized model found. Please refresh the add-in.");
+            setAuthChecked(true);
+            return;
+          }
+          const resp = await AWSconnections.FetchMetaData(
+            "FETCH_METADATA",
+            localStorage.getItem("idToken"),
+            CONFIG.AWS_SECRETS_NAME,
+            localStorage.getItem("User_ID"),
+            localStorage.getItem("username")
           );
-          if (!mdSheet) return;
-          const range = mdSheet.getRange("B7");
-          range.load("values");
-          await context.sync();
-          setModelIDValue(range.values[0][0] || "");
+          const df = new DataFrame(resp.result3);
+          const allowed = df.toCollection().some(r => r.model_id === id && (r.model_type?.toString().trim()||"") === type);
+          if (!allowed) {
+            setAuthError("No authorized model found. Please refresh the add-in.");
+          } else {
+            setAuthorized(true);
+          }
+          setAuthChecked(true);
         });
-      } catch (error) {
-        console.error(error);
+      } catch (err) {
+        console.error(err);
+        setAuthError("No authorized model found. Please refresh the add-in.");
+        setAuthChecked(true);
       }
     };
-    checkModelType();
+    checkAuth();
   }, []);
 
   // Sync metadata
@@ -97,21 +111,11 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
         localStorage.getItem("username")
       );
       await Excelconnections.setCalculationMode("manual");
-      await Excelconnections.apiResponseToExcel(
-        resp,
-        "cloud_backend_ds",
-        "A1"
-      );
-      setPageValue(
-        "SaveForecastPageinterim",
-        "Dropdowns synced with the latest scenario names from the data lake"
-      );
+      await Excelconnections.apiResponseToExcel(resp, "cloud_backend_ds", "A1");
+      setPageValue("SaveForecastPageinterim", "Dropdowns synced with the latest scenario names from the data lake");
     } catch (error) {
       console.error(error);
-      setPageValue(
-        "SaveForecastPageinterim",
-        "Some error occurred, please try again"
-      );
+      setPageValue("SaveForecastPageinterim", "Some error occurred, please try again");
     } finally {
       await Excelconnections.setCalculationMode("automatic");
     }
@@ -121,40 +125,21 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
   const LoadAggModels = useCallback(async () => {
     setPageValue("LoadingCircleComponent", "0% | Loading Models...");
     try {
-      const data = await Excelconnections.readNamedRangeToArray(
-        "Cloud_LoadModels_List"
-      );
-      const sheetNames = data.map((row) => row[0]);
-      const forecastIDs = data.map((row) => row[6]);
-
+      const data = await Excelconnections.readNamedRangeToArray("Cloud_LoadModels_List");
+      const sheetNames = data.map(r=>r[0]);
+      const forecastIDs = data.map(r=>r[6]);
       await Excelconnections.setCalculationMode("manual");
       const saveFlag = await AWSconnections.service_orchestration(
-        "Agg_Load_Models",
-        "", "", "", "", "", "", "",
-        "", "",
-        sheetNames,
-        forecastIDs,
-        [],
-        setPageValue
+        "Agg_Load_Models", "", "", "", "", "", "", "", "", "", sheetNames, forecastIDs, [], setPageValue
       );
-
       if (saveFlag.status === "SUCCESS" || (saveFlag && saveFlag.result === "DONE")) {
-        setPageValue(
-          "SaveForecastPageinterim",
-          "Selected scenarios loaded successfully."
-        );
+        setPageValue("SaveForecastPageinterim", "Selected scenarios loaded successfully.");
       } else {
-        setPageValue(
-          "SaveForecastPageinterim",
-          "Some error occurred, please try again"
-        );
+        setPageValue("SaveForecastPageinterim", "Some error occurred, please try again");
       }
     } catch (error) {
       console.error(error);
-      setPageValue(
-        "SaveForecastPageinterim",
-        "Some error occurred, please try again"
-      );
+      setPageValue("SaveForecastPageinterim", "Some error occurred, please try again");
     } finally {
       await Excelconnections.setCalculationMode("automatic");
     }
@@ -163,49 +148,23 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
   // Modal handlers
   const handleLoadClick = () => setShowLoadConfirm(true);
   const handleLoadCancel = () => setShowLoadConfirm(false);
-  const handleLoadConfirm = async () => {
-    setShowLoadConfirm(false);
-    await LoadAggModels();
-  };
+  const handleLoadConfirm = async () => { setShowLoadConfirm(false); await LoadAggModels(); };
 
-  // Other buttons array
+  // block UI until auth checked
+  if (!authChecked) {
+    return <p style={{ color: '#B4322A', textAlign:'center', marginTop:20 }}>Checking cloud compatibility, please wait...</p>;
+  }
+  if (!authorized) {
+    return <p style={{ color: '#B4322A', textAlign:'center', marginTop:20 }}>{authError}</p>;
+  }
+
   const buttons = [
-    {
-      name: "Sync Data",
-      icon: <IoMdSync size={buttonSize.iconSize} />,
-      action: sync_MetaData_AGG,
-      disabled: false,
-    },
-    {
-      name: "Load Models",
-      icon: <MdSaveAlt size={buttonSize.iconSize} />,
-      action: handleLoadClick,
-      disabled: false,
-    },
-    {
-      name: "Save",
-      icon: <MdOutlineSave size={buttonSize.iconSize} />,
-      action: () => setPageValue("AggSaveScenario"),
-      disabled: false,
-    },
-    {
-      name: "Save & Lock",
-      icon: <CiLock size={buttonSize.iconSize} />,
-      action: () => setPageValue("AggLockScenario"),
-      disabled: false,
-    },
-    {
-      name: "Save Actuals Only",
-      icon: <MdOutlineSave size={buttonSize.iconSize} />,
-      action: () => setPageValue("SaveScenarioActuals"),
-      disabled: false,
-    },
-    {
-      name: "Load Aggregator",
-      icon: <MdSaveAlt size={buttonSize.iconSize} />,
-      action: () => setPageValue("LoadScenarioAgg"),
-      disabled: false,
-    },
+    { name: "Sync Data", icon:<IoMdSync size={buttonSize.iconSize}/>, action:sync_MetaData_AGG, disabled:false },
+    { name: "Load Models", icon:<MdSaveAlt size={buttonSize.iconSize}/>, action:handleLoadClick, disabled:false },
+    { name: "Save", icon:<MdOutlineSave size={buttonSize.iconSize}/>, action:()=>setPageValue("AggSaveScenario"), disabled:false },
+    { name: "Save & Lock", icon:<CiLock size={buttonSize.iconSize}/>, action:()=>setPageValue("AggLockScenario"), disabled:false },
+    { name: "Save Actuals Only", icon:<MdOutlineSave size={buttonSize.iconSize}/>, action:()=>setPageValue("SaveScenarioActuals"), disabled:false },
+    { name: "Load Aggregator", icon:<AiOutlineSetting size={buttonSize.iconSize}/>, action:()=>setPageValue("LoadScenarioAgg"), disabled:false },
   ];
 
   return (
@@ -215,36 +174,21 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
           <BackButtonIcon as={FaArrowLeft} size={24} onClick={onBack} />
           <h1>Forecast Management</h1>
         </WelcomeContainer>
-
         <ButtonsContainer>
           {buttons.map((button, idx) => (
-            <Button
-              key={idx}
-              onClick={!button.disabled ? button.action : undefined}
-              disabled={button.disabled}
-            >
-              <IconWrapper
-                disabled={button.disabled}
-                size={buttonSize.iconSize}
-              >
-                {button.icon}
-              </IconWrapper>
+            <Button key={idx} onClick={!button.disabled?button.action:undefined} disabled={button.disabled}>
+              <IconWrapper disabled={button.disabled} size={buttonSize.iconSize}>{button.icon}</IconWrapper>
               <p className="button-text">{button.name}</p>
-              {button.disabled && (
-                <Tooltip className="tooltip">Feature not activated.</Tooltip>
-              )}
+              {button.disabled && <Tooltip className="tooltip">Feature not activated.</Tooltip>}
             </Button>
           ))}
         </ButtonsContainer>
       </ContentWrapper>
-
       {showLoadConfirm && (
         <Overlay>
           <Modal>
             <ModalHeader>Import Data?</ModalHeader>
-            <ModalBody>
-              Do you want to import data for selected indication and scenarios?
-            </ModalBody>
+            <ModalBody>Do you want to import data for selected indication and scenarios?</ModalBody>
             <ModalFooter>
               <ConfirmButton onClick={handleLoadConfirm}>Yes</ConfirmButton>
               <ConfirmButton onClick={handleLoadCancel}>No</ConfirmButton>

@@ -1,8 +1,12 @@
+// src/pages/ForecastManagementPage.jsx
+
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FaArrowLeft } from "react-icons/fa";
 import { MdSaveAlt, MdOutlineSave } from "react-icons/md";
 import { CiLock } from "react-icons/ci";
-import { DataFrame } from "dataframe-js"; // Ensure DataFrame is imported
+import { DataFrame } from "dataframe-js";
+
+import { specialModelIds } from "../../Middleware/Model Config";
 
 import {
   HomePageContainer,
@@ -16,6 +20,7 @@ import {
 } from "./ForecastManagementPageStyles";
 
 const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
+  // ─── 1️⃣ Local state ───────────────────────────────────────────────────────────
   const [buttonSize, setButtonSize] = useState({
     width: 90,
     height: 75,
@@ -26,15 +31,18 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
   const [modelIDValue, setModelIDValue] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // 1️⃣ Hard-coded DataFrame of allowed IDs
-  const allowedDF = useMemo(() => {
-    return new DataFrame([
-      { model_id: "f4e9582c-9c85-4b21-ae66-4137a1ed1ec5" }, // IDXD Model ID
-      { model_id: "04608048-f59c-4e1a-8921-0eec8b56249b" },// her3 Model ID
-    ]);
-  }, []);
+  // ─── 2️⃣ Build DataFrame of allowed IDs ────────────────────────────────────────
+  const allowedDF = useMemo(
+    () =>
+      new DataFrame(
+        specialModelIds.map((id) => ({
+          model_id: id.toString().trim().toLowerCase(),
+        }))
+      ),
+    []
+  );
 
-  // 2️⃣ Read ModelType & ModelID from the Excel sheet
+  // ─── 3️⃣ Excel check callback ─────────────────────────────────────────────────
   const checkModelType = useCallback(async () => {
     try {
       if (typeof window.Excel === "undefined") return;
@@ -57,12 +65,17 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
         ranges.ModelID.load("values");
         await context.sync();
 
-        const mt = (ranges.ModelType.values[0][0] || "").toString().trim();
-        const id = (ranges.ModelID.values[0][0] || "").toString().trim();
+        const mt = (ranges.ModelType.values[0][0] || "")
+          .toString()
+          .trim();
+        const id = (ranges.ModelID.values[0][0] || "")
+          .toString()
+          .trim();
 
         setModelType(mt);
         setModelIDValue(id);
 
+        // If aggregator, jump to AGG page
         if (mt === "AGGREGATOR") {
           setPageValue(
             "AGGForecastManagementPage",
@@ -75,26 +88,20 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
     }
   }, [setPageValue]);
 
-  // 3️⃣ On mount, run the Excel check
+  // ─── 4️⃣ Run the Excel check on mount ─────────────────────────────────────────
   useEffect(() => {
     checkModelType().finally(() => setLoading(false));
   }, [checkModelType]);
 
-  // 4️⃣ Compute whether Save & Lock should be enabled
+  // ─── 5️⃣ Compute whether Save & Lock should be enabled ────────────────────────
   const saveLockEnabled = useMemo(() => {
-    if (loading) return false;
-    if (modelType === "AGGREGATOR") return false;
-
+    if (loading || modelType === "AGGREGATOR") return false;
     const normId = modelIDValue.toString().trim().toLowerCase();
-    // pull the allowed list out of the DataFrame
-    const allowedIds = allowedDF
-      .toCollection()
-      .map((r) => r.model_id.toString().trim().toLowerCase());
-
+    const allowedIds = allowedDF.toCollection().map((r) => r.model_id);
     return allowedIds.includes(normId);
   }, [loading, modelType, modelIDValue, allowedDF]);
 
-  // 5️⃣ Button definitions
+  // ─── 6️⃣ Button definitions ─────────────────────────────────────────────────
   const buttons = useMemo(
     () => [
       {
@@ -119,7 +126,7 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
     [buttonSize.iconSize, saveLockEnabled, setPageValue]
   );
 
-  // 6️⃣ Responsive sizing logic (unchanged)
+  // ─── 7️⃣ Responsive sizing logic ─────────────────────────────────────────────
   useEffect(() => {
     const updateSize = () => {
       const aw = window.innerWidth - 130;
@@ -139,41 +146,60 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  return (
-    <HomePageContainer>
-      <ContentWrapper>
-        <WelcomeContainer>
-          <BackButtonIcon as={FaArrowLeft} size={24} onClick={onBack} />
-          <h1>Forecast Management</h1>
-        </WelcomeContainer>
-
-        <ButtonsContainer>
-          {buttons.map((btn, i) => (
-            <Button
-              key={i}
-              onClick={!btn.disabled ? btn.action : undefined}
-              disabled={btn.disabled}
-              style={{ width: buttonSize.width, height: buttonSize.height }}
-            >
-              <IconWrapper disabled={btn.disabled} size={buttonSize.iconSize}>
-                {btn.icon}
-              </IconWrapper>
-              <p className="button-text">{btn.name}</p>
-              {btn.disabled && (
-                <Tooltip className="tooltip">
-                  {btn.name === "Save & Lock"
-                    ? loading
-                      ? "Checking permissions..."
-                      : "You’re not allowed for this model."
-                    : "Feature not activated."}
-                </Tooltip>
-              )}
-            </Button>
-          ))}
-        </ButtonsContainer>
+  // ─── 8️⃣ If not a FORECAST model (and not loading), bail out ─────────────────
+  if (!loading && modelType !== "FORECAST") {
+    return (
+      <HomePageContainer>
+        <ContentWrapper>
+          <WelcomeContainer>
+            <BackButtonIcon as={FaArrowLeft} size={24} onClick={onBack} />
+            <h1>Forecast Management</h1>
+          </WelcomeContainer>
+          <p style={{ color: "#B4322A" }} > No authorised models found.</p>
       </ContentWrapper>
-    </HomePageContainer>
-  );
+      </HomePageContainer >
+    );
+  }
+
+// ─── 9️⃣ Main UI ──────────────────────────────────────────────────────────────
+return (
+  <HomePageContainer>
+    <ContentWrapper>
+      <WelcomeContainer>
+        <BackButtonIcon as={FaArrowLeft} size={24} onClick={onBack} />
+        <h1>Forecast Management</h1>
+      </WelcomeContainer>
+
+      <ButtonsContainer>
+        {buttons.map((btn, i) => (
+          <Button
+            key={i}
+            onClick={!btn.disabled ? btn.action : undefined}
+            disabled={btn.disabled}
+            style={{ width: buttonSize.width, height: buttonSize.height }}
+          >
+            <IconWrapper
+              disabled={btn.disabled}
+              size={buttonSize.iconSize}
+            >
+              {btn.icon}
+            </IconWrapper>
+            <p className="button-text">{btn.name}</p>
+            {btn.disabled && (
+              <Tooltip className="tooltip">
+                {btn.name === "Save & Lock"
+                  ? loading
+                    ? "Checking permissions..."
+                    : "Feature not activated."
+                  : "Feature not activated."}
+              </Tooltip>
+            )}
+          </Button>
+        ))}
+      </ButtonsContainer>
+    </ContentWrapper>
+  </HomePageContainer>
+);
 };
 
 export default ForecastManagementPage;

@@ -874,55 +874,130 @@ export async function service_orchestration(
       return pollingResult;
     }
     else if (buttonname === "EXTRACT_DASHBOARD_DATA") {
-      console.log("📤 preparing for Forecast Liobrary Extract");
-      // sedning Extract request for Forecat library
-      let Service_Resut = await Extract_Service_Request(
-        serviceorg_URL,
-        buttonname,
-        UUID_Generated[0],
-        idToken,
-        CONFIG.AWS_SECRETS_NAME,
-        User_Id,
-        ForecastIDS
+      console.log("📤 preparing for Forecast Library Extract");
 
-      )
-      console.log("Service_Resut", Service_Resut);
-      console.log("sednign request for download link");
-
-      let pollingResult = Service_Resut;
-      if (Service_Resut === "Endpoint request timed out" || (Service_Resut && Service_Resut.status === "Poll")) {
-        console.log("⏱️ Service request requires polling");
-        pollingResult = await poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+      // 1) kick off the extract request
+      let Service_Result;
+      try {
+        Service_Result = await Extract_Service_Request(
+          serviceorg_URL,
+          buttonname,
+          UUID_Generated[0],
+          idToken,
+          CONFIG.AWS_SECRETS_NAME,
+          User_Id,
+          ForecastIDS
+        );
+      } catch (err) {
+        console.error("❌ Extract_Service_Request threw:", err);
+        return { status: "ERROR", message: err.message || "Service request failed" };
       }
-      const Extract_download = await AuthorizationData(
-        "EXTRACT_DASHBOARD_DATA",
-        idToken,
-        CONFIG.AWS_SECRETS_NAME,
-        username,
-        UUID_Generated
-      );
+      console.log("Service_Result", Service_Result);
+
+      // 1a) if the service itself returned an error status, bail
+      if (
+        !Service_Result ||
+        (typeof Service_Result === "object" && Service_Result.status === "ERROR") ||
+        (typeof Service_Result === "string" && Service_Result.toLowerCase().includes("error"))
+      ) {
+        const msg = Service_Result?.message || Service_Result || "Service request failed";
+        return { status: "ERROR", message: msg };
+      }
+
+      // 2) if it needs polling, do that
+      let pollingResult = Service_Result;
+      if (
+        Service_Result === "Endpoint request timed out" ||
+        (Service_Result && Service_Result.status === "Poll")
+      ) {
+        console.log("⏱️ Service request requires polling");
+        try {
+          pollingResult = await poll(
+            UUID_Generated[0],
+            CONFIG.AWS_SECRETS_NAME,
+            pollingUrl,
+            idToken
+          );
+        } catch (err) {
+          console.error("❌ Polling failed:", err);
+          return { status: "ERROR", message: err.message || "Polling failed" };
+        }
+      }
+
+      // 2a) if polling came back with error, bail
+      if (pollingResult?.status === "ERROR") {
+        return {
+          status: "ERROR",
+          message: pollingResult.message || "Polling returned an error",
+        };
+      }
+
+      // 3) fetch the presigned download link
+      let Extract_download;
+      try {
+        Extract_download = await AuthorizationData(
+          "EXTRACT_DASHBOARD_DATA",
+          idToken,
+          CONFIG.AWS_SECRETS_NAME,
+          username,
+          UUID_Generated
+        );
+      } catch (err) {
+        console.error("❌ AuthorizationData threw:", err);
+        return { status: "ERROR", message: err.message || "Failed to fetch download link" };
+      }
       console.log("Extract_download", Extract_download);
 
-      const ExtractS3_Downloadlink = Extract_download["presigned urls"]["DOWNLOAD"]["EXTRACT_DASHBOARD_DATA"][UUID_Generated[0]];
-      // const downloadResult = await downloadAndInsertDataFromExcel(ExtractS3_Downloadlink, "Report Genie Backend");
-  
+      const downloadUrls = Extract_download?.["presigned urls"]?.DOWNLOAD?.EXTRACT_DASHBOARD_DATA;
+      const ExtractS3_Downloadlink = downloadUrls && downloadUrls[UUID_Generated[0]];
 
-      await writeUrlToNamedRange(ExtractS3_Downloadlink);
-      await refreshAllDataConnections();
-      // console.time("Pre-processing download data");
-      // let downloadResult = await downloadFileToArray(ExtractS3_Downloadlink);
-      // console.timeEnd("Pre-processing download data");
-      // console.time("flag insertion");
-      // downloadResult = await insertFlagColumn(downloadResult);
-      // console.timeEnd("flag insertion");
-      // console.time("Download and insert data from Excel");
-      // // await writeLargeArrayToTable(downloadResult, "Report Genie Backend");
-      //  await insertWorkbookFromArrayBuffer(downloadResult);
-      // console.timeEnd("Download and insert data from Excel");
+      // 3a) if we didn’t get a valid link, bail
+      if (!ExtractS3_Downloadlink) {
+        return {
+          status: "ERROR",
+          message: "Failed to retrieve download URL from service response",
+        };
+      }
 
-      // console.log(ExtractS3_Downloadlink);
-      return { status: "success", message: "Aggregated models downloaded." };
-    } else if (buttonname === "IMPORT_ASSUMPTIONS_AGG") {
+      // 4) update the workbook and wait for the refresh to finish
+      console.time("Updating URL and waiting for refresh");
+      let DatrefrshFlag;
+      try {
+        DatrefrshFlag = await updateUrlAndWaitForRefresh(
+          ExtractS3_Downloadlink,
+          "Report_Genie_Backend_Cloud"
+        );
+      } catch (err) {
+        console.error("❌ updateUrlAndWaitForRefresh threw:", err);
+        console.timeEnd("Updating URL and waiting for refresh");
+        return { status: "ERROR", message: err.message || "Data refresh failed" };
+      }
+      console.timeEnd("Updating URL and waiting for refresh");
+
+      // 5) conditional return based on the refresh flag
+      const flagStatus =
+        typeof DatrefrshFlag === "string"
+          ? DatrefrshFlag
+          : DatrefrshFlag?.status;
+
+      if (flagStatus && flagStatus.toUpperCase() === "SUCCESS") {
+        return {
+          status: "SUCCESS",
+          message: "Aggregated models downloaded.",
+        };
+      } else {
+        const errMsg =
+          DatrefrshFlag?.message ||
+          DatrefrshFlag?.error ||
+          "Unknown error during data refresh.";
+        return {
+          status: "ERROR",
+          message: `Aggregated models download failed: ${errMsg}`,
+        };
+      }
+    }
+
+    else if (buttonname === "IMPORT_ASSUMPTIONS_AGG") {
 
       let CONSTITUENT_AGG_ID = await ServiceRequest_Fetch_Constituent_ID(
         serviceorg_URL, "FETCH_AGG_CONSTITUENTS", UUID_Generated[0], idToken, CONFIG.AWS_SECRETS_NAME, User_Id, Forecast_UUID[0], Model_UUID);
@@ -2263,51 +2338,51 @@ export async function overwriteViaSheetUltraOptimized(
   const totalRows = bodyRows.length;
   const totalCols = bodyRows[0]?.length || 0;
   const totalCells = totalRows * totalCols;
-  
+
   console.log(`🚀 ULTRA-OPTIMIZED: ${totalRows} rows × ${totalCols} cols = ${totalCells.toLocaleString()} cells`);
-  
+
   await Excel.run(async ctx => {
     let stepTime = performance.now();
-    
+
     // STEP 1: Maximize performance up front
     console.log(`⚡ Suspending screen updates & switching to manual calc mode…`);
     ctx.application.suspendScreenUpdatingUntilNextSync();
     ctx.application.calculationMode = Excel.CalculationMode.manual;
     ctx.application.suspendApiCalculationUntilNextSync();
-    
+
     // STEP 2: Bulk‐load all objects
     console.log(`📋 Loading worksheet & table references…`);
     let ws = ctx.workbook.worksheets.getItemOrNullObject(sheetName);
     ws.load("isNullObject");
-    
+
     const table = ctx.workbook.tables.getItem(tableName);
     const header = table.getHeaderRowRange();
     const bodyRange = table.getDataBodyRange();
-    
+
     header.load(["rowIndex", "columnIndex"]);
     bodyRange.load("isNullObject");
-    
+
     await ctx.sync(); // first sync
     console.log(`⏱️  Load sync took ${(performance.now() - stepTime).toFixed(2)}ms`);
     stepTime = performance.now();
-    
+
     // If sheet didn’t exist, add it now
     if (ws.isNullObject) {
       ws = ctx.workbook.worksheets.add(sheetName);
       console.log(`➕ Created new sheet: ${sheetName}`);
     }
-    
+
     // STEP 3: Clear out old data (queued)
     if (!bodyRange.isNullObject) {
       bodyRange.clear(Excel.ClearApplyTo.contents);
       console.log(`🗑️  Queued clearing of existing table body`);
     }
-    
+
     // STEP 4: Compute write offsets
     const R0 = header.rowIndex + 1;
     const C0 = header.columnIndex;
     console.log(`📍 Writing beginning at row ${R0}, col ${C0}`);
-    
+
     // STEP 5: Write data (queued, no sync yet)
     const MAX_SINGLE_WRITE = 10_000_000;
     if (totalCells <= MAX_SINGLE_WRITE) {
@@ -2318,40 +2393,40 @@ export async function overwriteViaSheetUltraOptimized(
       const OPT_CHUNK = Math.min(4000, Math.floor(MAX_SINGLE_WRITE / totalCols));
       const chunks = Math.ceil(totalRows / OPT_CHUNK);
       console.log(`📦 Queueing ${chunks} chunks of up to ${OPT_CHUNK} rows each…`);
-      
+
       for (let i = 0; i < chunks; i++) {
         const startRow = i * OPT_CHUNK;
         const chunkSize = Math.min(OPT_CHUNK, totalRows - startRow);
         const chunkData = bodyRows.slice(startRow, startRow + chunkSize);
         ws.getRangeByIndexes(R0 + startRow, C0, chunkSize, totalCols).values = chunkData;
-        console.log(`   – Queued chunk ${i+1}/${chunks} (${chunkSize} rows)`);
+        console.log(`   – Queued chunk ${i + 1}/${chunks} (${chunkSize} rows)`);
       }
     }
-    
+
     // STEP 6: Resize the table (queued)
     console.log(`📏 Queueing table resize to fit ${totalRows + 1} rows…`);
     const newTableRange = ws.getRangeByIndexes(header.rowIndex, C0, totalRows + 1, totalCols);
     table.resize(newTableRange);
-    
+
     console.log(`⏱️  All edits queued in ${(performance.now() - stepTime).toFixed(2)}ms`);
     stepTime = performance.now();
-    
+
     // STEP 7: Suspend screen updates again before the big sync
     console.log(`⚡ Suspending screen updates one more time before main sync…`);
     ctx.application.suspendScreenUpdatingUntilNextSync();
-    
+
     console.log(`🔄 Executing all queued operations…`);
     await ctx.sync(); // this is where Excel actually applies everything
-    
+
     console.log(`⏱️  Main sync took ${(performance.now() - stepTime).toFixed(2)}ms`);
-    
+
     // STEP 8: Restore calculation mode (screen updates auto-resume)
     ctx.application.calculationMode = Excel.CalculationMode.automatic;
-    
+
     // Final performance stats
     const totalTime = performance.now() - startTime;
     const cps = totalCells / (totalTime / 1000);
-    console.log(`\n🎉 Completed in ${(totalTime/1000).toFixed(2)}s — ${cps.toLocaleString()} cells/sec`);
+    console.log(`\n🎉 Completed in ${(totalTime / 1000).toFixed(2)}s — ${cps.toLocaleString()} cells/sec`);
     console.log(`🎯 Under 15s?  ${totalTime < 15000 ? '✅ YES' : '❌ NO'}`);
   });
 }
@@ -2409,7 +2484,7 @@ export async function overwriteViaSheetUltraOptimized(
 
 //     // 8) Single final sync
 //     await ctx.sync();
-    
+
 //     // 9) Restore
 //     ctx.application.calculationMode = Excel.CalculationMode.automatic;
 //   });
@@ -2419,13 +2494,13 @@ export async function overwriteViaSheetUltraOptimized(
 /**
  * Convert an ArrayBuffer (or Uint8Array) into a Base64 string.
  *//**
- * Convert an ArrayBuffer (or Uint8Array) into a Base64 string.
- */
+* Convert an ArrayBuffer (or Uint8Array) into a Base64 string.
+*/
 /**
  * Convert an ArrayBuffer into a Base64 string.
  *//**
- * Convert an ArrayBuffer (or Uint8Array) into a Base64 string.
- */
+* Convert an ArrayBuffer (or Uint8Array) into a Base64 string.
+*/
 function arrayBufferToBase64(buffer) {
   var bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   var binary = "";
@@ -2476,40 +2551,133 @@ function arrayBufferToBase64(buffer) {
     .catch(err => console.error("CSV import failed:", err));
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// async function writeUrlToNamedRange(newUrl) {
+//   try {
+//     await Excel.run(async (ctx) => {
+//       // 1) Grab the Name object for "MYURL"
+//       const namedItem = ctx.workbook.names.getItem("MYURL");
+//       namedItem.load("name"); // just to ensure it exists
+//       await ctx.sync();
+
+//       // 2) Get the Range that the name refers to
+//       const targetRange = namedItem.getRange();
+//       // 3) Write your URL into that range (one cell)
+//       targetRange.values = [[ newUrl ]];
+
+//       // 4) Sync back to Excel
+//       await ctx.sync();
+//       console.log(`✅ Wrote "${newUrl}" to named range MYURL`);
+//     });
+//   } catch (error) {
+//     console.error("❌ Failed to write to MYURL:", error);
+//   }
+// }
 
 
-async function writeUrlToNamedRange(newUrl) {
-  try {
-    await Excel.run(async (ctx) => {
-      // 1) Grab the Name object for "MYURL"
-      const namedItem = ctx.workbook.names.getItem("MYURL");
-      namedItem.load("name"); // just to ensure it exists
-      await ctx.sync();
+// async function refreshAllDataConnections() {
+//   try {
+//     await Excel.run(async (ctx) => {
+//       console.log("🔄 Refreshing all data connections...");
+//       ctx.workbook.dataConnections.refreshAll();  // API set: ExcelApi 1.7 :contentReference[oaicite:0]{index=0}
+//       await ctx.sync();
+//       console.log("✅ All data connections have been refreshed.");
+//     });
+//   } catch (error) {
+//     console.error("❌ Error refreshing data connections:", error);
+//   }
+// }
 
-      // 2) Get the Range that the name refers to
-      const targetRange = namedItem.getRange();
-      // 3) Write your URL into that range (one cell)
-      targetRange.values = [[ newUrl ]];
 
-      // 4) Sync back to Excel
-      await ctx.sync();
-      console.log(`✅ Wrote "${newUrl}" to named range MYURL`);
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+/**
+ * Write a new URL to MYURL, refresh all connections, 
+ * and wait until the target table has been updated.
+ *
+ * @param {string} newUrl      The pre‐signed URL to load.
+ * @param {string} tableName   The name of the table your PQ query loads into.
+ * @param {number} [timeout=60] How many seconds to wait before giving up.
+ * @returns {Promise<string>}  Resolves "Success" when data arrives, rejects on error/timeout.
+ */
+function updateUrlAndWaitForRefresh(newUrl, tableName, timeout = 60) {
+  console.log("🚀 [Flow] Starting updateUrlAndWaitForRefresh");
+  let writeStep = "not started";
+  let refreshStep = "not started";
+
+  // STEP 1: Write the URL
+  return Excel.run(async ctx => {
+    writeStep = "getting named range";
+    console.log(`📌 [Step: ${writeStep}]`);
+    const namedItem = ctx.workbook.names.getItem("MYURL");
+    namedItem.load("name");
+    await ctx.sync();
+
+    writeStep = "writing new URL into named range";
+    console.log(`📌 [Step: ${writeStep}] value=`, newUrl);
+    const range = namedItem.getRange();
+    range.values = [[newUrl]];
+    await ctx.sync();
+
+    writeStep = "url written successfully";
+    console.log(`✅ [Step: ${writeStep}]`);
+  })
+    .catch(err => {
+      console.error(`❌ [Error in write step: ${writeStep}]`, {
+        code: err.code || "(no code)",
+        message: err.message,
+        stack: err.stack
+      });
+      throw err;       // propagate to outer Promise
+    })
+    // STEP 2+3: Refresh and wait for table change
+    .then(() => {
+      return new Promise((resolve, reject) => {
+        let pollCount = 0;
+        const maxPolls = Math.ceil(timeout * 1000 / 500);
+
+        Excel.run(async ctx => {
+          refreshStep = "getting table object";
+          console.log(`📌 [Step: ${refreshStep}] tableName=${tableName}`);
+          const tbl = ctx.workbook.tables.getItem(tableName);
+          tbl.load("name");
+          await ctx.sync();
+
+          refreshStep = "registering onChanged handler";
+          console.log(`📌 [Step: ${refreshStep}]`);
+          const handler = tbl.onChanged.add(async event => {
+            handler.remove();
+            await ctx.sync();
+            console.log("✅ [Event] table.onChanged fired:", event);
+            resolve("Success");
+          });
+
+          refreshStep = "triggering dataConnections.refreshAll()";
+          console.log(`📌 [Step: ${refreshStep}]`);
+          ctx.workbook.dataConnections.refreshAll();
+          await ctx.sync();
+          console.log("🔄 [Step done] refreshAll queued");
+        })
+          .catch(err => {
+            console.error(`❌ [Error in refresh step: ${refreshStep}]`, {
+              code: err.code || "(no code)",
+              message: err.message,
+              stack: err.stack
+            });
+            reject(err);
+          });
+
+        // Fallback timeout if no event arrives
+        const ticker = setInterval(() => {
+          pollCount++;
+          if (pollCount >= maxPolls) {
+            clearInterval(ticker);
+            console.error("❌ [Timeout] No table.onChanged after", timeout, "s");
+            reject(new Error(`Timeout waiting ${timeout}s for ${tableName} update`));
+          }
+        }, 500);
+      });
     });
-  } catch (error) {
-    console.error("❌ Failed to write to MYURL:", error);
-  }
-}
-
-
-async function refreshAllDataConnections() {
-  try {
-    await Excel.run(async (ctx) => {
-      console.log("🔄 Refreshing all data connections...");
-      ctx.workbook.dataConnections.refreshAll();  // API set: ExcelApi 1.7 :contentReference[oaicite:0]{index=0}
-      await ctx.sync();
-      console.log("✅ All data connections have been refreshed.");
-    });
-  } catch (error) {
-    console.error("❌ Error refreshing data connections:", error);
-  }
 }

@@ -146,12 +146,12 @@ const FLSyncData = ({ setPageValue }) => {
   return (
     <Container>
       {loading || !metadataLoaded ? (
-        <MessageBox>Loading please wait...</MessageBox>
+        <MessageBox>Checking cloud compatibility, please wait...</MessageBox>
       ) : isOutputSheet ? (
         <>
           <Heading>{heading}</Heading>
           <DropdownContainer>
-            {['saveStatus', 'cycle', 'asset'].map(key => (
+            {[ 'cycle', 'asset','saveStatus'].map(key => (
               <CustomDropdown key={key} ref={dropdownRefs[key]}>
                 <DropdownButton
                   onClick={() => setDropdownOpen(prev => ({ ...prev, [key]: !prev[key] }))}

@@ -170,6 +170,16 @@ const AggSaveScenario = ({ setPageValue }) => {
       console.timeEnd("Total save time request");
       return;
     }
+
+    const allSynced = cloudLoadModelsList.every(row => row[7] === true);
+    if (!allSynced) {
+      setPageValue(
+        "SaveForecastPageinterim",
+        "All Indication Models are not Synced, please load models before saving"
+      );
+      console.timeEnd("Total save time request");
+      return;
+    }
     let concatenatedArray;
     // Concatenate column 1 and column 7 from cloudLoadModelsList with a hyphen in between.
     if (cloudLoadModelsList && cloudLoadModelsList.length > 0) {
