@@ -163,5 +163,16 @@ export const Tooltip = styled("div")({
   },
 });
 
-
-// Removed DisabledOverlay component since we're not using it anymore
+// MessageBox styling for “Checking cloud compatibility, please wait…”
+export const MessageBox = styled("div")({
+  fontFamily: "Roboto, sans-serif",
+  fontWeight: 400,
+  fontSize: "14px",
+  color: "#FF0000",
+  padding: "20px",
+  borderRadius: "8px",
+  backgroundColor: "#FFE0E0",
+  textAlign: "center",
+  marginTop: "20px",
+  width: "90%",
+});

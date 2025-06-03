@@ -1664,3 +1664,22 @@ export async function calculateAndFetchColumnAN(sheetName) {
     return rangeAN.values.flat().filter(val => val !== null && val !== undefined && val !== "");
   });
 }
+
+
+
+
+export async function writeYesNoToNamedRange(rangeName, isYes) {
+  return Excel.run(async (context) => {
+    const namedItem = context.workbook.names.getItem(rangeName);
+    const range = namedItem.getRange();
+
+    // First clear the cell (this helps Excel treat the next write as a true "Change")
+    range.values = [[ "" ]];
+    await context.sync();
+
+    // Now write the actual Yes/No text
+    const textValue = isYes ? "Yes" : "No";
+    range.values = [[ textValue ]];
+    await context.sync();
+  });
+}

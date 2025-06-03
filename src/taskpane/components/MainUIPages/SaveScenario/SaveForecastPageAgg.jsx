@@ -170,8 +170,36 @@ const AggSaveScenario = ({ setPageValue }) => {
       console.timeEnd("Total save time request");
       return;
     }
+    if (
+      Array.isArray(cloudLoadModelsList) &&
+      cloudLoadModelsList.some(row => row[1] !== selectedCycle)
+    ) {
+      setPageValue(
+        "SaveForecastPageinterim",
+        "Selected cycle doesn’t match with the indication models. Please select the correct indication models to proceed with saving the aggregated forecast."
+      );
+      console.timeEnd("Total save time request");
+      return;
+    }
 
-    const allSynced = cloudLoadModelsList.every(row => row[7] === true);
+
+    const allSynced = cloudLoadModelsList.every(row => {
+      const val = row[7];
+
+      // if it’s explicitly false, fail immediately
+      if (val === false) {
+        return false;
+      }
+
+      // if it’s explicitly true, that row passes
+      if (val === true) {
+        return true;
+      }
+
+      // anything else (empty, null, undefined, non-boolean) → ignore (treat as “pass”)
+      return true;
+    });
+
     if (!allSynced) {
       setPageValue(
         "SaveForecastPageinterim",
@@ -180,6 +208,7 @@ const AggSaveScenario = ({ setPageValue }) => {
       console.timeEnd("Total save time request");
       return;
     }
+
     let concatenatedArray;
     // Concatenate column 1 and column 7 from cloudLoadModelsList with a hyphen in between.
     if (cloudLoadModelsList && cloudLoadModelsList.length > 0) {

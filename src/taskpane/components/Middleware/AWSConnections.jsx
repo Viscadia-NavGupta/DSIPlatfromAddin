@@ -832,11 +832,12 @@ export async function service_orchestration(
 
         for (const match of matchedForecasts) {
           try {
+           let RequestID =uuidv4();
             const newUUID = match.forecast_id.replace("forecast_", "");
             const lockStatus = await servicerequest(
               serviceorg_URL,
               "LOCK_FORECAST",
-              uuidv4(),
+              RequestID,
               "",
               idToken,
               CONFIG.AWS_SECRETS_NAME,
@@ -855,7 +856,7 @@ export async function service_orchestration(
               (lockStatus && lockStatus.status === "Poll")
             ) {
               if (lockStatus.status === "Poll" || lockStatus.status === "Endpoint request timed out") {
-                await poll(newUUID, CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+                await poll(RequestID, CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
               }
               completedCount++;
               const pct = 60 + Math.round((completedCount / totalCount) * 30);
@@ -2680,4 +2681,39 @@ function updateUrlAndWaitForRefresh(newUrl, tableName, timeout = 300) {
         }, 500);
       });
     });
+}
+
+/**
+ * Writes the selected cycle, scenario and save-status into a single named-range cell,
+ * each on its own line.
+ *
+ * @param {string} namedRange The name of a single-cell named range in your workbook
+ * @param {string} cycle      The selected cycle value
+ * @param {string} scenario   The selected scenario value
+ * @param {string} status     The selected saveStatus value
+ */
+export async function writeMetadataToNamedCell(namedRange, cycle, scenario, status) {
+  try {
+    await Excel.run(async (context) => {
+      // grab the named range
+      var namedItem = context.workbook.names.getItem(namedRange);
+      var cell = namedItem.getRange();
+
+      // build a single text blob with line breaks
+      var text =
+        "Cycle Name: " + cycle + "\n" +
+        "Scenario Name: " + scenario + "\n" +
+        "Save Status: " + status;
+
+      // write into the one cell
+      cell.values = [[ text ]];
+
+      // enable text wrapping so you see the line breaks
+      cell.format.wrapText = true;
+
+      await context.sync();
+    });
+  } catch (error) {
+    console.error("Error writing metadata to \"" + namedRange + "\":", error);
+  }
 }

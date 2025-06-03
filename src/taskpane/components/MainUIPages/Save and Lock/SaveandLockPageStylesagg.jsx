@@ -143,7 +143,8 @@ export const ModalFooter = styled("div")({
   gap: "12px",
 });
 
-export const Button = styled("button")({
+// ConfirmButton identical to your other pages
+export const ConfirmButton = styled("button")({
   padding: "8px 16px",
   fontFamily: "Roboto, sans-serif",
   fontWeight: 500,

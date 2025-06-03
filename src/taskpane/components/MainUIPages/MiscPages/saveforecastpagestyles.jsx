@@ -35,6 +35,10 @@ export const MessageBox = styled("div")({
   textAlign: "center",
   marginTop: "20px",
   width: "100%",
+
+  // ← preserve newline characters here:
+  whiteSpace: "pre-wrap",
+  wordBreak: "break-word",
 });
 
 export const SaveButton = styled("button")({

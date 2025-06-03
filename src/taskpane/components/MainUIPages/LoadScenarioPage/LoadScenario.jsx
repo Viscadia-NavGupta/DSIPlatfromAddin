@@ -255,6 +255,8 @@ const LoadScenario = ({ setPageValue }) => {
 
         await progressPromise;
 
+       await AWSconnections.writeMetadataToNamedCell("last_scn_update",selectedCycle,selectedScenario,saveStatus);
+
         // Step 3: Complete at 100%
         setImportProgress(100);
         setPageValue("LoadingCircleComponent", "100% | Import completed");

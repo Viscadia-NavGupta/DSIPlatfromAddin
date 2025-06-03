@@ -163,7 +163,7 @@ export const Tooltip = styled("div")({
   },
 });
 
-// --- Modal / Overlay Styles ---
+// ── MODAL / OVERLAY STYLES ─────────────────────────────────────────────────────
 export const Overlay = styled("div")({
   position: "fixed",
   top: 0,
@@ -223,4 +223,18 @@ export const ConfirmButton = styled("button")({
   "&:hover": {
     backgroundColor: "#8A1F1A",
   },
+});
+
+// ── MESSAGEBOX (for loading / error states) ───────────────────────────────────
+export const MessageBox = styled("div")({
+  fontFamily: "Roboto, sans-serif",
+  fontWeight: 400,
+  fontSize: "14px",
+  color: "#FF0000",
+  padding: "20px",
+  borderRadius: "8px",
+  backgroundColor: "#FFE0E0",
+  textAlign: "center",
+  marginTop: "20px",
+  width: "90%",
 });

@@ -1,5 +1,3 @@
-// src/pages/ForecastLibrarypageStyles.js
-
 import { styled } from "@mui/system";
 
 // ── PAGE LAYOUT ───────────────────────────────────────────────────────────────
@@ -225,4 +223,19 @@ export const ConfirmButton = styled("button")({
   "&:hover": {
     backgroundColor: "#8A1F1A",
   },
+});
+
+// ── MESSAGE BOX (for “Checking cloud compatibility…”) ─────────────────────────
+
+export const MessageBox = styled("div")({
+  fontFamily: "Roboto, sans-serif",
+  fontWeight: 400,
+  fontSize: "14px",
+  color: "#FF0000",
+  padding: "20px",
+  borderRadius: "8px",
+  backgroundColor: "#FFE0E0",
+  textAlign: "center",
+  marginTop: "20px",
+  width: "90%",
 });

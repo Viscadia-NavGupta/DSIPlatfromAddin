@@ -12,7 +12,7 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
-  Button,
+  ConfirmButton,  // <-- import ConfirmButton
 } from "./SaveandLockPageStylesagg";
 import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
@@ -53,11 +53,13 @@ const AggLockScenario = ({ setPageValue }) => {
       return new Set(
         dfResult1
           .toCollection()
-          .map(r =>
-            `${(r.model_id ?? "").toString()}|${(r.cycle_name ?? "").toString()}|${(r.scenario_name ?? "")
-              .toString()
-              .trim()
-              .toLowerCase()}`
+          .map((r) =>
+            `${(r.model_id ?? "")
+              .toString()}|${(r.cycle_name ?? "")
+                .toString()}|${(r.scenario_name ?? "")
+                  .toString()
+                  .trim()
+                  .toLowerCase()}`
           )
       ).has(key);
     },
@@ -67,13 +69,13 @@ const AggLockScenario = ({ setPageValue }) => {
   const checkofCloudBackendSheet = useCallback(async () => {
     try {
       if (typeof window.Excel === "undefined") return;
-      await Excel.run(async context => {
+      await Excel.run(async (context) => {
         const sheets = context.workbook.worksheets;
         sheets.load("items/name");
         await context.sync();
 
         const MetaDataSheet = sheets.items.find(
-          sheet => sheet.name.toLowerCase() === "cloud_backend_md"
+          (sheet) => sheet.name.toLowerCase() === "cloud_backend_md"
         );
         if (!MetaDataSheet) {
           setIsOutputSheet(false);
@@ -85,7 +87,7 @@ const AggLockScenario = ({ setPageValue }) => {
           ModelID: MetaDataSheet.getRange("B7"),
           ModelType: MetaDataSheet.getRange("B8"),
         };
-        Object.values(ranges).forEach(r => r.load("values"));
+        Object.values(ranges).forEach((r) => r.load("values"));
 
         const cloudLoadModelsName = context.workbook.names.getItem(
           "Cloud_LoadModels_List"
@@ -133,9 +135,7 @@ const AggLockScenario = ({ setPageValue }) => {
       const df3 = new DataFrame(resp.result3);
 
       setDataFrames({ dfResult1: df1, dfResult2: df2, dfResult3: df3 });
-      setCycleItems(
-        df2.distinct("cycle_name").toArray().map(r => r[0])
-      );
+      setCycleItems(df2.distinct("cycle_name").toArray().map((r) => r[0]));
     } catch (error) {
       console.error(error);
     }
@@ -149,7 +149,7 @@ const AggLockScenario = ({ setPageValue }) => {
     if (!loading && modelIDValue && dataFrames.dfResult3) {
       const authorized = dataFrames.dfResult3
         .toCollection()
-        .some(m => m.model_id === modelIDValue);
+        .some((m) => m.model_id === modelIDValue);
       if (!authorized) {
         setIsOutputSheet(false);
       }
@@ -217,17 +217,17 @@ const AggLockScenario = ({ setPageValue }) => {
     console.log("DataFrame df1 contents:", df1.toCollection());
 
     const prefixedForecastIds = cloudLoadModelsList.map(
-      row => `forecast_${row[6]}`
+      (row) => `forecast_${row[6]}`
     );
     console.log("Prefixed Forecast IDs:", prefixedForecastIds);
 
     const df1Records = df1.toCollection();
     const matchedForecasts = [];
-    prefixedForecastIds.forEach(forecastId => {
+    prefixedForecastIds.forEach((forecastId) => {
       const matches = df1Records.filter(
-        record => record.forecast_id === forecastId
+        (record) => record.forecast_id === forecastId
       );
-      matches.forEach(record => {
+      matches.forEach((record) => {
         matchedForecasts.push({
           model_id: record.model_id,
           forecast_id: record.forecast_id,
@@ -243,7 +243,35 @@ const AggLockScenario = ({ setPageValue }) => {
     console.log("🔹 Using Model ID:", modelIDValue);
     console.log("🔹 Using Model Type:", modelType);
 
-    const allSynced = cloudLoadModelsList.every(row => row[7] === true);
+    if (
+      Array.isArray(cloudLoadModelsList) &&
+      cloudLoadModelsList.some((row) => row[1] !== selectedCycle)
+    ) {
+      setPageValue(
+        "SaveForecastPageinterim",
+        "Selected cycle doesn’t match with the indication models. Please select the correct indication models to proceed with saving the aggregated forecast."
+      );
+      console.timeEnd("Total save time request");
+      return;
+    }
+
+    const allSynced = cloudLoadModelsList.every((row) => {
+      const val = row[7];
+
+      // if it’s explicitly false, fail immediately
+      if (val === false) {
+        return false;
+      }
+
+      // if it’s explicitly true, that row passes
+      if (val === true) {
+        return true;
+      }
+
+      // anything else (empty, null, undefined, non-boolean) → ignore (treat as “pass”)
+      return true;
+    });
+
     if (!allSynced) {
       setPageValue(
         "SaveForecastPageinterim",
@@ -255,7 +283,7 @@ const AggLockScenario = ({ setPageValue }) => {
 
     let concatenatedArray;
     if (cloudLoadModelsList && cloudLoadModelsList.length > 0) {
-      concatenatedArray = cloudLoadModelsList.map(row =>
+      concatenatedArray = cloudLoadModelsList.map((row) =>
         row.length >= 7 ? `${row[0]} - ${row[6]}` : ""
       );
       console.log("Concatenated Columns (1 & 7):", concatenatedArray);
@@ -269,7 +297,7 @@ const AggLockScenario = ({ setPageValue }) => {
 
       const [longformData, _] = await Promise.all([
         excelfucntions.generateLongFormData("US", "DataModel"),
-        inputfiles.saveData(),
+        excelfucntions.saveData(),
       ]);
 
       console.timeEnd("Parallel processes");
@@ -301,10 +329,12 @@ const AggLockScenario = ({ setPageValue }) => {
         saveFlag === "SUCCESS" ||
         (saveFlag && saveFlag.result === "DONE")
       ) {
-        const message = `Forecast scenario saved & locked for model: ${heading.replace(
-          "Save & Lock Aggregator Scenario for: ",
-          ""
-        )} | Cycle: ${selectedCycle} | Scenario: ${scenarioName}`;
+
+
+        const message = `Forecast scenario saved & locked for model: ${heading.replace("Save & Lock Aggregator Scenario for: ", "")}
+Cycle: ${selectedCycle}
+Scenario: ${scenarioName}`;
+
         await AWSconnections.sync_MetaData_AGG(setPageValue);
         excelfucntions.setCalculationMode("automatic");
         setPageValue("SaveForecastPageinterim", message);
@@ -363,7 +393,7 @@ const AggLockScenario = ({ setPageValue }) => {
           <DropdownContainer>
             <SelectDropdown
               value={selectedCycle}
-              onChange={e => setSelectedCycle(e.target.value)}
+              onChange={(e) => setSelectedCycle(e.target.value)}
             >
               <option value="" disabled>
                 Select Cycle
@@ -382,7 +412,7 @@ const AggLockScenario = ({ setPageValue }) => {
               type="text"
               placeholder="Enter Scenario Name"
               value={scenarioName}
-              onChange={e => setScenarioName(e.target.value)}
+              onChange={(e) => setScenarioName(e.target.value)}
             />
           </DropdownContainer>
           <SaveButton
@@ -406,8 +436,15 @@ const AggLockScenario = ({ setPageValue }) => {
                   {selectedCycle}”.
                 </ModalBody>
                 <ModalFooter>
-                  <Button onClick={handleSaveConfirmed}>Yes</Button>
-                  <Button onClick={handleCancel}>No</Button>
+                  <ConfirmButton onClick={handleSaveConfirmed}>
+                    Yes
+                  </ConfirmButton>
+                  <ConfirmButton
+                    style={{ backgroundColor: "#63666A" }}
+                    onClick={handleCancel}
+                  >
+                    No
+                  </ConfirmButton>
                 </ModalFooter>
               </Modal>
             </Overlay>

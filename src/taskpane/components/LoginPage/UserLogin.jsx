@@ -20,7 +20,8 @@ const LoginPage = ({ setPageValue, handleLogin, errorMessage, setErrorMessage })
   const loginUser = async (e) => {
     e.preventDefault();
 
-    const username = e.currentTarget.username.value.trim();
+    // Convert username to lowercase before sending to login
+    const username = e.currentTarget.username.value.trim().toLowerCase();
     const password = e.currentTarget.password.value;
 
     if (!username || !password) {

@@ -24,6 +24,7 @@ import {
   ModalBody,
   ModalFooter,
   ConfirmButton,
+  MessageBox, // ← import the same styled‐MessageBox used in ForecastManagementPage
 } from "./ForecastLibrarypageStyles";
 
 const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
@@ -43,24 +44,34 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
   // Modal for “Load Data” confirmation
   const [showConfirmLoad, setShowConfirmLoad] = useState(false);
 
-  // Responsive sizing
+  // Responsive sizing logic
   const updateSize = () => {
     const availableWidth = window.innerWidth - 130;
     const availableHeight = window.innerHeight - 180;
     const columns = Math.max(2, Math.floor(availableWidth / 110));
     const rows = Math.max(2, Math.floor(availableHeight / 110));
-    const newSize = Math.min(availableWidth / columns, availableHeight / rows, 90);
+    const newSize = Math.min(
+      availableWidth / columns,
+      availableHeight / rows,
+      90
+    );
     const fontSize = `${Math.max(0.7, newSize / 10)}rem`;
     const iconSize = newSize * 0.4;
-    setButtonSize({ width: newSize, height: newSize * 0.8, fontSize, iconSize });
+    setButtonSize({
+      width: newSize,
+      height: newSize * 0.8,
+      fontSize,
+      iconSize,
+    });
   };
+
   useEffect(() => {
     updateSize();
     window.addEventListener("resize", updateSize);
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  // Check cloud backend metadata sheet
+  // 1️⃣ Check cloud backend metadata sheet
   const checkModelAuthorization = async () => {
     try {
       if (typeof window.Excel === "undefined") return;
@@ -96,7 +107,7 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
     }
   };
 
-  // Fetch authorization list
+  // 2️⃣ Fetch authorization data from your Lambda
   const fetchAuthorizationData = async () => {
     try {
       const resp = await AWSconnections.FetchMetaData(
@@ -112,7 +123,7 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
     }
   };
 
-  // On mount
+  // 3️⃣ On mount, run both checks, then clear loading
   useEffect(() => {
     (async () => {
       await Promise.all([checkModelAuthorization(), fetchAuthorizationData()]);
@@ -120,7 +131,7 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
     })();
   }, []);
 
-  // Final authorization check: require both model_id AND model_type match
+  // 4️⃣ Final authorization check once loading is done
   useEffect(() => {
     if (!loading && modelIDValue && modelType && dataFrames.dfResult3) {
       const allowed = dataFrames.dfResult3
@@ -139,7 +150,7 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
     }
   }, [loading, modelIDValue, modelType, dataFrames.dfResult3]);
 
-  // Core load function with progress updates
+  // 5️⃣ Core “Load Data” function with progress updates
   const LoadAggModels = async () => {
     const access = await AWSconnections.ButtonAccess("EXTRACT_DASHBOARD_DATA");
     if (access?.message === "ACCESS DENIED") {
@@ -202,7 +213,7 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
     }
   };
 
-  // Modal handlers
+  // 6️⃣ Modal handlers
   const handleLoadClick = () => setShowConfirmLoad(true);
   const handleConfirmLoad = async () => {
     setShowConfirmLoad(false);
@@ -225,9 +236,16 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
     },
   ];
 
+  // ─── 8️⃣ If still loading, return ONLY the MessageBox (no header at all) ───
+  if (loading) {
+    return <MessageBox>Checking cloud compatibility, please wait...</MessageBox>;
+  }
+
+  // ─── 9️⃣ Once loading is false, render header + conditional body ──────────
   return (
     <HomePageContainer>
       <ContentWrapper>
+        {/** Always show the header with back arrow + title */}
         <WelcomeContainer>
           <BackButtonIcon
             as={FaArrowLeft}
@@ -237,25 +255,34 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
           <h1>Forecast Library</h1>
         </WelcomeContainer>
 
-        {loading ? (
-          <p style={{ color: "#B4322A" }}>Loading...</p>
-        ) : modelIDError ? (
+        {/** Now that loading is false, pick one of these four states: */}
+        {modelIDError ? (
+          // 1) authorization‐failure message
           <p style={{ color: "#B4322A" }}>{modelIDError}</p>
         ) : !isOutputSheet ? (
-          <p style={{ color: "#B4322A" }}>No output sheet found or model not authorized.</p>
+          // 2) missing sheet or id/type pair
+          <p style={{ color: "#B4322A" }}>
+            No output sheet found or model not authorized.
+          </p>
         ) : modelType !== "FORECAST_LIBRARY" ? (
-          <p style={{ color: "#B4322A" }}>Not a authorized forecast Library.</p>
+          // 3) wrong ModelType
+          <p style={{ color: "#B4322A" }}>
+            Not an authorized Forecast Library.
+          </p>
         ) : (
+          // 4) everything ok → show button grid
           <ButtonsContainer>
             {buttons.map((btn, idx) => (
               <Button
                 key={idx}
                 onClick={!btn.disabled ? btn.action : undefined}
                 disabled={btn.disabled}
+                style={{
+                  width: buttonSize.width,
+                  height: buttonSize.height,
+                }}
               >
-                <IconWrapper size={buttonSize.iconSize}>
-                  {btn.icon}
-                </IconWrapper>
+                <IconWrapper size={buttonSize.iconSize}>{btn.icon}</IconWrapper>
                 <p>{btn.name}</p>
                 {btn.disabled && <Tooltip>Feature not activated.</Tooltip>}
               </Button>

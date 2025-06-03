@@ -16,7 +16,7 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
-  Button,
+  ConfirmButton, // ← import ConfirmButton instead of generic Button
 } from "./saveactualsstyles";
 import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
@@ -70,7 +70,6 @@ const SaveScenarioActuals = ({ setPageValue }) => {
   const actualsCycle = "ACTUALS";
 
   const handleInitialClick = useCallback(() => {
-    console.log("Opening confirmation modal");
     setShowConfirm(true);
   }, []);
 
@@ -207,10 +206,7 @@ const SaveScenarioActuals = ({ setPageValue }) => {
 
   useEffect(() => {
     (async () => {
-      await Promise.all([
-        checkofCloudBackendSheet(),
-        fetchDataFromLambda()
-      ]);
+      await Promise.all([checkofCloudBackendSheet(), fetchDataFromLambda()]);
       setLoading(false);
     })();
   }, [checkofCloudBackendSheet, fetchDataFromLambda]);
@@ -266,11 +262,16 @@ const SaveScenarioActuals = ({ setPageValue }) => {
                 <ModalHeader>Submit Actuals?</ModalHeader>
                 <ModalBody>
                   Do you want to submit actuals for cycle “{actualsCycle}” and
-                  scenario “{scenarioName}”? 
+                  scenario “{scenarioName}”?
                 </ModalBody>
                 <ModalFooter>
-                  <Button onClick={handleConfirm}>Yes</Button>
-                  <Button onClick={handleCancel}>No</Button>
+                  <ConfirmButton onClick={handleConfirm}>Yes</ConfirmButton>
+                  <ConfirmButton
+                    style={{ backgroundColor: "#63666A" }}
+                    onClick={handleCancel}
+                  >
+                    No
+                  </ConfirmButton>
                 </ModalFooter>
               </Modal>
             </Overlay>

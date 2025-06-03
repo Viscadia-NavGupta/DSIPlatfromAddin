@@ -17,6 +17,7 @@ import {
   Tooltip,
   BackButtonIcon,
   IconWrapper,
+  MessageBox, // import the loading‐message style
 } from "./ForecastManagementPageStyles";
 
 const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
@@ -95,11 +96,11 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
 
   // ─── 5️⃣ Compute whether Save & Lock should be enabled ────────────────────────
   const saveLockEnabled = useMemo(() => {
-    if (loading || modelType === "AGGREGATOR") return false;
+    if (modelType === "AGGREGATOR") return false;
     const normId = modelIDValue.toString().trim().toLowerCase();
     const allowedIds = allowedDF.toCollection().map((r) => r.model_id);
     return allowedIds.includes(normId);
-  }, [loading, modelType, modelIDValue, allowedDF]);
+  }, [modelType, modelIDValue, allowedDF]);
 
   // ─── 6️⃣ Button definitions ─────────────────────────────────────────────────
   const buttons = useMemo(
@@ -146,8 +147,12 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  // ─── 8️⃣ If not a FORECAST model (and not loading), bail out ─────────────────
-  if (!loading && modelType !== "FORECAST") {
+  // ─── 8️⃣ Conditional rendering ────────────────────────────────────────────────
+  if (loading) {
+    return <MessageBox>Checking cloud compatibility, please wait...</MessageBox>;
+  }
+
+  if (modelType !== "FORECAST") {
     return (
       <HomePageContainer>
         <ContentWrapper>
@@ -155,51 +160,46 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
             <BackButtonIcon as={FaArrowLeft} size={24} onClick={onBack} />
             <h1>Forecast Management</h1>
           </WelcomeContainer>
-          <p style={{ color: "#B4322A" }} > No authorised models found.</p>
-      </ContentWrapper>
-      </HomePageContainer >
+          <p style={{ color: "#B4322A" }}>No authorised Forecast Models found.</p>
+        </ContentWrapper>
+      </HomePageContainer>
     );
   }
 
-// ─── 9️⃣ Main UI ──────────────────────────────────────────────────────────────
-return (
-  <HomePageContainer>
-    <ContentWrapper>
-      <WelcomeContainer>
-        <BackButtonIcon as={FaArrowLeft} size={24} onClick={onBack} />
-        <h1>Forecast Management</h1>
-      </WelcomeContainer>
+  // ─── 9️⃣ Main UI ──────────────────────────────────────────────────────────────
+  return (
+    <HomePageContainer>
+      <ContentWrapper>
+        <WelcomeContainer>
+          <BackButtonIcon as={FaArrowLeft} size={24} onClick={onBack} />
+          <h1>Forecast Management</h1>
+        </WelcomeContainer>
 
-      <ButtonsContainer>
-        {buttons.map((btn, i) => (
-          <Button
-            key={i}
-            onClick={!btn.disabled ? btn.action : undefined}
-            disabled={btn.disabled}
-            style={{ width: buttonSize.width, height: buttonSize.height }}
-          >
-            <IconWrapper
+        <ButtonsContainer>
+          {buttons.map((btn, i) => (
+            <Button
+              key={i}
+              onClick={!btn.disabled ? btn.action : undefined}
               disabled={btn.disabled}
-              size={buttonSize.iconSize}
+              style={{ width: buttonSize.width, height: buttonSize.height }}
             >
-              {btn.icon}
-            </IconWrapper>
-            <p className="button-text">{btn.name}</p>
-            {btn.disabled && (
-              <Tooltip className="tooltip">
-                {btn.name === "Save & Lock"
-                  ? loading
-                    ? "Checking permissions..."
-                    : "Feature not activated."
-                  : "Feature not activated."}
-              </Tooltip>
-            )}
-          </Button>
-        ))}
-      </ButtonsContainer>
-    </ContentWrapper>
-  </HomePageContainer>
-);
+              <IconWrapper disabled={btn.disabled} size={buttonSize.iconSize}>
+                {btn.icon}
+              </IconWrapper>
+              <p className="button-text">{btn.name}</p>
+              {btn.disabled && (
+                <Tooltip className="tooltip">
+                  {btn.name === "Save & Lock"
+                    ? "Feature not activated."
+                    : "Feature not activated."}
+                </Tooltip>
+              )}
+            </Button>
+          ))}
+        </ButtonsContainer>
+      </ContentWrapper>
+    </HomePageContainer>
+  );
 };
 
 export default ForecastManagementPage;
