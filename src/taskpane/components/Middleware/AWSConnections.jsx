@@ -1170,10 +1170,10 @@ export async function uploadFileToS3(sheetName, uploadURL) {
 
     // 3) Attempt upload up to 3 times with 15s timeout each
     let lastError;
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    for (let attempt = 1; attempt <= 4; attempt++) {
       // create controller to abort after 15s
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15_000);
+      const timeoutId = setTimeout(() => controller.abort(), 30_000);
 
       try {
         console.time(`⏱️ Upload attempt ${attempt}`);
@@ -1213,7 +1213,7 @@ export async function uploadFileToS3(sheetName, uploadURL) {
       // if not last attempt, wait 15s before retrying
       if (attempt < 3) {
         console.log(`🔄 Retrying upload in 15 seconds (attempt ${attempt + 1}/3)`);
-        await new Promise(res => setTimeout(res, 15_000));
+        await new Promise(res => setTimeout(res, 30_000));
       }
     }
 
@@ -1356,7 +1356,7 @@ export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, fo
     console.log(`📤 Uploading ${(blob.size / (1024 * 1024)).toFixed(2)} MB to: ${uploadURL}`);
 
     const MAX_RETRIES = 3;
-    const TIMEOUT_MS = 30000;
+    const TIMEOUT_MS = 60000;
     let attempt = 0;
     let success = false;
     let lastError = null;
