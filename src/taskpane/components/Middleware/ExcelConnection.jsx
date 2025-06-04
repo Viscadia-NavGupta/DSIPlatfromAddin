@@ -220,7 +220,7 @@ export async function loadWorkbookData() {
 }
 
 export function parseRangeString(rangeStr) {
-  let match = rangeStr.match(/^(.*?)!\s*([A-Z]+\d+)(?::([A-Z]+\d+))?$/);
+  let match = rangeStr.match(/^(.*?)!\s*([A-Za-z]+\d+)(?::([A-Za-z]+\d+))?$/);
   if (!match) {
     throw new Error("Invalid range format: " + rangeStr);
   }
@@ -1442,7 +1442,7 @@ export async function exportData2() {
 
           // ✅ 12. Parse and Validate Target Range
           let rangeStr = vntControl[i][21].trim();
-          let match = rangeStr.match(/^'?(.*?)'?!([A-Z]+\d+(:[A-Z]+\d+)?)$/);
+          let match = rangeStr.match(/^'?(.*?)'?!([A-Za-z]+\d+(?::[A-Za-z]+\d+)?)$/);
 
           if (!match) {
             console.error(`❌ Invalid range format: ${rangeStr}`);
@@ -1452,6 +1452,7 @@ export async function exportData2() {
 
           let sheetName = match[1].trim();
           let rangeAddress = match[2].trim();
+          rangeAddress = rangeAddress.toUpperCase();
 
           try {
             let targetSheet = workbook.worksheets.getItem(sheetName);
