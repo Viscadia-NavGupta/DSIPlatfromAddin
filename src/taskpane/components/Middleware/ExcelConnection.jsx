@@ -234,6 +234,10 @@ export function parseRangeString(rangeStr) {
     sheetName = sheetName.slice(1, -1);
   }
 
+  // Uppercase both cells
+  startCell = startCell.toUpperCase();
+  endCell = endCell.toUpperCase();
+
   return { sheetName, startCell, endCell };
 }
 
