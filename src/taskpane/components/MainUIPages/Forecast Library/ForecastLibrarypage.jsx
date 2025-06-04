@@ -262,7 +262,7 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
         ) : !isOutputSheet ? (
           // 2) missing sheet or id/type pair
           <p style={{ color: "#B4322A" }}>
-            No output sheet found or model not authorized.
+            Not an authorized Forecast Library.
           </p>
         ) : modelType !== "FORECAST_LIBRARY" ? (
           // 3) wrong ModelType

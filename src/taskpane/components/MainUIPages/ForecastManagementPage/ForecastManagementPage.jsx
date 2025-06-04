@@ -160,7 +160,7 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
             <BackButtonIcon as={FaArrowLeft} size={24} onClick={onBack} />
             <h1>Forecast Management</h1>
           </WelcomeContainer>
-          <p style={{ color: "#B4322A" }}>No authorised Forecast Models found.</p>
+          <p style={{ color: "#B4322A" }}>No authorised Forecast Model found.</p>
         </ContentWrapper>
       </HomePageContainer>
     );
