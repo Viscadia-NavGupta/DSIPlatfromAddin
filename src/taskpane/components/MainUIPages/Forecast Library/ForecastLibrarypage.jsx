@@ -171,6 +171,7 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
     try {
       let ForecastIDS = await Excelconnections.calculateAndFetchColumnAN("Setup");
       ForecastIDS = ForecastIDS.map((item) => item.replace(/^forecast_/, ""));
+      await Excelconnections.setCalculationMode("manual");
       const result = await AWSconnections.service_orchestration(
         "EXTRACT_DASHBOARD_DATA",
         "",
