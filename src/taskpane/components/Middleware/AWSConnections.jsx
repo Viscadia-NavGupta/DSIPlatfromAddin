@@ -951,6 +951,7 @@ export async function service_orchestration(
 
       const downloadUrls = Extract_download?.["presigned urls"]?.DOWNLOAD?.EXTRACT_DASHBOARD_DATA;
       const ExtractS3_Downloadlink = downloadUrls && downloadUrls[UUID_Generated[0]];
+      await updateUrlInNamedRange(ExtractS3_Downloadlink);
 
       // 3a) if we didn’t get a valid link, bail
       if (!ExtractS3_Downloadlink) {
@@ -2684,4 +2685,26 @@ export async function writeMetadataToNamedCell(namedRange, cycle, scenario, stat
   } catch (error) {
     console.error("Error writing metadata to \"" + namedRange + "\":", error);
   }
+}
+function updateUrlInNamedRange(newUrl) {
+  return Excel.run(async (ctx) => {
+    try {
+      // STEP: get the named range called "MYURL"
+      const namedItem = ctx.workbook.names.getItem("MYURL");
+      const range = namedItem.getRange();
+      
+      // STEP: write the new URL
+      range.values = [[newUrl]];
+      await ctx.sync();
+      
+      console.log("✅ URL written into named range MYURL:", newUrl);
+    } catch (err) {
+      console.error("❌ Failed to write URL into named range:", {
+        code: err.code || "(no code)",
+        message: err.message,
+        stack: err.stack,
+      });
+      throw err;
+    }
+  });
 }
