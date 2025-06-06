@@ -156,7 +156,7 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
     if (access?.message === "ACCESS DENIED") {
       setPageValue(
         "SaveForecastPageinterim",
-        "You do not have permission to save forecast."
+        "You do not have permission to use Forecast Library."
       );
       return;
     }
@@ -238,7 +238,7 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
 
   // ─── 8️⃣ If still loading, return ONLY the MessageBox (no header at all) ───
   if (loading) {
-    return <MessageBox>Checking cloud compatibility, please wait...</MessageBox>;
+    return <MessageBox>Connecting to data lake, please wait…</MessageBox>;
   }
 
   // ─── 9️⃣ Once loading is false, render header + conditional body ──────────
@@ -262,12 +262,12 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
         ) : !isOutputSheet ? (
           // 2) missing sheet or id/type pair
           <p style={{ color: "#B4322A" }}>
-            Not an authorized Forecast Library.
+            Current workbook is not a compatible version of Forecast Library. Please open the latest Forecast Library version to use this feature
           </p>
         ) : modelType !== "FORECAST_LIBRARY" ? (
           // 3) wrong ModelType
           <p style={{ color: "#B4322A" }}>
-            Not an authorized Forecast Library.
+            Current workbook is not a compatible version of Forecast Library. Please open the latest Forecast Library version to use this feature
           </p>
         ) : (
           // 4) everything ok → show button grid

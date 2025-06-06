@@ -265,9 +265,9 @@ const AggSaveScenario = ({ setPageValue }) => {
   }, [modelIDValue, selectedCycle, scenarioName, checkScenarioExists, setPageValue, heading, cloudLoadModelsList]);
 
   // Render
-  if (loading) return <MessageBox>Checking cloud compatibility, please wait...</MessageBox>;
+  if (loading) return <MessageBox>Connecting to data lake, please wait…</MessageBox>;
   if (modelIDError) return <MessageBox>{modelIDError}</MessageBox>;
-  if (!isOutputSheet) return <MessageBox>No authorized model detected. Please refresh the add-in.</MessageBox>;
+  if (!isOutputSheet) return <MessageBox> Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature.</MessageBox>;
 
   const isDisabled = !selectedCycle || !scenarioName;
   return (

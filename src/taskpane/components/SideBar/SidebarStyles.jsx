@@ -1,6 +1,6 @@
 import { styled } from "@mui/system";
 
-// ✅ Sidebar Container - Tooltip is positioned here to avoid clipping
+// Sidebar container
 export const SidebarContainer = styled("div")({
   display: "flex",
   flexDirection: "column",
@@ -9,12 +9,12 @@ export const SidebarContainer = styled("div")({
   height: "100vh",
   width: "60px",
   backgroundColor: "#63676B",
-  position: "relative", // ✅ Tooltip is positioned relative to this
+  position: "relative",
   padding: "10px 0",
   overflow: "visible",
 });
 
-// ✅ Sidebar Button Wrapper - Only holds button, tooltip is outside
+// Wrapper for each button
 export const SidebarButtonWrapper = styled("div")({
   position: "relative",
   width: "60px",
@@ -23,7 +23,7 @@ export const SidebarButtonWrapper = styled("div")({
   marginBottom: "5px",
 });
 
-// ✅ Sidebar Button - Turns red on hover & when active
+// Button itself
 export const SidebarButton = styled("button")(({ isActive }) => ({
   width: "50px",
   height: "50px",
@@ -47,31 +47,38 @@ export const SidebarButton = styled("button")(({ isActive }) => ({
   "&:hover": {
     backgroundColor: "#B4322A",
     color: "#fff",
-
     "& svg": {
       fill: "#fff",
     },
   },
+
+  // Native disabled state styling:
+  "&:disabled": {
+    backgroundColor: "transparent",
+    color: "#777",
+    cursor: "not-allowed",
+    "& svg": {
+      fill: "#777",
+    },
+  },
 }));
 
-// ✅ Tooltip Styling - Now properly outside the sidebar buttons
+// Tooltip
 export const TooltipContainer = styled("div")(({ visible }) => ({
-  position: "fixed", // Ensure tooltip is always in view
-  left: "70px", // Ensures it appears outside the sidebar
+  position: "fixed",
   backgroundColor: "#333",
   color: "#fff",
   padding: "6px 10px",
   borderRadius: "5px",
   fontSize: "0.8rem",
   whiteSpace: "nowrap",
-  zIndex: 1000, // Ensures tooltip is above other elements
-  boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",
-  opacity: visible ? 1 : 0, // Toggle visibility dynamically
+  zIndex: 1000,
+  opacity: visible ? 1 : 0,
   visibility: visible ? "visible" : "hidden",
   transition: "opacity 0.2s ease, visibility 0.2s ease",
 }));
 
-// Logout button uses the same style as a sidebar button.
+// Logout uses the same base styling
 export const LogoutButton = styled(SidebarButton)({
   marginTop: "auto",
 });

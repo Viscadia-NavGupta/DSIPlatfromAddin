@@ -221,7 +221,7 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
 
   // 5️⃣ While authorization has not yet completed, show “Checking cloud compatibility…” exactly like in other pages
   if (!authChecked) {
-    return <MessageBox>Checking cloud compatibility, please wait...</MessageBox>;
+    return <MessageBox>Connecting to data lake, please wait… </MessageBox>;
   }
 
   // 6️⃣ After auth check, if not authorized, show the error inside the same styled‐MessageBox

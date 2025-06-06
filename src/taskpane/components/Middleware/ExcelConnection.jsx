@@ -960,12 +960,15 @@ function getRangeDimensions(rangeAddress) {
     // Remove unnecessary characters (e.g., '=' or sheet name)
     let cleanedAddress = rangeAddress.replace(/^=.*?!/, "").replace(/'/g, "");
 
+    // Convert to uppercase so that "e12" becomes "E12"
+    cleanedAddress = cleanedAddress.toUpperCase();
+
     // Check for multi-cell range (e.g., "A1:B10")
     let match = cleanedAddress.match(/([A-Z]+)(\d+):([A-Z]+)(\d+)/);
     if (match) {
       let [, colStart, rowStart, colEnd, rowEnd] = match;
       return {
-        rowCount: Math.abs(parseInt(rowEnd) - parseInt(rowStart)) + 1,
+        rowCount: Math.abs(parseInt(rowEnd, 10) - parseInt(rowStart, 10)) + 1,
         colCount: Math.abs(columnToNumber(colEnd) - columnToNumber(colStart)) + 1,
       };
     }
@@ -982,6 +985,7 @@ function getRangeDimensions(rangeAddress) {
     return { rowCount: 0, colCount: 0 };
   }
 }
+
 
 // Helper function to convert column letters to numbers
 function columnToNumber(col) {

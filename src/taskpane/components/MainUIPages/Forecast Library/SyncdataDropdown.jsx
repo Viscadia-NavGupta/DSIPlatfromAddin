@@ -146,7 +146,7 @@ const FLSyncData = ({ setPageValue }) => {
   return (
     <Container>
       {loading || !metadataLoaded ? (
-        <MessageBox>Checking cloud compatibility, please wait...</MessageBox>
+        <MessageBox>Connecting to data lake, please wait…</MessageBox>
       ) : isOutputSheet ? (
         <>
           <Heading>{heading}</Heading>
@@ -202,7 +202,7 @@ const FLSyncData = ({ setPageValue }) => {
           <SaveButton onClick={handleSyncData}>Sync Data</SaveButton>
         </>
       ) : (
-        <MessageBox>No Authorized Forecast Library detected, please refresh the add-in.</MessageBox>
+        <MessageBox> Not an authorized Forecast Library. - Current workbook is not a compatible version of Forecast Library. Please open the latest Forecast Library version to use this feature</MessageBox>
       )}
     </Container>
   );

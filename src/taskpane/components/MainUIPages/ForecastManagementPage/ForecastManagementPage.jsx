@@ -149,7 +149,7 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
 
   // ─── 8️⃣ Conditional rendering ────────────────────────────────────────────────
   if (loading) {
-    return <MessageBox>Checking cloud compatibility, please wait...</MessageBox>;
+    return <MessageBox>Connecting to data lake, please wait…</MessageBox>;
   }
 
   if (modelType !== "FORECAST") {
@@ -160,7 +160,7 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
             <BackButtonIcon as={FaArrowLeft} size={24} onClick={onBack} />
             <h1>Forecast Management</h1>
           </WelcomeContainer>
-          <p style={{ color: "#B4322A" }}>No authorised Forecast Model found.</p>
+          <p style={{ color: "#B4322A" }}> Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature.</p>
         </ContentWrapper>
       </HomePageContainer>
     );

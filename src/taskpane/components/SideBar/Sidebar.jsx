@@ -17,35 +17,48 @@ import ReportGenie from "../Icons/ReportGenie";
 
 const Sidebar = ({ setPageValue, currentPage, handleLogout }) => {
   const [activePage, setActivePage] = useState(currentPage);
-  const [tooltip, setTooltip] = useState({ text: "", visible: false, top: 0, left: 0 });
+  const [tooltip, setTooltip] = useState({
+    text: "",
+    visible: false,
+    top: 0,
+    left: 0,
+  });
 
   useEffect(() => {
     setActivePage(currentPage);
   }, [currentPage]);
 
   const sidebarButtons = [
-    { name: "Home", icon: <AiOutlineHome size={20} />, action: "Home" },
+    {
+      name: "Home",
+      icon: <AiOutlineHome size={20} />,
+      action: "Home",
+      disabled: false,
+    },
     {
       name: "Model Management",
       icon: <ModelBuilder width={26} height={26} />,
-      action: "SaveForecastPageinterim",
-      message: "Model Management is coming soon. Stay tuned!",
+      action: null,               // No real action when enabled; it stays disabled.
+      disabled: false,             // <– locked feature
+      message: "Feature is locked", // Tooltip text when disabled
     },
     {
       name: "Forecast Management",
       icon: <ForecastManagement width={24} height={24} />,
       action: "ForecastManagement",
+      disabled: false,
     },
     {
       name: "Forecast Library",
       icon: <AssumptionsCatalogue width={24} height={24} />,
       action: "ForecastLibrarypage",
+      disabled: false,
     },
     {
       name: "Power BI Report",
       icon: <PowerBi width={24} height={24} />,
-      // We won’t use `action` here, since we want to open Google instead.
-      action: null,
+      action: null, // we open Google here
+      disabled: false,
     },
   ];
 
@@ -69,27 +82,35 @@ const Sidebar = ({ setPageValue, currentPage, handleLogout }) => {
         {sidebarButtons.map((button, index) => (
           <SidebarButtonWrapper key={index}>
             <SidebarButton
+              disabled={button.disabled} // disable natively if locked
+              isActive={
+                activePage === button.action ||
+                (button.name === "Power BI Report" &&
+                  activePage === "PowerBI")
+              }
               onClick={() => {
+                if (button.disabled) {
+                  // do nothing if locked
+                  return;
+                }
+
                 if (button.name === "Power BI Report") {
                   // Open Google in a new tab
                   window.open("https://www.google.com", "_blank");
                   return;
                 }
 
-                if (button.message) {
-                  setPageValue("SaveForecastPageinterim", button.message);
-                  setActivePage("SaveForecastPageinterim");
-                } else if (button.action) {
+                if (button.action) {
                   setPageValue(button.action);
                   setActivePage(button.action);
                 }
-                // If neither `message` nor a valid `action`, do nothing
               }}
-              isActive={
-                activePage === button.action ||
-                (button.name === "Power BI Report" && activePage === "PowerBI")
+              onMouseEnter={(e) =>
+                handleMouseEnter(
+                  button.disabled ? button.message : button.name,
+                  e
+                )
               }
-              onMouseEnter={(e) => handleMouseEnter(button.name, e)}
               onMouseLeave={handleMouseLeave}
             >
               {button.icon}
@@ -109,7 +130,10 @@ const Sidebar = ({ setPageValue, currentPage, handleLogout }) => {
       </SidebarButtonWrapper>
 
       {tooltip.visible && (
-        <TooltipContainer visible={tooltip.visible} style={{ top: tooltip.top, left: tooltip.left }}>
+        <TooltipContainer
+          visible={tooltip.visible}
+          style={{ top: tooltip.top, left: tooltip.left }}
+        >
           {tooltip.text}
         </TooltipContainer>
       )}

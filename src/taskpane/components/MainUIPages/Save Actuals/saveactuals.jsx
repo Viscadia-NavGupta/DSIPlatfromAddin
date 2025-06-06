@@ -237,7 +237,7 @@ const SaveScenarioActuals = ({ setPageValue }) => {
   return (
     <Container>
       {loading ? (
-        <MessageBox>Checking cloud compatibility, please wait...</MessageBox>
+        <MessageBox>Connecting to data lake, please wait… </MessageBox>
       ) : isOutputSheet ? (
         <>
           <Heading>{heading}</Heading>
@@ -279,7 +279,7 @@ const SaveScenarioActuals = ({ setPageValue }) => {
         </>
       ) : (
         <MessageBox>
-          No authorized model detected, please refresh the add-in
+          Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature. 
         </MessageBox>
       )}
     </Container>

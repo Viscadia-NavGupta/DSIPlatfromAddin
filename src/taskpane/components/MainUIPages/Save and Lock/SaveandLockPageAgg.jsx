@@ -386,7 +386,7 @@ Scenario: ${scenarioName}`;
   return (
     <Container>
       {loading ? (
-        <MessageBox>Checking cloud compatibility, please wait...</MessageBox>
+        <MessageBox>Connecting to data lake, please wait…</MessageBox>
       ) : isOutputSheet ? (
         <>
           <Heading>{heading}</Heading>
@@ -452,7 +452,7 @@ Scenario: ${scenarioName}`;
         </>
       ) : (
         <MessageBox>
-          No Authorised model detected, please refresh the add-in
+          Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature.
         </MessageBox>
       )}
     </Container>

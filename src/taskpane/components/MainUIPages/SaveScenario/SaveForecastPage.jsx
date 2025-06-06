@@ -283,7 +283,7 @@ Scenario: ${scenarioName}`;
   ]);
 
   if (loading) {
-    return <MessageBox>Checking cloud compatibility, please wait...</MessageBox>;
+    return <MessageBox>Connecting to data lake, please wait…</MessageBox>;
   };
   if (modelIDError) {
     return <MessageBox>{modelIDError}</MessageBox>;
@@ -291,7 +291,7 @@ Scenario: ${scenarioName}`;
   if (!isOutputSheet) {
     return (
       <MessageBox>
-        No authorized model found. Please refresh the add-in.
+        Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature.
       </MessageBox>
     );
   };

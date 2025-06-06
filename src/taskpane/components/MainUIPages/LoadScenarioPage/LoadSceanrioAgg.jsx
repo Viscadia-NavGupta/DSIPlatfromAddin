@@ -265,6 +265,8 @@ const LoadScenarioAgg = ({ setPageValue }) => {
         setImportProgress(100);
         setPageValue("LoadingCircleComponent", "100% | Import completed");
 
+         await AWSconnections.writeMetadataToNamedCell("last_scn_update",selectedCycle,selectedScenario,saveStatus);
+
         const modelNameOnly = heading.replace("Import Scenario for: ", "");
         const message = [
           `Forecast scenario imported for:`,
@@ -287,7 +289,7 @@ const LoadScenarioAgg = ({ setPageValue }) => {
   return (
     <Container>
       {loading || !metadataLoaded ? (
-        <MessageBox>Checking cloud compatibility, please wait...</MessageBox>
+        <MessageBox>Connecting to data lake, please wait…</MessageBox>
       ) : isOutputSheet ? (
         <>
           <Heading>{heading}</Heading>
@@ -326,7 +328,7 @@ const LoadScenarioAgg = ({ setPageValue }) => {
           <SaveButton onClick={handleImportClick}>Import Scenario</SaveButton>
         </>
       ) : (
-        <MessageBox>No Authorized model detected, please refresh the add-in.</MessageBox>
+        <MessageBox>Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature.</MessageBox>
       )}
     </Container>
   );
