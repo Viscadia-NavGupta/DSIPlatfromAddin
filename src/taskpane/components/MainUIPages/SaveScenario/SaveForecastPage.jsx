@@ -150,7 +150,7 @@ const SaveScenario = ({ setPageValue }) => {
         .some((m) => (m.model_id ?? "").toString() === modelIDValue);
       if (!authorized) {
         setModelIDError(
-          "Model ID mismatch. The current model is not authorized."
+          "Access to current model is not authorized. Please reach out to support team to gain access."
         );
         setIsOutputSheet(false);
       } else {
@@ -259,7 +259,7 @@ Scenario: ${scenarioName}`;
         (saveFlag && saveFlag.result === "DONE")
       ) {
         setPageValue("SaveForecastPageinterim", message);
-        await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, selectedScenario, saveStatus);
+        await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, scenarioName, "Interim");
       } else {
         setPageValue(
           "SaveForecastPageinterim",

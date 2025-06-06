@@ -85,12 +85,12 @@ const HomePage = ({ userName, setPageValue }) => {
       action: () => setPageValue("ForecastLibrarypage"),
       disabled: false,
     },
-    {
-      name: "Risk & Analytics",
-      icon: <RiskAnalytics width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-      action: () => ProdExcelConnections.exportData2(),
-      disabled: false,
-    },
+    // {
+    //   name: "Risk & Analytics",
+    //   icon: <RiskAnalytics width={buttonSize.iconSize} height={buttonSize.iconSize} />,
+    //   action: () => ProdExcelConnections.exportData2(),
+    //   disabled: false,
+    // },
     {
       name: "Power BI Report",
       icon: <PowerBi width={buttonSize.iconSize} height={buttonSize.iconSize} />,

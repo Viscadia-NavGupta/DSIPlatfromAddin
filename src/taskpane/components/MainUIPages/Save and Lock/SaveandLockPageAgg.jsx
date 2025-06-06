@@ -337,7 +337,7 @@ Scenario: ${scenarioName}`;
 
         await AWSconnections.sync_MetaData_AGG(setPageValue);
         excelfucntions.setCalculationMode("automatic");
-        await AWSconnections.writeMetadataToNamedCell("last_scn_update",selectedCycle,selectedScenario,saveStatus);
+        await AWSconnections.writeMetadataToNamedCell("last_scn_update",selectedCycle,scenarioName,"Locked");
         setPageValue("SaveForecastPageinterim", message);
       } else if (
         saveFlag ===

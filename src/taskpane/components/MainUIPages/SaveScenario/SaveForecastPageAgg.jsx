@@ -145,7 +145,7 @@ const AggSaveScenario = ({ setPageValue }) => {
     if (!loading && modelIDValue && dataFrames.dfResult3) {
       const authorized = dataFrames.dfResult3.toCollection().some((m) => (m.model_id ?? "").toString() === modelIDValue);
       if (!authorized) {
-        setModelIDError("Model ID mismatch. The current model is not authorized.");
+        setModelIDError("Access to current model is not authorized. Please reach out to support team to gain access.");
         setIsOutputSheet(false);
       } else {
         setModelIDError("");
@@ -254,7 +254,7 @@ const AggSaveScenario = ({ setPageValue }) => {
       if (saveFlag === "SUCCESS" || (saveFlag && saveFlag.result === "DONE")) {
         const message = `Forecast scenario saved for\nModel: ${heading.replace("Save Aggregator Scenario for: ", "")}\nCycle: ${selectedCycle}\nScenario: ${scenarioName}`;
         setPageValue("SaveForecastPageinterim", message);
-        await AWSconnections.writeMetadataToNamedCell("last_scn_update",selectedCycle,selectedScenario,saveStatus);
+        await AWSconnections.writeMetadataToNamedCell("last_scn_update",selectedCycle,scenarioName,"Interim");
       } else {
         setPageValue("SaveForecastPageinterim", "Some error occurred while saving, please try again");
       }

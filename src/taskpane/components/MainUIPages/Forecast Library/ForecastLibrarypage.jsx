@@ -196,7 +196,7 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
       if (result?.status === "SUCCESS") {
         setPageValue(
           "SaveForecastPageinterim",
-          "Selected Data is loaded and refreshed"
+          "Data successfully loaded"
         );
       } else {
         const errMsg =

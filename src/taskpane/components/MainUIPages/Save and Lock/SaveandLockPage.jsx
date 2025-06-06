@@ -294,7 +294,7 @@ Scenario: ${scenarioName}`;
         (saveFlag && saveFlag.result === "DONE")
       ) {
         setPageValue("SaveForecastPageinterim", message);
-        await AWSconnections.writeMetadataToNamedCell("last_scn_update",selectedCycle,selectedScenario,saveStatus);
+        await AWSconnections.writeMetadataToNamedCell("last_scn_update",selectedCycle,scenarioName,"Locked");
       } else {
         setPageValue(
           "SaveForecastPageinterim",
