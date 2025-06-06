@@ -958,42 +958,10 @@ export async function service_orchestration(
           status: "ERROR",
           message: "Failed to retrieve download URL from service response",
         };
-      }
-
-      // 4) update the workbook and wait for the refresh to finish
-      console.time("Updating URL and waiting for refresh");
-      let DatrefrshFlag;
-      try {
-        DatrefrshFlag = await updateUrlAndWaitForRefresh(
-          ExtractS3_Downloadlink,
-          "Table7"
-        );
-      } catch (err) {
-        console.error("❌ updateUrlAndWaitForRefresh threw:", err);
-        console.timeEnd("Updating URL and waiting for refresh");
-        return { status: "ERROR", message: err.message || "Data refresh failed" };
-      }
-      console.timeEnd("Updating URL and waiting for refresh");
-
-      // 5) conditional return based on the refresh flag
-      const flagStatus =
-        typeof DatrefrshFlag === "string"
-          ? DatrefrshFlag
-          : DatrefrshFlag?.status;
-
-      if (flagStatus && flagStatus.toUpperCase() === "SUCCESS") {
+      } else (flagStatus && flagStatus.toUpperCase() === "SUCCESS") {
         return {
           status: "SUCCESS",
           message: "Aggregated models downloaded.",
-        };
-      } else {
-        const errMsg =
-          DatrefrshFlag?.message ||
-          DatrefrshFlag?.error ||
-          "Unknown error during data refresh.";
-        return {
-          status: "ERROR",
-          message: `Aggregated models download failed: ${errMsg}`,
         };
       }
     }

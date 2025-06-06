@@ -197,7 +197,7 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
       if (result?.status === "SUCCESS") {
         setPageValue(
           "SaveForecastPageinterim",
-          "Data successfully loaded"
+          "Please configure the workbook."
         );
       } else {
         const errMsg =
