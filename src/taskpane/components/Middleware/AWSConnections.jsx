@@ -958,7 +958,7 @@ export async function service_orchestration(
           status: "ERROR",
           message: "Failed to retrieve download URL from service response",
         };
-      } else (flagStatus && flagStatus.toUpperCase() === "SUCCESS") {
+      } else {
         return {
           status: "SUCCESS",
           message: "Aggregated models downloaded.",
