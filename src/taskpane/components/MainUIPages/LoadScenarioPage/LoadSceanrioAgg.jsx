@@ -265,7 +265,9 @@ const LoadScenarioAgg = ({ setPageValue }) => {
         setImportProgress(100);
         setPageValue("LoadingCircleComponent", "100% | Import completed");
 
-         await AWSconnections.writeMetadataToNamedCell("last_scn_update",selectedCycle,selectedScenario,saveStatus);
+        await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, selectedScenario, saveStatus);
+        await AWSconnections.sync_MetaData_AGG(setPageValue);
+        excelconnections.setCalculationMode("automatic");
 
         const modelNameOnly = heading.replace("Import Scenario for: ", "");
         const message = [
