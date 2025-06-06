@@ -283,6 +283,7 @@ const SaveandLockScenario = ({ setPageValue }) => {
       );
 
       // ← Notice backticks with actual newlines in the template literal:
+      
       const message = `Forecast scenario saved for
 Model: ${heading.replace("Save & Lock Scenario for:", "")}
 Cycle: ${selectedCycle}
@@ -293,6 +294,7 @@ Scenario: ${scenarioName}`;
         (saveFlag && saveFlag.result === "DONE")
       ) {
         setPageValue("SaveForecastPageinterim", message);
+        await AWSconnections.writeMetadataToNamedCell("last_scn_update",selectedCycle,selectedScenario,saveStatus);
       } else {
         setPageValue(
           "SaveForecastPageinterim",

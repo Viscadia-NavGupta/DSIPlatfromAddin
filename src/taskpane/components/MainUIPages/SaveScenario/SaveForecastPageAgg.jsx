@@ -250,9 +250,11 @@ const AggSaveScenario = ({ setPageValue }) => {
         setPageValue
       );
       // Success, Error, and catch-all handling
+
       if (saveFlag === "SUCCESS" || (saveFlag && saveFlag.result === "DONE")) {
         const message = `Forecast scenario saved for\nModel: ${heading.replace("Save Aggregator Scenario for: ", "")}\nCycle: ${selectedCycle}\nScenario: ${scenarioName}`;
         setPageValue("SaveForecastPageinterim", message);
+        await AWSconnections.writeMetadataToNamedCell("last_scn_update",selectedCycle,selectedScenario,saveStatus);
       } else {
         setPageValue("SaveForecastPageinterim", "Some error occurred while saving, please try again");
       }

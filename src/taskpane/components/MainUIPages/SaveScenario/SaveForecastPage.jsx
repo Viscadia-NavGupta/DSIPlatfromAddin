@@ -252,12 +252,14 @@ const SaveScenario = ({ setPageValue }) => {
 Model: ${heading.replace("Save Scenario for:", "")}
 Cycle: ${selectedCycle}
 Scenario: ${scenarioName}`;
+      
 
       if (
         saveFlag === "SUCCESS" ||
         (saveFlag && saveFlag.result === "DONE")
       ) {
         setPageValue("SaveForecastPageinterim", message);
+        await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, selectedScenario, saveStatus);
       } else {
         setPageValue(
           "SaveForecastPageinterim",
