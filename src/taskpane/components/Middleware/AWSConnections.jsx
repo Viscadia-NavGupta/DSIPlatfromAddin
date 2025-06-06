@@ -2603,7 +2603,7 @@ function arrayBufferToBase64(buffer) {
  * @param {number} [timeout=60] How many seconds to wait before giving up.
  * @returns {Promise<string>}  Resolves "Success" when data arrives, rejects on error/timeout.
  */
-function updateUrlAndWaitForRefresh(newUrl, tableName, timeout = 300) {
+function updateUrlAndWaitForRefresh(newUrl, tableName, timeout = 500) {
   console.log("🚀 [Flow] Starting updateUrlAndWaitForRefresh");
   let writeStep = "not started";
   let refreshStep = "not started";

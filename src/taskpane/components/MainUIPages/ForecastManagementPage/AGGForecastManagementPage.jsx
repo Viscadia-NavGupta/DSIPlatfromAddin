@@ -80,7 +80,7 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
             (s) => s.name.toLowerCase() === "cloud_backend_md"
           );
           if (!md) {
-            setAuthError("No authorized model found. Please refresh the add-in.");
+            setAuthError("Access to current model is not authorized. Please reach out to support team to gain access.");
             setAuthChecked(true);
             return;
           }
