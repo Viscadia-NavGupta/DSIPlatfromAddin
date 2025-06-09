@@ -63,7 +63,7 @@ const HomePage = ({ userName, setPageValue }) => {
 
   // Function to open Google (or Power BI link) in a new tab
   const handleOpenGoogle = () => {
-    window.open("https://www.google.com", "_blank");
+    window.open("https://app.powerbi.com/groups/8432e502-aff3-49cd-9ad9-e3ccb1ab4eea/reports/1fb0132c-fcf1-4bd5-9ce8-37d7e35adb0e/ca00450869d3c67885cf?experience=power-bi", "_blank");
   };
 
   const buttons = [
