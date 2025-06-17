@@ -197,7 +197,7 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
       if (result?.status === "SUCCESS") {
         setPageValue(
           "SaveForecastPageinterim",
-          "Data loaded successfully. Please press the 'Configure' button to reflect latest changes"
+          "Data loaded successfully. Please press the 'Refresh Slicers' button to reflect latest changes"
         );
       } else {
         const errMsg =

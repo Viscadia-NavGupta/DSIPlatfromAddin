@@ -1590,57 +1590,55 @@ export async function refreshPivotTable(sheetName, pivotTableName) {
 
 export async function MetaDataSyncwithoutheaders(apiResponse, sheetName, startRange) {
   await Excel.run(async (context) => {
-    // Improve performance by switching to manual calculation
     context.workbook.application.calculation = Excel.CalculationMode.manual;
 
     try {
-      // Load worksheet names
+      // Load sheets
       const worksheets = context.workbook.worksheets;
       worksheets.load('items/name');
       await context.sync();
 
-      // Find the specified sheet
       const sheet = worksheets.items.find(item => item.name === sheetName);
-      if (!sheet) {
-        throw new Error(`Sheet "${sheetName}" not found.`);
-      }
+      if (!sheet) throw new Error(`Sheet "${sheetName}" not found.`);
 
-      // Get the data array
       const results = apiResponse.results1;
       if (!Array.isArray(results) || results.length === 0) {
         console.error('No data available to write.');
         return;
       }
 
-      // Determine column order from first object
       const columns = Object.keys(results[0]);
-
-      // Build rows without headers
       const dataRows = results.map(row =>
         columns.map(col => row[col])
       );
 
-      // Clear existing contents (adjust range if needed)
-      sheet.getRange('A2:Z1000').clear();
+      const table = sheet.tables.getItem('Table5');
 
-      // Get starting cell
-      const startCell = sheet.getRange(startRange);
+      // Clear old data and formatting
+      sheet.getRange('A2:Z1000').clear(Excel.ClearApplyTo.all);
 
-      // Resize to match dataRows (rows x columns)
-      const writeRange = startCell.getResizedRange(
+      // Write new data
+      const dataStartCell = sheet.getRange(startRange);
+      const dataRange = dataStartCell.getResizedRange(
         dataRows.length - 1,
         columns.length - 1
       );
+      dataRange.values = dataRows;
 
-      // Write only the data rows
-      writeRange.values = dataRows;
+      // Now resize the table including header row
+      const headerRowCell = dataStartCell.getOffsetRange(-1, 0); // startRange is A2, header is A1
+      const fullTableRange = headerRowCell.getResizedRange(
+        dataRows.length, // +1 header
+        columns.length - 1
+      );
+      table.resize(fullTableRange);
 
-      // Autofit columns for readability
-      writeRange.format.autofitColumns();
+      // Auto-fit
+      fullTableRange.format.autofitColumns();
+
     } catch (error) {
       console.error('Error writing to Excel:', error);
     } finally {
-      // Restore automatic calculation and sync changes
       context.workbook.application.calculation = Excel.CalculationMode.automatic;
       await context.sync();
     }
