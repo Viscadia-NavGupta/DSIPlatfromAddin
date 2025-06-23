@@ -5,7 +5,11 @@ const LoadingCircleComponent = ({ message = "Running calculations..." }) => {
   return (
     <Overlay>
       <LoadingContainer>
-        <LoadingCircle />
+        <LoadingCircle>
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} />
+          ))}
+        </LoadingCircle>
         <LoadingMessage>{message}</LoadingMessage>
       </LoadingContainer>
     </Overlay>

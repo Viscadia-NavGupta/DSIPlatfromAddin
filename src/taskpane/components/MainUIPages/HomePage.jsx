@@ -88,7 +88,7 @@ const HomePage = ({ userName, setPageValue }) => {
     // {
     //   name: "Risk & Analytics",
     //   icon: <RiskAnalytics width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-    //   action: () => ProdExcelConnections.exportData2(),
+    //   action: () => ProdExcelConnections.generateLongFormData("US", "DataModel"),
     //   disabled: false,
     // },
     {

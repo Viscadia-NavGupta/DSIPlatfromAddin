@@ -1,5 +1,3 @@
-// src/pages/SaveandLockScenario.jsx
-
 import React, {
   useState,
   useEffect,
@@ -38,6 +36,8 @@ const SaveandLockScenario = ({ setPageValue }) => {
   const [modelType, setModelType] = useState("");
   const [modelIDError, setModelIDError] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showOverwriteWarning, setShowOverwriteWarning] = useState(false);
+  const [lockedScenarioInfo, setLockedScenarioInfo] = useState(null);
 
   const [dataFrames, setDataFrames] = useState({
     dfResult1: null,
@@ -45,7 +45,6 @@ const SaveandLockScenario = ({ setPageValue }) => {
     dfResult3: null,
   });
 
-  // Build a Set of existing (modelId|cycle|scenario) keys
   const scenarioSet = useMemo(() => {
     const df = dataFrames.dfResult1;
     if (!df) return new Set();
@@ -67,76 +66,85 @@ const SaveandLockScenario = ({ setPageValue }) => {
   const checkScenarioExists = useCallback(
     (modelId, cycleName, scenarioName) => {
       if (!dataFrames.dfResult1) return false;
-      const key = `${modelId}|${cycleName}|${scenarioName
-        .trim()
-        .toLowerCase()}`;
+      const key = `${modelId}|${cycleName}|${scenarioName.trim().toLowerCase()}`;
       return scenarioSet.has(key);
     },
     [dataFrames.dfResult1, scenarioSet]
   );
 
-  // Read “CloudBackend” sheet from Excel to set heading, modelID, modelType
-  const checkofCloudBackendSheet = useCallback(
-    async () => {
-      try {
-        if (!window.Excel) return;
-        await Excel.run(async (context) => {
-          const sheets = context.workbook.worksheets;
-          sheets.load("items/name");
-          await context.sync();
+  const checkLockedScenarioExists = useCallback(
+    (modelId, cycleName) => {
+      if (!dataFrames.dfResult1) return false;
+      const match = dataFrames.dfResult1
+        .toCollection()
+        .find(
+          (r) =>
+            (r.model_id ?? '').toString().trim() === modelId &&
+            (r.cycle_name ?? '').toString().trim() === cycleName &&
+            (r.save_status ?? '').toString().trim().toLowerCase() === 'locked'
+        );
 
-          const mdSheet = sheets.items.find(
-            (s) => s.name.toLowerCase() === "cloud_backend_md"
-          );
-          if (!mdSheet) {
-            setIsOutputSheet(false);
-            return;
-          }
-
-          const ranges = {
-            ModelName: mdSheet.getRange("B5"),
-            ModelID: mdSheet.getRange("B7"),
-            ModelType: mdSheet.getRange("B8"),
-          };
-          Object.values(ranges).forEach((r) => r.load("values"));
-          await context.sync();
-
-          const nameVal = (ranges.ModelName.values[0][0] ?? "")
-            .toString()
-            .trim();
-          const idVal = (ranges.ModelID.values[0][0] ?? "")
-            .toString()
-            .trim();
-          const typeVal = (ranges.ModelType.values[0][0] ?? "")
-            .toString()
-            .trim();
-
-          if (!nameVal || !idVal || !typeVal) {
-            setIsOutputSheet(false);
-            return;
-          }
-
-          setHeading(`Save & Lock Scenario for: ${nameVal}`);
-          setModelIDValue(idVal);
-          setModelType(typeVal);
-          setIsOutputSheet(true);
-
-          if (typeVal === "AGGREGATOR") {
-            setPageValue(
-              "AggSaveScenario",
-              "Loading scenario for Aggregator model..."
-            );
-          }
+      if (match) {
+        setLockedScenarioInfo({
+          scenarioName: match.scenario_name ?? '',
+          cycleName: match.cycle_name ?? ''
         });
-      } catch (error) {
-        console.error("Error checking Outputs sheet:", error);
-        setIsOutputSheet(false);
+        return true;
       }
+
+      return false;
     },
-    [setPageValue]
+    [dataFrames.dfResult1]
   );
 
-  // Fetch metadata from Lambda and populate dataFrames & cycleItems
+  const checkofCloudBackendSheet = useCallback(async () => {
+    try {
+      if (!window.Excel) return;
+      await Excel.run(async (context) => {
+        const sheets = context.workbook.worksheets;
+        sheets.load("items/name");
+        await context.sync();
+
+        const mdSheet = sheets.items.find(
+          (s) => s.name.toLowerCase() === "cloud_backend_md"
+        );
+        if (!mdSheet) {
+          setIsOutputSheet(false);
+          return;
+        }
+
+        const ranges = {
+          ModelName: mdSheet.getRange("B5"),
+          ModelID: mdSheet.getRange("B7"),
+          ModelType: mdSheet.getRange("B8"),
+        };
+        Object.values(ranges).forEach((r) => r.load("values"));
+        await context.sync();
+
+        const nameVal = (ranges.ModelName.values[0][0] ?? "").toString().trim();
+        const idVal = (ranges.ModelID.values[0][0] ?? "").toString().trim();
+        const typeVal = (ranges.ModelType.values[0][0] ?? "").toString().trim();
+
+        if (!nameVal || !idVal || !typeVal) {
+          setIsOutputSheet(false);
+          return;
+        }
+
+        setHeading(`Save & Lock Scenario for: ${nameVal}`);
+        setModelIDValue(idVal);
+        setModelType(typeVal);
+        setIsOutputSheet(true);
+
+        if (typeVal === "AGGREGATOR") {
+          setPageValue("AggSaveScenario", "Loading scenario for Aggregator model...");
+        }
+      });
+    } catch (error) {
+      console.error("Error checking Outputs sheet:", error);
+      setIsOutputSheet(false);
+    }
+  }, [setPageValue]);
+
   const fetchDataFromLambda = useCallback(async () => {
     try {
       const resp = await AWSconnections.FetchMetaData(
@@ -164,7 +172,6 @@ const SaveandLockScenario = ({ setPageValue }) => {
     }
   }, []);
 
-  // On mount: run both checks, then clear loading
   useEffect(() => {
     (async () => {
       try {
@@ -177,16 +184,13 @@ const SaveandLockScenario = ({ setPageValue }) => {
     })();
   }, [checkofCloudBackendSheet, fetchDataFromLambda]);
 
-  // After data loads, verify modelIDValue is allowed
   useEffect(() => {
     if (!loading && modelIDValue && dataFrames.dfResult3) {
       const allowed = dataFrames.dfResult3
         .toCollection()
         .some((m) => (m.model_id ?? "").toString() === modelIDValue);
       if (!allowed) {
-        setModelIDError(
-          "Model ID mismatch. The current model is not authorized."
-        );
+        setModelIDError("Model ID mismatch. The current model is not authorized.");
         setIsOutputSheet(false);
       } else {
         setModelIDError("");
@@ -194,14 +198,16 @@ const SaveandLockScenario = ({ setPageValue }) => {
     }
   }, [loading, modelIDValue, dataFrames.dfResult3]);
 
-  // Show the confirmation modal
   const handleSaveClick = useCallback(() => {
-    setShowConfirm(true);
-  }, []);
+    const lockedExists = checkLockedScenarioExists(modelIDValue, selectedCycle);
+    if (lockedExists) {
+      setShowOverwriteWarning(true);
+    } else {
+      setShowConfirm(true);
+    }
+  }, [checkLockedScenarioExists, modelIDValue, selectedCycle]);
 
-  // User confirmed “Yes” → save + lock logic
-  const handleSaveConfirmed = useCallback(async () => {
-    setShowConfirm(false);
+  const proceedWithSave = useCallback(async () => {
     console.time("Total save time request");
     setPageValue("LoadingCircleComponent", "0% | Checking Access...");
 
@@ -215,53 +221,17 @@ const SaveandLockScenario = ({ setPageValue }) => {
       return;
     }
 
-    if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
-      setPageValue(
-        "SaveForecastPageinterim",
-        "Scenario names already exist… choose a different one."
-      );
-      return;
-    }
-
     try {
-      // Switch Excel to Manual calc
       await excelfucntions.setCalculationMode("manual");
       setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
 
       let longformData;
       let outputbackend_data = [];
 
-      if (specialModelIds.includes(modelIDValue)) {
-        // Special‐model flow: generate long form and skip saveData
-        try {
-          [longformData] = await Promise.all([
-            excelfucntions.generateLongFormData("US", "DataModel"),
-            excelfucntions.saveData(),
-          ]);
-        } catch (err) {
-          console.error("Error in special flow:", err);
-          setPageValue(
-            "SaveForecastPageinterim",
-            "Some error occurred while saving, please try again"
-          );
-          return;
-        }
-      } else {
-        // Default flow: generate long form + saveData
-        try {
-          [longformData] = await Promise.all([
-            excelfucntions.generateLongFormData("US", "DataModel"),
-            excelfucntions.saveData(),
-          ]);
-        } catch (err) {
-          console.error("Error in default flow:", err);
-          setPageValue(
-            "SaveForecastPageinterim",
-            "Some error occurred while saving, please try again"
-          );
-          return;
-        }
-      }
+      [longformData] = await Promise.all([
+        excelfucntions.generateLongFormData("US", "DataModel"),
+        excelfucntions.saveData(),
+      ]);
 
       setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
 
@@ -282,46 +252,38 @@ const SaveandLockScenario = ({ setPageValue }) => {
         setPageValue
       );
 
-      // ← Notice backticks with actual newlines in the template literal:
-      
       const message = `Forecast scenario saved for
 Model: ${heading.replace("Save & Lock Scenario for:", "")}
 Cycle: ${selectedCycle}
 Scenario: ${scenarioName}`;
 
-      if (
-        saveFlag === "SUCCESS" ||
-        (saveFlag && saveFlag.result === "DONE")
-      ) {
+      if (saveFlag === "SUCCESS" || (saveFlag && saveFlag.result === "DONE")) {
         setPageValue("SaveForecastPageinterim", message);
-        await AWSconnections.writeMetadataToNamedCell("last_scn_update",selectedCycle,scenarioName,"Locked");
+        await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, scenarioName, "Locked");
       } else {
-        setPageValue(
-          "SaveForecastPageinterim",
-          "Some error occurred while saving, please try again"
-        );
+        setPageValue("SaveForecastPageinterim", "Some error occurred while saving, please try again");
       }
     } catch (error) {
       console.error("Unhandled error:", error);
-      setPageValue(
-        "SaveForecastPageinterim",
-        "Some error occurred while saving, please try again"
-      );
+      setPageValue("SaveForecastPageinterim", "Some error occurred while saving, please try again");
     } finally {
       console.timeEnd("Total save time request");
     }
-  }, [
-    modelIDValue,
-    selectedCycle,
-    scenarioName,
-    checkScenarioExists,
-    setPageValue,
-    heading,
-  ]);
+  }, [heading, modelIDValue, scenarioName, selectedCycle, setPageValue]);
+
+  const handleSaveConfirmed = useCallback(async () => {
+    setShowConfirm(false);
+
+    if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
+      setPageValue("SaveForecastPageinterim", "Scenario names already exist… choose a different one.");
+      return;
+    }
+
+    await proceedWithSave();
+  }, [modelIDValue, selectedCycle, scenarioName, checkScenarioExists, proceedWithSave]);
 
   const handleCancel = () => setShowConfirm(false);
 
-  // Render states:
   if (loading) {
     return <MessageBox>Connecting to data lake, please wait… </MessageBox>;
   }
@@ -331,7 +293,7 @@ Scenario: ${scenarioName}`;
   if (!isOutputSheet) {
     return (
       <MessageBox>
-       Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature.
+        Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature.
       </MessageBox>
     );
   }
@@ -375,8 +337,7 @@ Scenario: ${scenarioName}`;
           <Modal>
             <ModalHeader>You are locking a scenario</ModalHeader>
             <ModalBody>
-              Please confirm you want to lock “{scenarioName}” on cycle “
-              {selectedCycle}”.
+              Please confirm you want to lock “{scenarioName}” on cycle “{selectedCycle}”.
             </ModalBody>
             <ModalFooter>
               <ConfirmButton onClick={handleSaveConfirmed}>Yes</ConfirmButton>
@@ -385,6 +346,35 @@ Scenario: ${scenarioName}`;
                 onClick={handleCancel}
               >
                 No
+              </ConfirmButton>
+            </ModalFooter>
+          </Modal>
+        </Overlay>
+      )}
+
+      {showOverwriteWarning && (
+        <Overlay>
+          <Modal>
+            <ModalHeader>Overwrite Locked Scenario</ModalHeader>
+            <ModalBody>
+              A scenario is already locked for cycle “{lockedScenarioInfo?.cycleName}” and Scenario Name: “{lockedScenarioInfo?.scenarioName}”<br />
+              Proceeding will move the existing locked scenario to the Interim.<br />
+              Do you want to continue?
+            </ModalBody>
+            <ModalFooter>
+              <ConfirmButton
+                onClick={() => {
+                  setShowOverwriteWarning(false);
+                  proceedWithSave();
+                }}
+              >
+                Yes, Continue
+              </ConfirmButton>
+              <ConfirmButton
+                style={{ backgroundColor: "#63666A" }}
+                onClick={() => setShowOverwriteWarning(false)}
+              >
+                Cancel
               </ConfirmButton>
             </ModalFooter>
           </Modal>
