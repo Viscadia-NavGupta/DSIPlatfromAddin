@@ -832,9 +832,9 @@ export async function service_orchestration(
 
         for (const match of matchedForecasts) {
           try {
-           let RequestID =uuidv4();
+            const RequestID = uuidv4();
             const newUUID = match.forecast_id.replace("forecast_", "");
-            const lockStatus = await servicerequest(
+            const rawLockStatus = await servicerequest(
               serviceorg_URL,
               "LOCK_FORECAST",
               RequestID,
@@ -848,22 +848,34 @@ export async function service_orchestration(
               newUUID
             );
 
-            // check for success conditions
-            if (
-              lockStatus === "Forecast is already locked" ||
-              lockStatus === "Forecast locked successfully" ||
-              lockStatus === "SUCCESS" ||
-              (lockStatus && lockStatus.status === "Poll")
-            ) {
-              if (lockStatus.status === "Poll" || lockStatus.status === "Endpoint request timed out") {
-                await poll(RequestID, CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
-              }
-              completedCount++;
-              const pct = 60 + Math.round((completedCount / totalCount) * 30);
-              setPageValue("LoadingCircleComponent", `${pct}% | Saving your forecast...`);
-            } else {
-              throw new Error(`Unexpected lock response: ${JSON.stringify(lockStatus)}`);
+            // Normalize into a single string status
+            const status =
+              typeof rawLockStatus === "string"
+                ? rawLockStatus
+                : rawLockStatus.status || rawLockStatus;
+
+            // Define all the statuses we consider “okay”
+            const accepted = new Set([
+              "Forecast is already locked",
+              "Forecast locked successfully",
+              "SUCCESS",
+              "Poll",
+              "Endpoint request timed out",
+            ]);
+
+            if (!accepted.has(status)) {
+              throw new Error(`Unexpected lock response: ${JSON.stringify(rawLockStatus)}`);
             }
+
+            // If we need to poll (either Poll or timed out), do it
+            if (status === "Poll" || status === "Endpoint request timed out") {
+              await poll(RequestID, CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+            }
+
+            // Update completion and UI
+            completedCount++;
+            const pct = 60 + Math.round((completedCount / totalCount) * 30);
+            setPageValue("LoadingCircleComponent", `${pct}% | Saving your forecast...`);
           } catch (err) {
             console.error("❌ Error locking forecast", match.forecast_id, err);
             return { status: "error", message: err.message };
@@ -2675,7 +2687,7 @@ export async function writeMetadataToNamedCell(namedRange, cycle, scenario, stat
         "Save Status: " + status;
 
       // write into the one cell
-      cell.values = [[ text ]];
+      cell.values = [[text]];
 
       // enable text wrapping so you see the line breaks
       cell.format.wrapText = true;
@@ -2692,11 +2704,11 @@ function updateUrlInNamedRange(newUrl) {
       // STEP: get the named range called "MYURL"
       const namedItem = ctx.workbook.names.getItem("MYURL");
       const range = namedItem.getRange();
-      
+
       // STEP: write the new URL
       range.values = [[newUrl]];
       await ctx.sync();
-      
+
       console.log("✅ URL written into named range MYURL:", newUrl);
     } catch (err) {
       console.error("❌ Failed to write URL into named range:", {
