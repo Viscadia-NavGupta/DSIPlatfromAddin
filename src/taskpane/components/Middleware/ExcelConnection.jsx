@@ -1476,6 +1476,9 @@ export async function exportData2() {
       }
 
       // console.log("✅ Inputs have been imported successfully!");
+      dataModelSheet.visibility === Excel.SheetVisibility.hidden;
+      await context.sync();
+
 
       // ✅ 14. Error Logging
       if (blnRangeCheck) {
