@@ -95,7 +95,7 @@ const HomePage = ({ userName, setPageValue }) => {
       name: "Power BI Report",
       icon: <PowerBi width={buttonSize.iconSize} height={buttonSize.iconSize} />,
       // ← Changed this to open Google (or any URL) instead of saveData()
-      action: handleOpenGoogle,
+      action: () => setPageValue("PowerbiManegment"),
       disabled: false,
     },
     // {

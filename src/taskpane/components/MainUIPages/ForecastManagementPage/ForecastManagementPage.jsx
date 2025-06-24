@@ -190,8 +190,8 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
               {btn.disabled && (
                 <Tooltip className="tooltip">
                   {btn.name === "Save & Lock"
-                    ? "Feature not activated."
-                    : "Feature not activated."}
+                    ? ""
+                    : ""}
                 </Tooltip>
               )}
             </Button>

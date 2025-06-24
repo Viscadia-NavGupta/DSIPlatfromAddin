@@ -29,18 +29,20 @@ const AggLockScenario = ({ setPageValue }) => {
   const [heading, setHeading] = useState("Active Sheet Name");
   const [isOutputSheet, setIsOutputSheet] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showConfirm, setShowConfirm] = useState(false);
+
+  // modals
+  const [showRefreshPrompt, setShowRefreshPrompt] = useState(false);
   const [showLockedWarning, setShowLockedWarning] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
   const [lockedScenarioInfo, setLockedScenarioInfo] = useState(null);
 
-  // NEW: prompt to check if tabular summary has been refreshed
-  const [showRefreshPrompt, setShowRefreshPrompt] = useState(false);
-
+  // data
   const storedUsername = useMemo(() => sessionStorage.getItem("username"), []);
   const [cycleItems, setCycleItems] = useState([]);
+  const [cloudLoadModelsList, setCloudLoadModelsList] = useState([]);
   const [modelIDValue, setModelIDValue] = useState("");
   const [modelType, setModelType] = useState("");
-  const [cloudLoadModelsList, setCloudLoadModelsList] = useState([]);
   const [dataFrames, setDataFrames] = useState({
     dfResult1: null,
     dfResult2: null,
@@ -53,13 +55,11 @@ const AggLockScenario = ({ setPageValue }) => {
 
   const checkScenarioExists = useCallback(
     (modelId, cycleName, scenarioName) => {
-      const { dfResult1 } = dataFrames;
-      if (!dfResult1) return false;
-      const key = `${modelId}|${cycleName}|${scenarioName
-        .trim()
-        .toLowerCase()}`;
+      const df1 = dataFrames.dfResult1;
+      if (!df1) return false;
+      const key = `${modelId}|${cycleName}|${scenarioName.trim().toLowerCase()}`;
       return new Set(
-        dfResult1
+        df1
           .toCollection()
           .map((r) =>
             `${(r.model_id ?? "").toString()}|${(r.cycle_name ?? "").toString()}|${(
@@ -75,9 +75,9 @@ const AggLockScenario = ({ setPageValue }) => {
   );
 
   const findLockedScenario = useCallback(() => {
-    const { dfResult1 } = dataFrames;
-    if (!dfResult1) return null;
-    const locked = dfResult1
+    const df1 = dataFrames.dfResult1;
+    if (!df1) return null;
+    const locked = df1
       .toCollection()
       .find(
         (r) =>
@@ -90,6 +90,10 @@ const AggLockScenario = ({ setPageValue }) => {
       : null;
   }, [dataFrames, modelIDValue, selectedCycle]);
 
+  // =============================================================================
+  //                          EXCEL SHEET METADATA CHECK
+  // =============================================================================
+
   const checkofCloudBackendSheet = useCallback(async () => {
     try {
       if (typeof window.Excel === "undefined") return;
@@ -98,18 +102,18 @@ const AggLockScenario = ({ setPageValue }) => {
         sheets.load("items/name");
         await context.sync();
 
-        const MetaDataSheet = sheets.items.find(
-          (sheet) => sheet.name.toLowerCase() === "cloud_backend_md"
+        const mdSheet = sheets.items.find(
+          (s) => s.name.toLowerCase() === "cloud_backend_md"
         );
-        if (!MetaDataSheet) {
+        if (!mdSheet) {
           setIsOutputSheet(false);
           return;
         }
 
         const ranges = {
-          ModelName: MetaDataSheet.getRange("B5"),
-          ModelID: MetaDataSheet.getRange("B7"),
-          ModelType: MetaDataSheet.getRange("B8"),
+          ModelName: mdSheet.getRange("B5"),
+          ModelID: mdSheet.getRange("B7"),
+          ModelType: mdSheet.getRange("B8"),
         };
         Object.values(ranges).forEach((r) => r.load("values"));
 
@@ -121,9 +125,9 @@ const AggLockScenario = ({ setPageValue }) => {
 
         await context.sync();
 
-        const modelNameValue = ranges.ModelName.values[0][0] || "";
-        const modelID = ranges.ModelID.values[0][0] || "";
-        const modelTypeVal = ranges.ModelType.values[0][0] || "";
+        const modelNameValue = (ranges.ModelName.values[0][0] ?? "").toString().trim();
+        const modelID = (ranges.ModelID.values[0][0] ?? "").toString().trim();
+        const modelTypeVal = (ranges.ModelType.values[0][0] ?? "").toString().trim();
         const loadedList = cloudLoadModelsRange.values;
 
         setHeading(`Save & Lock Aggregator Scenario for: ${modelNameValue}`);
@@ -133,10 +137,14 @@ const AggLockScenario = ({ setPageValue }) => {
         setIsOutputSheet(true);
       });
     } catch (error) {
-      console.error(error);
+      console.error("Error checking Outputs sheet:", error);
       setIsOutputSheet(false);
     }
   }, []);
+
+  // =============================================================================
+  //                         LAMBDA DATA FETCH
+  // =============================================================================
 
   const fetchDataFromLambda = useCallback(async () => {
     try {
@@ -147,36 +155,31 @@ const AggLockScenario = ({ setPageValue }) => {
         localStorage.getItem("User_ID"),
         storedUsername
       );
-      if (!resp || !resp.results1 || !resp.results2 || !resp.result3) {
+      if (!resp?.results1 || !resp?.results2 || !resp?.result3) {
         throw new Error("Incomplete metadata");
       }
+
       const df1 = new DataFrame(resp.results1);
       const df2 = new DataFrame(resp.results2);
       const df3 = new DataFrame(resp.result3);
       setDataFrames({ dfResult1: df1, dfResult2: df2, dfResult3: df3 });
-      setCycleItems(
-        df2.distinct("cycle_name").toArray().map((r) => r[0])
+
+      // — FILTER OUT “ACTUALS” CYCLE —
+      const allCycles = df2
+        .distinct("cycle_name")
+        .toArray()
+        .map((r) => (r[0] ?? "").toString().trim());
+      const filteredCycles = allCycles.filter(
+        (cycle) => cycle.toUpperCase() !== "ACTUALS"
       );
+      setCycleItems(filteredCycles);
     } catch (error) {
-      console.error(error);
+      console.error("Error fetching data:", error);
     }
   }, [storedUsername]);
 
   // =============================================================================
-  //                          AUTHORIZATION CHECK
-  // =============================================================================
-
-  useEffect(() => {
-    if (!loading && modelIDValue && dataFrames.dfResult3) {
-      const authorized = dataFrames.dfResult3.toCollection().some(
-        (m) => m.model_id === modelIDValue
-      );
-      if (!authorized) setIsOutputSheet(false);
-    }
-  }, [loading, modelIDValue, dataFrames]);
-
-  // =============================================================================
-  //                                INIT
+  //                          AUTH CHECK & INIT
   // =============================================================================
 
   useEffect(() => {
@@ -186,20 +189,33 @@ const AggLockScenario = ({ setPageValue }) => {
     })();
   }, [checkofCloudBackendSheet, fetchDataFromLambda]);
 
+  useEffect(() => {
+    if (!loading && modelIDValue && dataFrames.dfResult3) {
+      const authorized = dataFrames.dfResult3
+        .toCollection()
+        .some((m) => m.model_id === modelIDValue);
+      if (!authorized) {
+        setIsOutputSheet(false);
+      }
+    }
+  }, [loading, modelIDValue, dataFrames]);
+
   // =============================================================================
-  //                SAVE CLICK → EXISTENCE & LOCKED CHECK
+  //                SAVE CLICK → EXistence & LOCKED CHECK
   // =============================================================================
 
   const handleSaveClick = useCallback(() => {
-    // Scenario-exists guard
-    if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
+    // 1) scenario-name-exists guard
+    if (
+      checkScenarioExists(modelIDValue, selectedCycle, scenarioName)
+    ) {
       setPageValue(
         "SaveForecastPageinterim",
         "Scenario names already exist in the database. Please choose a different scenario name."
       );
       return;
     }
-    // Locked-scenario guard
+    // 2) locked-scenario guard
     const info = findLockedScenario();
     if (info) {
       setLockedScenarioInfo(info);
@@ -223,14 +239,14 @@ const AggLockScenario = ({ setPageValue }) => {
   const handleLockedCancel = () => setShowLockedWarning(false);
 
   // =============================================================================
-  //                   AFTER USER CONFIRMS → SAVE LOGIC
+  //            AFTER USER CONFIRMS → ACTUAL SAVE LOGIC
   // =============================================================================
 
   const handleSaveConfirmed = useCallback(async () => {
     setShowConfirm(false);
     console.time("Total save time request");
 
-    // Check access
+    // access check
     setPageValue("LoadingCircleComponent", "0% | Checking Access...");
     const access = await AWSconnections.ButtonAccess("SAVE_LOCKED_FORECAST");
     if (access?.message === "ACCESS DENIED") {
@@ -242,8 +258,10 @@ const AggLockScenario = ({ setPageValue }) => {
       return;
     }
 
-    // Redundant scenario-exists guard
-    if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
+    // redundant scenario-exists guard
+    if (
+      checkScenarioExists(modelIDValue, selectedCycle, scenarioName)
+    ) {
       setPageValue(
         "SaveForecastPageinterim",
         "Scenario names already exist in the database. Please choose a different scenario name."
@@ -252,24 +270,25 @@ const AggLockScenario = ({ setPageValue }) => {
       return;
     }
 
-    // Original save logic begins
+    // begin save
     setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
     const df1 = dataFrames.dfResult1;
-    if (!df1) return console.error("DataFrame df1 is not loaded yet.");
+    if (!df1) {
+      console.error("DataFrame dfResult1 not loaded.");
+      return;
+    }
 
-    // Build matchedForecasts
-    const prefixedForecastIds = cloudLoadModelsList.map(
-      (row) => `forecast_${row[6]}`
-    );
+    // prepare matchedForecasts
+    const prefixes = cloudLoadModelsList.map((row) => `forecast_${row[6]}`);
     const matches = df1
       .toCollection()
-      .filter((rec) => prefixedForecastIds.includes(rec.forecast_id));
+      .filter((rec) => prefixes.includes(rec.forecast_id));
     const matchedForecasts = matches.map((r) => ({
       model_id: r.model_id,
       forecast_id: r.forecast_id,
     }));
 
-    // Cycle-match guard
+    // cycle-match guard
     if (cloudLoadModelsList.some((row) => row[1] !== selectedCycle)) {
       setPageValue(
         "SaveForecastPageinterim",
@@ -279,7 +298,7 @@ const AggLockScenario = ({ setPageValue }) => {
       return;
     }
 
-    // Sync guard
+    // sync guard
     const allSynced = cloudLoadModelsList.every((row) => row[7] !== false);
     if (!allSynced) {
       setPageValue(
@@ -339,7 +358,7 @@ const AggLockScenario = ({ setPageValue }) => {
         setPageValue("SaveForecastPageinterim", message);
       } else if (
         saveFlag ===
-          "A scenario of this name for the provided model and cycle details already exists, try with another one."
+        "A scenario of this name for the provided model and cycle details already exists, try with another one."
       ) {
         setPageValue(
           "SaveForecastPageinterim",
@@ -404,7 +423,6 @@ const AggLockScenario = ({ setPageValue }) => {
             />
           </DropdownContainer>
 
-          {/* Save button opens the Refresh-prompt first */}
           <SaveButton
             onClick={() => setShowRefreshPrompt(true)}
             disabled={isDisabled}
@@ -417,15 +435,13 @@ const AggLockScenario = ({ setPageValue }) => {
             Save
           </SaveButton>
 
-          {/* NEW MODAL: Have you refreshed the tabular summary? */}
+          {/* Refresh-prompt modal */}
           {showRefreshPrompt && (
             <Overlay>
               <Modal>
-                <ModalHeader>
-                  Please Confirm
-                </ModalHeader>
-                  <ModalBody>
-                  Have you refreshed the tabular summary before saving?
+                <ModalHeader>Please Confirm</ModalHeader>
+                <ModalBody>
+                  Have you refreshed the "Outputs" before saving?
                 </ModalBody>
                 <ModalFooter>
                   <ConfirmButton
@@ -455,9 +471,9 @@ const AggLockScenario = ({ setPageValue }) => {
                 <ModalBody>
                   A scenario is already locked for cycle “
                   {lockedScenarioInfo.cycleName}” and Scenario Name: “
-                  {lockedScenarioInfo.scenarioName}”.<br />
-                  Proceeding will move the previous locked scenario to the
-                  Interim.
+                  {lockedScenarioInfo.scenarioName}”.
+                  <br />
+                  Proceeding will move the previous locked scenario to Interim.
                   <br />
                   Do you want to continue?
                 </ModalBody>
@@ -476,7 +492,7 @@ const AggLockScenario = ({ setPageValue }) => {
             </Overlay>
           )}
 
-          {/* Standard save confirmation modal */}
+          {/* Final save confirmation modal */}
           {showConfirm && (
             <Overlay>
               <Modal>

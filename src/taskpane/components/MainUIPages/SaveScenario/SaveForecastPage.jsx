@@ -118,10 +118,12 @@ const SaveScenario = ({ setPageValue }) => {
         dfResult3: new DataFrame(resp.result3),
       });
 
+      // Exclude "ACTUALS" cycle from dropdown
       const cycles = new DataFrame(resp.results2)
         .distinct("cycle_name")
         .toArray()
-        .map((row) => row[0]);
+        .map((row) => row[0])
+        .filter((c) => c !== "ACTUALS");
       setCycleItems(cycles);
     } catch (error) {
       console.error("Error fetching data from Lambda:", error);
@@ -182,6 +184,7 @@ const SaveScenario = ({ setPageValue }) => {
       return;
     }
 
+    
     try {
       await excelfucntions.setCalculationMode("manual");
       setPageValue("LoadingCircleComponent", "0% | Saving your forecast…");
@@ -190,43 +193,19 @@ const SaveScenario = ({ setPageValue }) => {
       let outputbackend_data;
 
       if (specialModelIds.includes(modelIDValue)) {
-        try {
-          longformData = await excelfucntions.generateLongFormData(
-            "US",
-            "DataModel"
-          );
-          await excelfucntions.saveData();
-        } catch (err) {
-          console.error("Error in special data flow:", err);
-          setPageValue(
-            "SaveForecastPageinterim",
-            "Some error occurred while saving, please try again"
-          );
-          return;
-        }
+        longformData = await excelfucntions.generateLongFormData(
+          "US",
+          "DataModel"
+        );
+        await excelfucntions.saveData();
       } else {
-        try {
-          const [lf, , ob] = await Promise.all([
-            excelfucntions.generateLongFormData("US", "DataModel"),
-            excelfucntions.saveData(),
-            excelfucntions.readNamedRangeToArray("aggregator_data"),
-          ]);
-          longformData = lf;
-          outputbackend_data = ob;
-          if (
-            !Array.isArray(outputbackend_data) ||
-            outputbackend_data.length === 0
-          ) {
-            throw new Error("Named range 'aggregator_data' not found or empty");
-          }
-        } catch (err) {
-          console.error("Error in default data flow:", err);
-          setPageValue(
-            "SaveForecastPageinterim",
-            "Some error occurred while saving, please try again"
-          );
-          return;
-        }
+        const [lf, , ob] = await Promise.all([
+          excelfucntions.generateLongFormData("US", "DataModel"),
+          excelfucntions.saveData(),
+          excelfucntions.readNamedRangeToArray("aggregator_data"),
+        ]);
+        longformData = lf;
+        outputbackend_data = ob;
       }
 
       setPageValue("LoadingCircleComponent", "75% | Saving your forecast…");
@@ -248,18 +227,16 @@ const SaveScenario = ({ setPageValue }) => {
         setPageValue
       );
 
-      const message = `Forecast scenario saved for
-Model: ${heading.replace("Save Scenario for:", "")}
-Cycle: ${selectedCycle}
-Scenario: ${scenarioName}`;
-      
+      const message = `Forecast scenario saved for\nModel: ${heading.replace("Save Scenario for: ", "")}\nCycle: ${selectedCycle}\nScenario: ${scenarioName}`;
 
-      if (
-        saveFlag === "SUCCESS" ||
-        (saveFlag && saveFlag.result === "DONE")
-      ) {
+      if (saveFlag === "SUCCESS" || (saveFlag && saveFlag.result === "DONE")) {
         setPageValue("SaveForecastPageinterim", message);
-        await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, scenarioName, "Interim");
+        await AWSconnections.writeMetadataToNamedCell(
+          "last_scn_update",
+          selectedCycle,
+          scenarioName,
+          "Interim"
+        );
       } else {
         setPageValue(
           "SaveForecastPageinterim",
@@ -275,28 +252,16 @@ Scenario: ${scenarioName}`;
     } finally {
       console.timeEnd("Total save time request");
     }
-  }, [
-    modelIDValue,
-    selectedCycle,
-    scenarioName,
-    checkScenarioExists,
-    setPageValue,
-    heading,
-  ]);
+  }, [modelIDValue, selectedCycle, scenarioName, checkScenarioExists, setPageValue, heading]);
 
-  if (loading) {
-    return <MessageBox>Connecting to data lake, please wait…</MessageBox>;
-  };
-  if (modelIDError) {
-    return <MessageBox>{modelIDError}</MessageBox>;
-  };
-  if (!isOutputSheet) {
+  if (loading) return <MessageBox>Connecting to data lake, please wait…</MessageBox>;
+  if (modelIDError) return <MessageBox>{modelIDError}</MessageBox>;
+  if (!isOutputSheet)
     return (
       <MessageBox>
         Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature.
       </MessageBox>
     );
-  };
 
   const isDisabled = !selectedCycle || !scenarioName;
   return (

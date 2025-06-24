@@ -79,15 +79,15 @@ const SaveandLockScenario = ({ setPageValue }) => {
         .toCollection()
         .find(
           (r) =>
-            (r.model_id ?? '').toString().trim() === modelId &&
-            (r.cycle_name ?? '').toString().trim() === cycleName &&
-            (r.save_status ?? '').toString().trim().toLowerCase() === 'locked'
+            (r.model_id ?? "").toString().trim() === modelId &&
+            (r.cycle_name ?? "").toString().trim() === cycleName &&
+            (r.save_status ?? "").toString().trim().toLowerCase() === "locked"
         );
 
       if (match) {
         setLockedScenarioInfo({
-          scenarioName: match.scenario_name ?? '',
-          cycleName: match.cycle_name ?? ''
+          scenarioName: match.scenario_name ?? "",
+          cycleName: match.cycle_name ?? "",
         });
         return true;
       }
@@ -136,7 +136,10 @@ const SaveandLockScenario = ({ setPageValue }) => {
         setIsOutputSheet(true);
 
         if (typeVal === "AGGREGATOR") {
-          setPageValue("AggSaveScenario", "Loading scenario for Aggregator model...");
+          setPageValue(
+            "AggSaveScenario",
+            "Loading scenario for Aggregator model..."
+          );
         }
       });
     } catch (error) {
@@ -162,10 +165,14 @@ const SaveandLockScenario = ({ setPageValue }) => {
         dfResult2: new DataFrame(resp.results2),
         dfResult3: new DataFrame(resp.result3),
       });
+
+      // Exclude "ACTUALS" (case-insensitive) from cycle dropdown
       const cycles = new DataFrame(resp.results2)
         .distinct("cycle_name")
         .toArray()
-        .map((r) => r[0]);
+        .map((r) => (r[0] ?? "").toString().trim())
+        .filter((cycle) => cycle.toUpperCase() !== "ACTUALS");
+
       setCycleItems(cycles);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -225,10 +232,7 @@ const SaveandLockScenario = ({ setPageValue }) => {
       await excelfucntions.setCalculationMode("manual");
       setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
 
-      let longformData;
-      let outputbackend_data = [];
-
-      [longformData] = await Promise.all([
+      const [longformData] = await Promise.all([
         excelfucntions.generateLongFormData("US", "DataModel"),
         excelfucntions.saveData(),
       ]);
@@ -245,7 +249,7 @@ const SaveandLockScenario = ({ setPageValue }) => {
         "",
         "",
         longformData,
-        outputbackend_data,
+        [],
         [],
         [],
         [],
@@ -259,13 +263,24 @@ Scenario: ${scenarioName}`;
 
       if (saveFlag === "SUCCESS" || (saveFlag && saveFlag.result === "DONE")) {
         setPageValue("SaveForecastPageinterim", message);
-        await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, scenarioName, "Locked");
+        await AWSconnections.writeMetadataToNamedCell(
+          "last_scn_update",
+          selectedCycle,
+          scenarioName,
+          "Locked"
+        );
       } else {
-        setPageValue("SaveForecastPageinterim", "Some error occurred while saving, please try again");
+        setPageValue(
+          "SaveForecastPageinterim",
+          "Some error occurred while saving, please try again"
+        );
       }
     } catch (error) {
       console.error("Unhandled error:", error);
-      setPageValue("SaveForecastPageinterim", "Some error occurred while saving, please try again");
+      setPageValue(
+        "SaveForecastPageinterim",
+        "Some error occurred while saving, please try again"
+      );
     } finally {
       console.timeEnd("Total save time request");
     }
@@ -275,7 +290,10 @@ Scenario: ${scenarioName}`;
     setShowConfirm(false);
 
     if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
-      setPageValue("SaveForecastPageinterim", "Scenario names already exist… choose a different one.");
+      setPageValue(
+        "SaveForecastPageinterim",
+        "Scenario names already exist… choose a different one."
+      );
       return;
     }
 
@@ -357,8 +375,10 @@ Scenario: ${scenarioName}`;
           <Modal>
             <ModalHeader>Overwrite Locked Scenario</ModalHeader>
             <ModalBody>
-              A scenario is already locked for cycle “{lockedScenarioInfo?.cycleName}” and Scenario Name: “{lockedScenarioInfo?.scenarioName}”<br />
-              Proceeding will move the existing locked scenario to the Interim.<br />
+              A scenario is already locked for cycle “{lockedScenarioInfo?.cycleName}” and Scenario Name: “{lockedScenarioInfo?.scenarioName}”
+              <br />
+              Proceeding will move the existing locked scenario to the Interim.
+              <br />
               Do you want to continue?
             </ModalBody>
             <ModalFooter>

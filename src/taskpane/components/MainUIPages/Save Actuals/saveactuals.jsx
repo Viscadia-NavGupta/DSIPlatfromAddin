@@ -16,7 +16,7 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
-  ConfirmButton, // ← import ConfirmButton instead of generic Button
+  ConfirmButton,
 } from "./saveactualsstyles";
 import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
@@ -37,7 +37,7 @@ const SaveScenarioActuals = ({ setPageValue }) => {
     dfResult3: null,
   });
 
-  // scenarioSet logic
+  // build set of existing scenarios
   const scenarioSet = useMemo(() => {
     const df = dataFrames.dfResult1;
     if (!df) return new Set();
@@ -65,7 +65,7 @@ const SaveScenarioActuals = ({ setPageValue }) => {
     [dataFrames.dfResult1, scenarioSet]
   );
 
-  // modal state & handlers
+  // new state for refresh-confirm modal
   const [showConfirm, setShowConfirm] = useState(false);
   const actualsCycle = "ACTUALS";
 
@@ -149,7 +149,7 @@ const SaveScenarioActuals = ({ setPageValue }) => {
     setPageValue,
   ]);
 
-  // sheet check & data fetch
+  // sheet detection & metadata fetch
   const checkofCloudBackendSheet = useCallback(async () => {
     try {
       if (typeof window.Excel === "undefined") return;
@@ -220,7 +220,6 @@ const SaveScenarioActuals = ({ setPageValue }) => {
     }
   }, [loading, modelIDValue, dataFrames.dfResult3]);
 
-  // date helpers
   function excelSerialToJSDate(serial) {
     return new Date(new Date(1899, 11, 30).getTime() + serial * 86400000);
   }
@@ -233,7 +232,6 @@ const SaveScenarioActuals = ({ setPageValue }) => {
       .replace(" ", "-");
   }
 
-  // render
   return (
     <Container>
       {loading ? (
@@ -259,10 +257,9 @@ const SaveScenarioActuals = ({ setPageValue }) => {
           {showConfirm && (
             <Overlay>
               <Modal>
-                <ModalHeader>Submit Actuals?</ModalHeader>
+                <ModalHeader>Please Confirm</ModalHeader>
                 <ModalBody>
-                  Do you want to submit actuals for cycle “{actualsCycle}” and
-                  scenario “{scenarioName}”?
+                  Have you refreshed the "Outputs" before saving?
                 </ModalBody>
                 <ModalFooter>
                   <ConfirmButton onClick={handleConfirm}>Yes</ConfirmButton>
@@ -279,7 +276,7 @@ const SaveScenarioActuals = ({ setPageValue }) => {
         </>
       ) : (
         <MessageBox>
-          Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature. 
+          Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature.
         </MessageBox>
       )}
     </Container>

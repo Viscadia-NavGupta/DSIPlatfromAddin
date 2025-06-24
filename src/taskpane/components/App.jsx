@@ -25,6 +25,7 @@ import FLSyncData from "./MainUIPages/Forecast Library/SyncdataDropdown";
 import PasswordResetSuccess from "./ForgotPasswordPage/PasswordResetSuccess";
 import ResetPassword from "./ForgotPasswordPage/ResetPassword";
 import LoadScenarioAgg from "./MainUIPages/LoadScenarioPage/LoadSceanrioAgg";
+import PowerbiManegment from "./MainUIPages/PowerBi Page/PowerBIPage";
 function App() {
   const [page, setPage] = useState("UserLogin");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -241,6 +242,8 @@ function App() {
         return <PasswordResetSuccess setPageValue={setPageValue} />;
       case "LoadScenarioAgg":
         return <LoadScenarioAgg setPageValue={setPageValue} />;
+      case "PowerbiManegment":
+        return <PowerbiManegment setPageValue={setPageValue} />;
       case "ResetPassword":
         return (
           <ResetPassword

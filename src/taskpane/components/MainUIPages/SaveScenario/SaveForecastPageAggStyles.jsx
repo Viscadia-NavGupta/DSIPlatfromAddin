@@ -91,4 +91,71 @@ export const SaveButton = styled("button")({
   "&:hover": {
     backgroundColor: "#8A1F1A",
   },
+  "&:disabled": {
+    backgroundColor: "#ccc",
+    cursor: "not-allowed",
+  },
+});
+
+// Modal overlay to dim background
+export const Overlay = styled("div")({
+  position: "fixed",
+  top: 0,
+  left: 0,
+  width: "100%",
+  height: "100%",
+  backgroundColor: "rgba(0, 0, 0, 0.4)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 1000,
+});
+
+// Modal container
+export const Modal = styled("div")({
+  backgroundColor: "#FFFFFF",
+  borderRadius: "8px",
+  boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+  width: "90%",
+  maxWidth: "400px",
+  overflow: "hidden",
+});
+
+export const ModalHeader = styled("div")({
+  padding: "16px 24px",
+  fontSize: "1.125rem",
+  fontWeight: 500,
+  borderBottom: "1px solid #E0E0E0",
+  color: "#333333",
+});
+
+export const ModalBody = styled("div")({
+  padding: "20px 24px",
+  fontSize: "14px",
+  color: "#4F4F4F",
+  lineHeight: 1.5,
+});
+
+export const ModalFooter = styled("div")({
+  padding: "12px 24px",
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: "10px",
+  borderTop: "1px solid #E0E0E0",
+});
+
+export const ConfirmButton = styled("button")({
+  padding: "8px 16px",
+  fontFamily: "Roboto, sans-serif",
+  fontWeight: 500,
+  fontSize: "14px",
+  color: "#FFFFFF",
+  backgroundColor: "#BD302B",
+  borderRadius: "4px",
+  border: "none",
+  cursor: "pointer",
+  transition: "background 0.2s ease-in-out",
+  "&:hover": {
+    backgroundColor: "#8A1F1A",
+  },
 });
