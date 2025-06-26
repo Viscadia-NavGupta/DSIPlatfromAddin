@@ -1,12 +1,9 @@
-
 import React, { useState, useEffect } from "react";
 import { FaArrowLeft } from "react-icons/fa";
 import { MdOutlineSave } from "react-icons/md";
 import { CiLock } from "react-icons/ci";
 import { CgLock } from "react-icons/cg";
 import { CgLockUnlock } from "react-icons/cg";
-
-
 
 import {
   HomePageContainer,
@@ -20,7 +17,7 @@ import {
   MessageBox,
 } from "./powerbistyles";
 
-const PowerbiManegment = ({ onBack }) => {
+const PowerbiManegment = ({ setPageValue }) => {
   // ─── Responsive sizing logic ─────────────────────────────────────────────
   const [buttonSize, setButtonSize] = useState({
     width: 90,
@@ -52,14 +49,24 @@ const PowerbiManegment = ({ onBack }) => {
     <HomePageContainer>
       <ContentWrapper>
         <WelcomeContainer>
-          <BackButtonIcon as={FaArrowLeft} size={24} onClick={onBack} />
+          {/* on click, go back to the Home page */}
+          <BackButtonIcon
+            as={FaArrowLeft}
+            size={24}
+            onClick={() => setPageValue("Home")}
+          />
           <h1>Power BI Dashboards</h1>
         </WelcomeContainer>
 
         <ButtonsContainer>
           {/* PowerBI Locked */}
           <Button
-            onClick={() => window.open("https://app.powerbi.com/groups/8432e502-aff3-49cd-9ad9-e3ccb1ab4eea/reports/1fb0132c-fcf1-4bd5-9ce8-37d7e35adb0e/ca00450869d3c67885cf?experience=power-bi", "_blank")}
+            onClick={() =>
+              window.open(
+                "https://app.powerbi.com/groups/8432e502-aff3-49cd-9ad9-e3ccb1ab4eea/reports/1fb0132c-fcf1-4bd5-9ce8-37d7e35adb0e/ca00450869d3c67885cf?experience=power-bi",
+                "_blank"
+              )
+            }
             style={{
               width: buttonSize.width,
               height: buttonSize.height,

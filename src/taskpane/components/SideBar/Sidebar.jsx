@@ -57,7 +57,7 @@ const Sidebar = ({ setPageValue, currentPage, handleLogout }) => {
     {
       name: "Power BI Report",
       icon: <PowerBi width={24} height={24} />,
-      action: null, // we open Google here
+      action: "PowerbiManegment", // we open Google here
       disabled: false,
     },
   ];
@@ -94,11 +94,11 @@ const Sidebar = ({ setPageValue, currentPage, handleLogout }) => {
                   return;
                 }
 
-                if (button.name === "Power BI Report") {
-                  // Open Google in a new tab
-                  window.open("https://app.powerbi.com/groups/8432e502-aff3-49cd-9ad9-e3ccb1ab4eea/reports/1fb0132c-fcf1-4bd5-9ce8-37d7e35adb0e/ca00450869d3c67885cf?experience=power-bi", "_blank");
-                  return;
-                }
+                // if (button.name === "Power BI Report") {
+                //   // Open Google in a new tab
+                //   window.open("https://app.powerbi.com/groups/8432e502-aff3-49cd-9ad9-e3ccb1ab4eea/reports/1fb0132c-fcf1-4bd5-9ce8-37d7e35adb0e/ca00450869d3c67885cf?experience=power-bi", "_blank");
+                //   return;
+                // }
 
                 if (button.action) {
                   setPageValue(button.action);

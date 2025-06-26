@@ -115,6 +115,7 @@ const FLSyncData = ({ setPageValue }) => {
   const handleSyncData = async () => {
     const warn = { saveStatus: !saveStatus.length, cycle: !selectedCycle.length, asset: !selectedAsset.length };
     setWarnings(warn);
+    // excelconnections.unprotectWorkbookAndSheet("Setup","Overarching@123");
     if (warn.saveStatus || warn.cycle || warn.asset) return;
     setPageValue("LoadingCircleComponent", "Syncing data, please wait...");
 
@@ -134,6 +135,7 @@ const FLSyncData = ({ setPageValue }) => {
       );
       await excelconnections.MetaDataSyncwithoutheaders({ results1: filtered }, "cloud_backend_ds", "A2");
       await excelconnections.refreshPivotTable("Setup", "PivotTable3");
+      // excelconnections.protectSetupSheet("Overarching@123");
       setPageValue("SaveForecastPageinterim", "Data synced successfully.");
     } catch (e) {
       console.error("Sync Data Error:", e);

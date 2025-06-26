@@ -1693,3 +1693,102 @@ export async function writeYesNoToNamedRange(rangeName, isYes) {
     await context.sync();
   });
 }
+
+
+export async function unprotectWorkbookAndSheet(sheetName, password) {
+  try {
+    await Excel.run(async (context) => {
+      // 1. Load workbook protection state
+      const workbook = context.workbook;
+      workbook.protection.load("protected");
+      await context.sync();
+      console.log("Workbook protected before unprotect:", workbook.protection.protected);
+
+      // 2. If workbook is protected, unprotect it
+      if (workbook.protection.protected) {
+        // Try with password if provided, otherwise no-arg
+        if (password) {
+          workbook.protection.unprotect(password);
+          console.log(`Called workbook.protection.unprotect("${password}")`);
+        } else {
+          workbook.protection.unprotect();
+          console.log("Called workbook.protection.unprotect()");
+        }
+        await context.sync();
+        console.log("Workbook protected after unprotect:", workbook.protection.protected);
+      }
+
+      // 3. Now handle the sheet
+      const sheet = context.workbook.worksheets.getItemOrNullObject(sheetName);
+      await context.sync();
+      if (sheet.isNullObject) {
+        console.error(`Sheet "${sheetName}" not found.`);
+        return;
+      }
+      sheet.protection.load("protected");
+      await context.sync();
+      console.log(`Sheet "${sheetName}" protected before unprotect:`, sheet.protection.protected);
+
+      // 4. Unprotect, choosing the right signature
+      let usePwd = false;
+      if (password) {
+        const checkRes = sheet.protection.checkPassword(password);
+        await context.sync();
+        usePwd = checkRes.value;
+        console.log("Password valid for sheet?", usePwd);
+      }
+      if (usePwd) {
+        sheet.protection.unprotect(password);
+        console.log(`Called sheet.protection.unprotect("${password}")`);
+      } else {
+        sheet.protection.unprotect();
+        console.log("Called sheet.protection.unprotect()");
+      }
+      await context.sync();
+
+      // 5. Final verification
+      sheet.protection.load("protected");
+      await context.sync();
+      console.log(`Sheet "${sheetName}" protected after unprotect:`, sheet.protection.protected);
+    });
+  } catch (err) {
+    console.error("Error in unprotectWorkbookAndSheet:", err);
+  }
+}
+
+
+export async function protectSetupSheet(password) {
+  try {
+    await Excel.run(async (context) => {
+      // Get the "Setup" worksheet if it exists
+      const sheet = context.workbook.worksheets.getItemOrNullObject("Setup");
+      await context.sync();
+
+      if (!sheet.isNullObject) {
+        // Apply protection with the same options as your VBA macro
+        sheet.protection.protect({
+          password: password,
+          allowEditObjects: false,        // DrawingObjects:=False
+          allowEditScenarios: true,       // Scenarios:=True
+          allowFormattingCells: true,     // AllowFormattingCells:=True
+          allowFormattingColumns: true,   // AllowFormattingColumns:=True
+          allowFormattingRows: true,      // AllowFormattingRows:=True
+          allowSorting: true,             // AllowSorting:=True
+          allowFiltering: true,           // AllowFiltering:=True
+          allowUsePivotTables: true,      // AllowUsingPivotTables:=True
+          allowInsertingColumns: false,   // AllowInsertingColumns:=False
+          allowInsertingRows: false,      // AllowInsertingRows:=False
+          allowInsertingHyperlinks: false,// AllowInsertingHyperlinks:=False
+          allowDeletingColumns: false,    // AllowDeletingColumns:=False
+          allowDeletingRows: false        // AllowDeletingRows:=False
+        });
+        await context.sync();
+        console.log("Setup sheet protected.");
+      } else {
+        console.log("No sheet named 'Setup' found.");
+      }
+    });
+  } catch (error) {
+    console.error(`Error protecting Setup sheet: ${error}`);
+  }
+}
