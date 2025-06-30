@@ -152,7 +152,7 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
       await Excelconnections.setCalculationMode("manual");
       await Excelconnections.apiResponseToExcel(resp, "cloud_backend_ds", "A1");
       setPageValue(
-        "SaveForecastPageinterim",
+        "SuccessMessagePage",
         "Dropdowns synced with the latest scenario names from the data lake"
       );
     } catch (error) {
@@ -195,7 +195,7 @@ const AGGForecastManagementPage = ({ userName, setPageValue, onBack }) => {
           (saveFlag && saveFlag.result === "DONE")
         ) {
           setPageValue(
-            "SaveForecastPageinterim",
+            "SuccessMessagePage",
             "Selected scenarios loaded successfully."
           );
         } else {

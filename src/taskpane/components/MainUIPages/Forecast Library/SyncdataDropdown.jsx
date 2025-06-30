@@ -136,7 +136,7 @@ const FLSyncData = ({ setPageValue }) => {
       await excelconnections.MetaDataSyncwithoutheaders({ results1: filtered }, "cloud_backend_ds", "A2");
       await excelconnections.refreshPivotTable("Setup", "PivotTable3");
       // excelconnections.protectSetupSheet("Overarching@123");
-      setPageValue("SaveForecastPageinterim", "Data synced successfully.");
+      setPageValue("SuccessMessagePage", "Data synced successfully.");
     } catch (e) {
       console.error("Sync Data Error:", e);
       setPageValue("SaveForecastPageinterim", "Error syncing data.");

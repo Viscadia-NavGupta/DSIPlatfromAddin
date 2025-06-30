@@ -355,7 +355,7 @@ const AggLockScenario = ({ setPageValue }) => {
           scenarioName,
           "Locked"
         );
-        setPageValue("SaveForecastPageinterim", message);
+        setPageValue("SuccessMessagePage", message);
       } else if (
         saveFlag ===
         "A scenario of this name for the provided model and cycle details already exists, try with another one."

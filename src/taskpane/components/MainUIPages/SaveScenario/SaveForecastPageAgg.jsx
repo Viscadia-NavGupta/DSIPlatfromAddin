@@ -250,7 +250,7 @@ const AggSaveScenario = ({ setPageValue }) => {
           "Save Aggregator Scenario for: ",
           ""
         )}\nCycle: ${selectedCycle}\nScenario: ${scenarioName}`;
-        setPageValue("SaveForecastPageinterim", message);
+        setPageValue("SuccessMessagePage", message);
         await AWSconnections.writeMetadataToNamedCell(
           "last_scn_update",
           selectedCycle,

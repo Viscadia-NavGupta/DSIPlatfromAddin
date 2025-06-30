@@ -26,6 +26,7 @@ import PasswordResetSuccess from "./ForgotPasswordPage/PasswordResetSuccess";
 import ResetPassword from "./ForgotPasswordPage/ResetPassword";
 import LoadScenarioAgg from "./MainUIPages/LoadScenarioPage/LoadSceanrioAgg";
 import PowerbiManegment from "./MainUIPages/PowerBi Page/PowerBIPage";
+import SuccessMessagePage from "./MainUIPages/MiscPages/successMessagePage";
 function App() {
   const [page, setPage] = useState("UserLogin");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -39,7 +40,7 @@ function App() {
   const setPageValue = (value, message = "Processing request...") => {
     if (value === "LoadingCircleComponent") {
       setLoadingMessage(message);
-    } else if (value === "SaveForecastPageinterim") {
+    } else if (value === "SaveForecastPageinterim" || value === "SuccessMessagePage") {
       setSaveForecastMessage(message);
     }
     setPage(value);
@@ -244,6 +245,13 @@ function App() {
         return <LoadScenarioAgg setPageValue={setPageValue} />;
       case "PowerbiManegment":
         return <PowerbiManegment setPageValue={setPageValue} />;
+      case "SuccessMessagePage":
+        return (
+          <SuccessMessagePage
+            setPageValue={setPageValue}
+            message={saveForecastMessage}
+          />
+        );
       case "ResetPassword":
         return (
           <ResetPassword

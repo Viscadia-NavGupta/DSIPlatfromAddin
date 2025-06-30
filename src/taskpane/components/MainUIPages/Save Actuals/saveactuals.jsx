@@ -124,7 +124,7 @@ const SaveScenarioActuals = ({ setPageValue }) => {
       );
 
       setPageValue(
-        "SaveForecastPageinterim",
+        "SuccessMessagePage",
         saveFlag === "SUCCESS" || saveFlag?.result === "DONE"
           ? `Actuals Scenario saved for Model: ${heading.replace(
               "Save Scenario for: ",

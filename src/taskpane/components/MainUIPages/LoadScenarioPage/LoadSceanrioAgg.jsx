@@ -276,7 +276,7 @@ const LoadScenarioAgg = ({ setPageValue }) => {
           `Cycle: ${selectedCycle}`,
           `Scenario: ${selectedScenario}`,
         ].join("\n");
-        setPageValue("SaveForecastPageinterim", message);
+        setPageValue("SuccessMessagePage", message);
         excelconnections.setCalculationMode("automatic");
 
       } else {

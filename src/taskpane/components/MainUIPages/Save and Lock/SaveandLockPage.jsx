@@ -262,7 +262,7 @@ Cycle: ${selectedCycle}
 Scenario: ${scenarioName}`;
 
       if (saveFlag === "SUCCESS" || (saveFlag && saveFlag.result === "DONE")) {
-        setPageValue("SaveForecastPageinterim", message);
+        setPageValue("SuccessMessagePage", message);
         await AWSconnections.writeMetadataToNamedCell(
           "last_scn_update",
           selectedCycle,
