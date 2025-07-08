@@ -80,7 +80,7 @@ const PowerbiManegment = ({ setPageValue }) => {
 
           {/* PowerBI Interim */}
           <Button
-            onClick={() => window.open("", "_blank")}
+            onClick={() => window.open("https://app.powerbi.com/groups/8432e502-aff3-49cd-9ad9-e3ccb1ab4eea/reports/8f422736-fec8-4f54-aeb5-8f7f276acc26/ec86a4985c1873dd9be4?experience=power-bi", "_blank")}
             style={{
               width: buttonSize.width,
               height: buttonSize.height,
