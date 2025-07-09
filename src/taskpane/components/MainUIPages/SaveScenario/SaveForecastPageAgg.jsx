@@ -205,7 +205,7 @@ const AggSaveScenario = ({ setPageValue }) => {
       return;
     }
 
-    const allSynced = cloudLoadModelsList.every((row) => row[7] === true);
+     const allSynced = cloudLoadModelsList.every((row) => row[7] !== false);
     if (!allSynced) {
       setPageValue(
         "SaveForecastPageinterim",
