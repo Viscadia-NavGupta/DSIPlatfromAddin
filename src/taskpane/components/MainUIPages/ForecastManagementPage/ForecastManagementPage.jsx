@@ -2,11 +2,13 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FaArrowLeft } from "react-icons/fa";
-import { MdSaveAlt, MdOutlineSave } from "react-icons/md";
+import { MdSaveAlt, MdOutlineSave, MdOutlineCalculate } from "react-icons/md";
 import { CiLock } from "react-icons/ci";
+import { RiFlowChart } from "react-icons/ri";
 import { DataFrame } from "dataframe-js";
 
 import { specialModelIds } from "../../Middleware/Model Config";
+import * as AWSConnections from "../../Middleware/AWSConnections";
 
 import {
   HomePageContainer,
@@ -17,7 +19,7 @@ import {
   Tooltip,
   BackButtonIcon,
   IconWrapper,
-  MessageBox, // import the loading‐message style
+  MessageBox,
 } from "./ForecastManagementPageStyles";
 
 const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
@@ -66,12 +68,8 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
         ranges.ModelID.load("values");
         await context.sync();
 
-        const mt = (ranges.ModelType.values[0][0] || "")
-          .toString()
-          .trim();
-        const id = (ranges.ModelID.values[0][0] || "")
-          .toString()
-          .trim();
+        const mt = (ranges.ModelType.values[0][0] || "").toString().trim();
+        const id = (ranges.ModelID.values[0][0] || "").toString().trim();
 
         setModelType(mt);
         setModelIDValue(id);
@@ -102,6 +100,38 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
     return allowedIds.includes(normId);
   }, [modelType, modelIDValue, allowedDF]);
 
+  // ─── NEW: Compute handler ────────────────────────────────────────────────────
+  const handleCompute = async () => {
+    try {
+      setPageValue("LoadingCircleComponent", "Calculating Results...");
+      const result = await AWSConnections.service_orchestration("RUN_COMPUTATION");
+      console.log("Computation result:", result);
+      setPageValue("SuccessMessagePage", "Forecast Data Updated Successfully");
+      // you can add further success UI/notifications here
+    } catch (err) {
+      console.error("Error during computation:", err);
+      // you can show a MessageBox or toast here
+    }
+  };
+
+  // ─── NEW: Calculations handler ───────────────────────────────────────────────
+  const handleCalculations = async () => {
+    setPageValue("LoadingCircleComponent", "Generating Calculations...");
+    // wait 5 seconds
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+
+    // then unhide
+    AWSConnections.unhideSheets([
+      "Calculation Tabs>>",
+      "Calculations | 1L",
+      "Calculations | 2L",
+      "Calculations | 3L",
+      "Calculations | 4L+",
+      "Event Modeling",
+    ]);
+    setPageValue("SuccessMessagePage", "Calculations generated successfully");
+  };
+
   // ─── 6️⃣ Button definitions ─────────────────────────────────────────────────
   const buttons = useMemo(
     () => [
@@ -110,6 +140,18 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
         icon: <MdSaveAlt size={buttonSize.iconSize} />,
         action: () => setPageValue("LoadScenario"),
         disabled: false,
+      },
+      {
+        name: "Compute",
+        icon: <RiFlowChart size={buttonSize.iconSize} />,
+        action: handleCompute,
+        disabled: !saveLockEnabled,
+      },
+      {
+        name: "Calculations",
+        icon: <MdOutlineCalculate size={buttonSize.iconSize} />,
+        action: handleCalculations,
+        disabled: !saveLockEnabled,
       },
       {
         name: "Save",
@@ -124,7 +166,7 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
         disabled: !saveLockEnabled,
       },
     ],
-    [buttonSize.iconSize, saveLockEnabled, setPageValue]
+    [buttonSize.iconSize, saveLockEnabled, setPageValue, handleCompute]
   );
 
   // ─── 7️⃣ Responsive sizing logic ─────────────────────────────────────────────
@@ -160,7 +202,10 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
             <BackButtonIcon as={FaArrowLeft} size={24} onClick={onBack} />
             <h1>Forecast Management</h1>
           </WelcomeContainer>
-          <p style={{ color: "#B4322A" }}> Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature.</p>
+          <p style={{ color: "#B4322A" }}>
+            Current workbook is not a compatible forecast model. Please open the
+            latest ADC models to use this feature.
+          </p>
         </ContentWrapper>
       </HomePageContainer>
     );

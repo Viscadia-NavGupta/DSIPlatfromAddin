@@ -3,20 +3,21 @@ import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
 import Papa from "papaparse";
 import * as Excelconnections from "./ExcelConnection";
+import * as Formatfile from "./Formatfile"
 
 // =============================================================================
 //                         CONFIGURATION CONSTANTS
 // =============================================================================
-const ENV = "prod"; // Change to "prod" to switch environments
+const ENV = "dev"; // Change to "prod" to switch environments
 
 const CONFIG = {
   dev: {
     COGNITO: {
       URL: "https://cognito-idp.us-east-1.amazonaws.com/",
-      CLIENT_ID: "47ht7bakkhf3k89enj23581vcd",
+      CLIENT_ID: "6gv7o7k7aucmpd75tfq65ad268",
     },
-    AUTH_URL: "https://tj67lue8y7.execute-api.us-east-1.amazonaws.com/dev/sqldbquery",
-    AWS_SECRETS_NAME: "dsivis-dev-remaining-secret",
+    AUTH_URL: "https://nkhrhqpcs3.execute-api.us-east-1.amazonaws.com/prod/sqldbquery",
+    AWS_SECRETS_NAME: "vis-prod-remaining-secret",
     POLLING: {
       MAX_ATTEMPTS: 100,
       DELAY_MS: 5000,
@@ -978,8 +979,104 @@ export async function service_orchestration(
         };
       }
     }
+    /// add run and genrate ace sheet code here
+    else if (buttonname === "GENERATE_ACE_SHEET") {
+      console.log("📤 preparing for Forecast Library Extract");
 
-    else if (buttonname === "IMPORT_ASSUMPTIONS_AGG") {
+      const S3Uploadobejct = await AuthorizationData(
+        "GENERATE_ACE_UPLOAD",
+        idToken,
+        CONFIG.AWS_SECRETS_NAME,
+        username,
+        UUID_Generated
+      );
+      console.log("S3Uploadobejct", S3Uploadobejct);
+      const UploadS3SaveForecastURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["GENERATE_ACE"][UUID_Generated[0]];
+
+      console.log("UploadS3SaveForecastURL", UploadS3SaveForecastURL);
+      await uploadXlsxToS3("Model Management", UploadS3SaveForecastURL);
+      let servicestatus;
+      try {
+        servicestatus = await servicerequest(
+          serviceorg_URL,
+          buttonname,
+          UUID_Generated[0],
+          "",
+          idToken,
+          CONFIG.AWS_SECRETS_NAME,
+          User_Id,
+        );
+
+        const S3Uploadobejct = await AuthorizationData(
+          "GENERATE_ACE_DOWNLOAD",
+          idToken,
+          CONFIG.AWS_SECRETS_NAME,
+          username,
+          UUID_Generated
+        );
+        console.log("S3Uploadobejct", S3Uploadobejct);
+        const DownloadS3SaveForecastURL = S3Uploadobejct["presigned urls"]["DOWNLOAD"]["GENERATE_ACE"][UUID_Generated[0]];
+        var outputflag = await downloadAndInsertDataFromExcelACESheet(DownloadS3SaveForecastURL, "GENERATE ACE SHEET");
+        console.log("Outputflag:", outputflag);
+        if (outputflag.success && buttonname === "GENERATE_ACE_SHEET") {
+
+          await Formatfile.aceSheetformat(outputflag.newSheetName);
+
+          return { uuid: UUID_Generated[0], result: true };
+        }
+      } catch (err) {
+        console.error("❌ Service request error:", err);
+        return { status: "error", message: err.message };
+      }
+
+
+
+    } else if (buttonname === "RUN_COMPUTATION") {
+      console.log("📤 preparing for Forecast Library Extract");
+
+      const S3Uploadobejct = await AuthorizationData(
+        "RUN_COMPUTATION_UPLOAD",
+        idToken,
+        CONFIG.AWS_SECRETS_NAME,
+        username,
+        UUID_Generated
+      );
+      console.log("S3Uploadobejct", S3Uploadobejct);
+      const UploadS3SaveForecastURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["RUN_COMPUTATION"][UUID_Generated[0]];
+
+      console.log("UploadS3SaveForecastURL", UploadS3SaveForecastURL);
+      await uploadFileToS3RunCompute(UUID_Generated[0], UploadS3SaveForecastURL, buttonname,"Product X Forecast");
+      let servicestatus;
+      try {
+        servicestatus = await servicerequest(
+          serviceorg_URL,
+          buttonname,
+          UUID_Generated[0],
+          "",
+          idToken,
+          CONFIG.AWS_SECRETS_NAME,
+          User_Id,
+        );
+
+        const S3Uploadobejct = await AuthorizationData(
+          "RUN_COMPUTATION_DOWNLOAD",
+          idToken,
+          CONFIG.AWS_SECRETS_NAME,
+          username,
+          UUID_Generated
+        );
+        console.log("S3Uploadobejct", S3Uploadobejct);
+        const DownloadS3SaveForecastURL = S3Uploadobejct["presigned urls"]["DOWNLOAD"]["RUN_COMPUTATION/horizontal_data_dump"][UUID_Generated[0]];
+        var outputflag = await downloadAndInsertDataFromExcelACESheet(DownloadS3SaveForecastURL, "RUN COMPUTATION");
+        console.log("Outputflag:", outputflag);
+      } catch (err) {
+        console.error("❌ Service request error:", err);
+        return { status: "error", message: err.message };
+      }
+
+
+
+    } else if (buttonname === "IMPORT_ASSUMPTIONS_AGG") {
 
       let CONSTITUENT_AGG_ID = await ServiceRequest_Fetch_Constituent_ID(
         serviceorg_URL, "FETCH_AGG_CONSTITUENTS", UUID_Generated[0], idToken, CONFIG.AWS_SECRETS_NAME, User_Id, Forecast_UUID[0], Model_UUID);
@@ -2719,4 +2816,387 @@ function updateUrlInNamedRange(newUrl) {
       throw err;
     }
   });
+}
+
+export async function uploadFileToS3RunCompute(
+  uuid,
+  uploadURL,
+  buttonName,
+  sheetName // ← new argument
+) {
+  try {
+    return await Excel.run(async (context) => {
+      // ← replaced getActiveWorksheet() with getItem(sheetName)
+      const sheet = context.workbook.worksheets.getItem(sheetName);
+      let range = sheet.getUsedRange();
+      range.load(["values", "numberFormat"]);
+      await context.sync();
+
+      // Grab the raw values & formats
+      let worksheetData = range.values;
+      let numberFormats = range.numberFormat;
+
+      // If this was a “RUN COMPUTATION” call, strip off column A
+      if (buttonName === "RUN_COMPUTATION") {
+        worksheetData = worksheetData.map(row => row.slice(1));
+        numberFormats = numberFormats.map(fmt => fmt.slice(1));
+      }
+
+      // Build a new sheet from the array of arrays
+      const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+      for (let R = 0; R < worksheetData.length; R++) {
+        for (let C = 0; C < worksheetData[R].length; C++) {
+          const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+          if (worksheet[cellRef]) {
+            worksheet[cellRef].z = numberFormats[R][C];
+          }
+        }
+      }
+
+      // Package into a workbook
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        buttonName === "GENERATE ACE SHEET" ? "Model Management" : "ACE"
+      );
+
+      // Write to an ArrayBuffer and wrap as a blob
+      const workbookBinary = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array"
+      });
+      const blob = new Blob([workbookBinary], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      });
+
+      // *** PRESIGNED URL USAGE ***
+      const presignedUrl = uploadURL;
+      const startTime = performance.now();
+      const response = await fetch(presignedUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type":
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        },
+        body: blob
+      });
+      const endTime = performance.now();
+
+      if (response.ok) {
+        console.log(
+          `File uploaded successfully in ${((endTime - startTime) / 1000).toFixed(
+            2
+          )}s.`
+        );
+        return true;
+      } else {
+        console.error(
+          `Upload failed (status ${response.status}):`,
+          await response.text()
+        );
+        return false;
+      }
+    });
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    return false;
+  }
+}
+
+
+
+
+
+export async function uploadXlsxToS3(sheetName, uploadURL) {
+  return Excel.run(async (context) => {
+    console.time("⏱️ Total upload execution");
+
+    // 1) Load data from the sheet
+    const sheet = context.workbook.worksheets.getItem(sheetName);
+    const range = sheet.getUsedRange();
+    range.load("values");
+    console.time("⏱️ Data loading");
+    await context.sync();
+    console.timeEnd("⏱️ Data loading");
+
+    const values = range.values;
+    if (!values || values.length === 0) {
+      throw new Error("No data found in the worksheet");
+    }
+    console.log(`📊 Processing ${values.length} rows × ${values[0].length} columns`);
+
+    // 2) Build real .xlsx in memory with ExcelJS
+    console.time("⏱️ XLSX creation");
+    const workbookJS = new ExcelJS.Workbook();
+    const worksheetJS = workbookJS.addWorksheet(sheetName);
+    values.forEach(row => worksheetJS.addRow(row));
+    const buffer = await workbookJS.xlsx.writeBuffer();
+    console.timeEnd("⏱️ XLSX creation");
+
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+    console.log(`📦 Blob size: ${(blob.size / (1024 * 1024)).toFixed(2)} MB`);
+
+    // 3) Attempt upload up to 3 times with 30s timeout each
+    let lastError = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+      try {
+        console.time(`⏱️ Upload attempt ${attempt}`);
+        const response = await fetch(uploadURL, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "x-amz-acl": "bucket-owner-full-control",
+            "Cache-Control": "no-cache",
+          },
+          body: blob,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        console.timeEnd(`⏱️ Upload attempt ${attempt}`);
+
+        if (response.ok) {
+          console.log(`✅ File uploaded successfully on attempt ${attempt}`);
+          console.timeEnd("⏱️ Total upload execution");
+          return true;
+        } else {
+          const text = await response.text();
+          console.error(`❌ Upload failed (status ${response.status}) on attempt ${attempt}: ${text}`);
+          lastError = new Error(`Upload failed with status ${response.status}`);
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (err.name === "AbortError") {
+          console.error(`❌ Upload attempt ${attempt} aborted after 30s`);
+          lastError = new Error("Upload aborted after timeout");
+        } else {
+          console.error(`❌ Upload error on attempt ${attempt}:`, err);
+          lastError = err;
+        }
+      }
+
+      if (attempt < 3) {
+        console.log(`🔄 Retrying upload in 15 seconds (attempt ${attempt + 1}/3)`);
+        await new Promise(res => setTimeout(res, 15_000));
+      }
+    }
+
+    throw lastError;
+  });
+}
+
+export async function downloadAndInsertDataFromExcelACESheet(downloadURL, serviceName) {
+  const BATCH_SIZE = 90000;
+  const NORMALIZE_BATCH_SIZE = 20000;
+  const TEMP_SHEET_NAME = "tempAWSdata";
+  const OUTPUTS_SHEET_NAME = "outputs";
+
+  async function fetchData() {
+    console.log("Starting to fetch the file from S3...");
+    const response = await fetch(downloadURL);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch the file: ${response.statusText}`);
+    }
+    console.log("File fetched successfully. Streaming data in chunks...");
+    return response.body;
+  }
+
+  async function processStream(stream, sheetName) {
+    console.log("Starting to process stream...");
+    const reader = stream.getReader();
+    let rows = [];
+    let rowIndex = 1;
+    let buffer = "";
+    // skip the very first CSV row when generating the ACE sheet
+    let skipHeader = serviceName.toLowerCase().includes("generate ace");
+
+    return new Promise((resolve, reject) => {
+      const processChunk = async ({ done, value }) => {
+        if (done) {
+          if (buffer) processBuffer(buffer);
+          if (rows.length) {
+            await normalizeRows(rows);
+            await insertParsedData(rows, rowIndex, sheetName);
+          }
+          console.log("Stream processing completed.");
+          resolve();
+          return;
+        }
+
+        const text = new TextDecoder("utf-8").decode(value);
+        const lines = (buffer + text).split("\n");
+        buffer = lines.pop();
+
+        for (let line of lines) processBuffer(line);
+
+        if (rows.length >= BATCH_SIZE) {
+          await normalizeRows(rows);
+          await insertParsedData(rows.slice(0, BATCH_SIZE), rowIndex, sheetName);
+          rowIndex += BATCH_SIZE;
+          rows = rows.slice(BATCH_SIZE);
+        }
+
+        reader.read().then(processChunk).catch(reject);
+      };
+
+      reader.read().then(processChunk).catch(reject);
+    });
+
+    function processBuffer(line) {
+      // drop the first line when skipHeader is true
+      if (skipHeader) {
+        skipHeader = false;
+        return;
+      }
+      const parsed = Papa.parse(line, {
+        header: false,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        quoteChar: '"',
+        escapeChar: '"',
+        error: err => console.error(`Parsing error: ${err.message}`)
+      });
+      if (parsed.errors.length) {
+        parsed.errors.forEach(e => console.error(`CSV error: ${e.message}`));
+      } else {
+        rows.push(parsed.data[0]);
+      }
+    }
+  }
+
+  async function normalizeRows(rows) {
+    return new Promise(resolve => {
+      const maxCols = Math.max(...rows.map(r => r.length));
+      console.log(`Normalizing to ${maxCols} columns.`);
+      let idx = 0;
+      function batch() {
+        const end = Math.min(idx + NORMALIZE_BATCH_SIZE, rows.length);
+        for (let i = idx; i < end; i++) {
+          while (rows[i].length < maxCols) rows[i].push("");
+        }
+        idx = end;
+        if (idx < rows.length) requestAnimationFrame(batch);
+        else resolve();
+      }
+      batch();
+    });
+  }
+
+  function getColumnLetter(i) {
+    let s = "";
+    while (i >= 0) {
+      s = String.fromCharCode((i % 26) + 65) + s;
+      i = Math.floor(i / 26) - 1;
+    }
+    return s;
+  }
+
+  async function insertParsedData(rows, startRow, sheetName) {
+    await Excel.run(async context => {
+      const sheet = context.workbook.worksheets.getItemOrNullObject(sheetName);
+      await context.sync();
+      if (sheet.isNullObject) throw new Error(`Sheet "${sheetName}" not found.`);
+      const endRow = startRow + rows.length - 1;
+      const colCount = rows[0].length;
+      const rangeAddr = `A${startRow}:${getColumnLetter(colCount - 1)}${endRow}`;
+      const range = sheet.getRange(rangeAddr);
+      range.values = rows;
+      await context.sync();
+      console.log(`Inserted rows ${startRow}–${endRow} in "${sheetName}"`);
+    });
+  }
+
+  async function createOrClearSheet(sheetName) {
+    await Excel.run(async context => {
+      let sheet = context.workbook.worksheets.getItemOrNullObject(sheetName);
+      await context.sync();
+      if (!sheet.isNullObject) {
+        sheet.getUsedRange().clear();
+        console.log(`Cleared "${sheetName}".`);
+      } else {
+        sheet = context.workbook.worksheets.add(sheetName);
+        console.log(`Created "${sheetName}".`);
+      }
+      await context.sync();
+    });
+  }
+
+  async function renameSheet(serviceName) {
+    return Excel.run(async context => {
+      const temp = context.workbook.worksheets.getItemOrNullObject(TEMP_SHEET_NAME);
+      await context.sync();
+      if (temp.isNullObject) return { success: false, newSheetName: null };
+
+      let newName;
+      if (serviceName === "GENERATE ACE SHEET") {
+        const cell = temp.getRange("J5");
+        cell.load("values");
+        await context.sync();
+        const val = cell.values[0][0];
+        if (!val) return { success: false, newSheetName: null };
+        newName = val.split("_").pop().substring(0, 31).replace(/[:\/\\\?\*\[\]]/g, "").trim();
+      } else if (serviceName === "RUN COMPUTATION") {
+        newName = OUTPUTS_SHEET_NAME;
+        const exists = context.workbook.worksheets.getItemOrNullObject(newName);
+        await context.sync();
+        if (!exists.isNullObject) return { success: true, newSheetName: null };
+      } else {
+        return { success: false, newSheetName: null };
+      }
+
+      const conflict = context.workbook.worksheets.getItemOrNullObject(newName);
+      await context.sync();
+      if (!conflict.isNullObject && newName !== "outputs") {
+        conflict.delete();
+        await context.sync();
+      }
+
+      temp.name = newName;
+      await context.sync();
+      console.log(`Renamed to "${newName}".`);
+      return { success: true, newSheetName: newName };
+    });
+  }
+
+  try {
+    console.log("Download & insert started…");
+    const stream = await fetchData();
+
+    if (serviceName === "RUN COMPUTATION") {
+      await createOrClearSheet(OUTPUTS_SHEET_NAME);
+      await processStream(stream, OUTPUTS_SHEET_NAME);
+      return { success: true, newSheetName: OUTPUTS_SHEET_NAME };
+    } else {
+      await createOrClearSheet(TEMP_SHEET_NAME);
+      await processStream(stream, TEMP_SHEET_NAME);
+      return await renameSheet(serviceName);
+    }
+  } catch (err) {
+    console.error("Error:", err);
+    return { success: false, newSheetName: null };
+  }
+}
+
+
+export async function unhideSheets(sheetNames) {
+  try {
+    await Excel.run(async (context) => {
+      sheetNames.forEach(name => {
+        const sheet = context.workbook.worksheets.getItem(name);
+        // Set visibility to visible
+        sheet.visibility = Excel.SheetVisibility.visible;
+      });
+      await context.sync();
+    });
+    console.log(`Successfully unhid sheets: ${sheetNames.join(", ")}`);
+    return true;
+  } catch (error) {
+    console.error("Error unhiding sheets:", error);
+    return false;
+  }
 }

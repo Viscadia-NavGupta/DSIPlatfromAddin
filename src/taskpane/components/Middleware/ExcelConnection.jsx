@@ -1792,3 +1792,39 @@ export async function protectSetupSheet(password) {
     console.error(`Error protecting Setup sheet: ${error}`);
   }
 }
+
+
+
+export async function activateSheet(sheetName) {
+  Excel.run(function (context) {
+    // Get the worksheet by name
+    const sheet = context.workbook.worksheets.getItem(sheetName);
+
+    // Activate the worksheet
+    sheet.activate();
+
+    // Sync to apply the changes
+    return context.sync().then(function () {
+      console.log(`Sheet "${sheetName}" is now active.`);
+    });
+  }).catch(function (error) {
+    console.log(`Error: ${error}`);
+  });
+}
+
+export async function unhideSheet(sheetName) {
+  try {
+    await Excel.run(async (context) => {
+      // Get the worksheet by name
+      const sheet = context.workbook.worksheets.getItem(sheetName);
+
+      // Set the visibility of the sheet to visible
+      sheet.visibility = Excel.SheetVisibility.visible;
+
+      await context.sync();
+      console.log(`Sheet '${sheetName}' has been unhidden.`);
+    });
+  } catch (error) {
+    console.error(`Error unhiding sheet '${sheetName}':`, error);
+  }
+}

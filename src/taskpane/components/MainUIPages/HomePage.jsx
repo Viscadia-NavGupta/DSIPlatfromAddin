@@ -70,8 +70,8 @@ const HomePage = ({ userName, setPageValue }) => {
     {
       name: "Model Management",
       icon: <ModelBuilder width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-      action: () => ProdExcelConnections.exportData2(),
-      disabled: true,
+      action: () => setPageValue("ModelManagementPage1"),
+      disabled: false,
     },
     {
       name: "Forecast Management",

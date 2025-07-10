@@ -27,6 +27,8 @@ import ResetPassword from "./ForgotPasswordPage/ResetPassword";
 import LoadScenarioAgg from "./MainUIPages/LoadScenarioPage/LoadSceanrioAgg";
 import PowerbiManegment from "./MainUIPages/PowerBi Page/PowerBIPage";
 import SuccessMessagePage from "./MainUIPages/MiscPages/successMessagePage";
+import ModelManagementPage1 from "./MainUIPages/ModelBuilder/Modelbuilder";
+import MMSheetManagment from "./MainUIPages/Model Desinger/ModelDesigner";
 function App() {
   const [page, setPage] = useState("UserLogin");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -245,6 +247,10 @@ function App() {
         return <LoadScenarioAgg setPageValue={setPageValue} />;
       case "PowerbiManegment":
         return <PowerbiManegment setPageValue={setPageValue} />;
+      case "ModelManagementPage1":
+        return <ModelManagementPage1 setPageValue={setPageValue} />;
+      case "MMSheetManagment":
+        return <MMSheetManagment setPageValue={setPageValue} />;
       case "SuccessMessagePage":
         return (
           <SuccessMessagePage
