@@ -262,6 +262,7 @@ Cycle: ${selectedCycle}
 Scenario: ${scenarioName}`;
 
       if (saveFlag === "SUCCESS" || (saveFlag && saveFlag.result === "DONE")) {
+        await excelfucntions.setCalculationMode("automatic");
         setPageValue("SuccessMessagePage", message);
         await AWSconnections.writeMetadataToNamedCell(
           "last_scn_update",

@@ -230,6 +230,7 @@ const SaveScenario = ({ setPageValue }) => {
       const message = `Forecast scenario saved for\nModel: ${heading.replace("Save Scenario for: ", "")}\nCycle: ${selectedCycle}\nScenario: ${scenarioName}`;
 
       if (saveFlag === "SUCCESS" || (saveFlag && saveFlag.result === "DONE")) {
+        await excelfucntions.setCalculationMode("automatic");
         setPageValue("SuccessMessagePage", message);
         await AWSconnections.writeMetadataToNamedCell(
           "last_scn_update",

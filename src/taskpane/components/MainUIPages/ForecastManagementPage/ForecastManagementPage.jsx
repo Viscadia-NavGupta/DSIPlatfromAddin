@@ -104,8 +104,10 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
   const handleCompute = async () => {
     try {
       setPageValue("LoadingCircleComponent", "Calculating Results...");
+      await ExcelFunctions.setCalculationMode("manual");
       const result = await AWSConnections.service_orchestration("RUN_COMPUTATION");
       console.log("Computation result:", result);
+      await ExcelFunctions.setCalculationMode("automatic");
       setPageValue("SuccessMessagePage", "Forecast Data Updated Successfully");
       // you can add further success UI/notifications here
     } catch (err) {
