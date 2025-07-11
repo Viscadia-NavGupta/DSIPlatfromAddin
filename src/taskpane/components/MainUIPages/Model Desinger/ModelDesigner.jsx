@@ -23,7 +23,7 @@ const MMSheetManagement = ({ setPageValue }) => {
   const handleGenerateACE = async () => {
     try {
       setPageValue("LoadingCircleComponent", "Genrating Model...");
-      await new Promise((resolve) => setTimeout(resolve, 15000));
+      await new Promise((resolve) => setTimeout(resolve, 10000));
       ExcelFunctions.activateSheet("Product X Forecast 1");
       // await ExcelFunctions.setCalculationMode("manual");
       // const serviceFlag = await AWSConnections.service_orchestration(
