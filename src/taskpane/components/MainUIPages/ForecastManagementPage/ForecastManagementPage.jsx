@@ -9,6 +9,7 @@ import { DataFrame } from "dataframe-js";
 
 import { specialModelIds } from "../../Middleware/Model Config";
 import * as AWSConnections from "../../Middleware/AWSConnections";
+import * as ExcelFunctions from "../../Middleware/ExcelConnection";
 
 import {
   HomePageContainer,
