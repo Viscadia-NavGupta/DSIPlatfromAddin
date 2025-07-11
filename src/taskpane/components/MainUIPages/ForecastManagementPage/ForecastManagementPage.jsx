@@ -121,7 +121,7 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
   const handleCalculations = async () => {
     setPageValue("LoadingCircleComponent", "Generating Calculations...");
     // wait 5 seconds
-    await new Promise((resolve) => setTimeout(resolve, 10000));
+    await new Promise((resolve) => setTimeout(resolve, 15000));
 
     // then unhide
     AWSConnections.unhideSheets([

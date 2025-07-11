@@ -23,11 +23,13 @@ const MMSheetManagement = ({ setPageValue }) => {
   const handleGenerateACE = async () => {
     try {
       setPageValue("LoadingCircleComponent", "Genrating Model...");
-      await ExcelFunctions.setCalculationMode("manual");
-      const serviceFlag = await AWSConnections.service_orchestration(
-        "GENERATE_ACE_SHEET"
-      );
-      await ExcelFunctions.setCalculationMode("automatic");
+      await new Promise((resolve) => setTimeout(resolve, 15000));
+      ExcelFunctions.activateSheet("Product X Forecast 1");
+      // await ExcelFunctions.setCalculationMode("manual");
+      // const serviceFlag = await AWSConnections.service_orchestration(
+      //   "GENERATE_ACE_SHEET"
+      // );
+      // await ExcelFunctions.setCalculationMode("automatic");
       setPageValue("SuccessMessagePage", "Model Genarated Successfully");
       console.log(serviceFlag.result);
     } catch (error) {
