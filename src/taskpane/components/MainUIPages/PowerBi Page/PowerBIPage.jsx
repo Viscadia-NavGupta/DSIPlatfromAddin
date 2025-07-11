@@ -63,7 +63,7 @@ const PowerbiManegment = ({ setPageValue }) => {
           <Button
             onClick={() =>
               window.open(
-                "https://app.powerbi.com/groups/8432e502-aff3-49cd-9ad9-e3ccb1ab4eea/reports/1fb0132c-fcf1-4bd5-9ce8-37d7e35adb0e/ca00450869d3c67885cf?experience=power-bi",
+                "https://app.powerbi.com/groups/me/reports/b46b9827-0286-4133-89a5-d39e2eebc85f/f1810362774bd852b3c8?ctid=c05372cf-28bd-4caf-83dd-e8b65c066ce9&experience=power-bi",
                 "_blank"
               )
             }
@@ -80,7 +80,7 @@ const PowerbiManegment = ({ setPageValue }) => {
 
           {/* PowerBI Interim */}
           <Button
-            onClick={() => window.open("https://app.powerbi.com/groups/8432e502-aff3-49cd-9ad9-e3ccb1ab4eea/reports/8f422736-fec8-4f54-aeb5-8f7f276acc26/ec86a4985c1873dd9be4?experience=power-bi", "_blank")}
+            onClick={() => window.open("https://app.powerbi.com/groups/me/reports/b46b9827-0286-4133-89a5-d39e2eebc85f/f1810362774bd852b3c8?ctid=c05372cf-28bd-4caf-83dd-e8b65c066ce9&experience=power-bi", "_blank")}
             style={{
               width: buttonSize.width,
               height: buttonSize.height,
