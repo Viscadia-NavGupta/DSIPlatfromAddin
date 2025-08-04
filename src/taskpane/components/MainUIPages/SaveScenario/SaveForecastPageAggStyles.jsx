@@ -76,7 +76,6 @@ export const Input = styled("input")({
 
 export const SaveButton = styled("button")({
   padding: "14px 24px",
-  marginTop: "30px",
   width: "100%",
   maxWidth: "400px",
   fontFamily: "Roboto, sans-serif",
@@ -158,4 +157,14 @@ export const ConfirmButton = styled("button")({
   "&:hover": {
     backgroundColor: "#8A1F1A",
   },
+});
+
+// New styled component to left-align the checkbox row
+export const CheckboxRow = styled("div")({
+  display: "flex",
+  width: "100%",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  alignSelf: "flex-start",
+  margin: "0.5rem 0",
 });

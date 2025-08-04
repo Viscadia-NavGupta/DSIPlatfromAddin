@@ -70,7 +70,7 @@ const HomePage = ({ userName, setPageValue }) => {
     {
       name: "Model Management",
       icon: <ModelBuilder width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-      action: () => ProdExcelConnections.exportData2(),
+      action: () => ProdExcelConnections.generateLongFormData("US", "DataModel"),
       disabled: true,
     },
     {

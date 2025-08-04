@@ -338,7 +338,11 @@ const AggLockScenario = ({ setPageValue }) => {
         "",
         concatenatedArray,
         matchedForecasts,
-        setPageValue
+        setPageValue,
+        [],
+        cloudLoadModelsList.map(row =>
+          row.length >= 7 ? `${row[0]} - ${row[6]}|${row[3]}|` : ""
+        )
       );
       console.timeEnd("save forecast");
 

@@ -549,13 +549,14 @@ export async function service_orchestration(
   User_ID = "",
   secret_name = "",
   Forecast_UUID = "",
-  LongformData,
+  LongformData = [],
   outputbackend_data = [],
   sheetNames_Agg = [],
   constituent_ID = [],
   matchedForecasts = [],
   setPageValue,
-  ForecastIDS = []
+  ForecastIDS = [],
+  constituent_ID_SaveStatus = []
 ) {
   console.log(`🚀 Service orchestration started: ${buttonname}`);
 
@@ -584,7 +585,7 @@ export async function service_orchestration(
     const pollingUrl = secretsObject.Polling;
 
 
-    if (buttonname === "SAVE_FORECAST" || buttonname === "SAVE_LOCKED_FORECAST") {
+    if (buttonname === "SAVE_FORECAST" || buttonname === "SAVE_LOCKED_FORECAST" || buttonname === "SAVE_SANDBOX") {
       console.log("📤 Preparing forecast upload");
       // save_forecast is used to get the s3 objects to upload the lifes 
       const S3Uploadobejct = await AuthorizationData(
@@ -627,12 +628,43 @@ export async function service_orchestration(
           scenarioname
         );
 
+
         if (servicestatus === "Endpoint request timed out" || (servicestatus && servicestatus.status === "Poll")) {
           console.log("⏱️ Service request requires polling");
           return poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
         }
         return servicestatus;
       }
+    }
+    /// cahnge for save interim to snadbox 
+    else if (buttonname === "SANDBOXED_TO_INTERIM_FORECAST") {
+      console.log("📤 Preparing to lock sandboxed forecast");
+
+      let servicestatus = await servicerequest(
+        serviceorg_URL,
+        buttonname,
+        UUID_Generated[0],
+        "",
+        idToken,
+        CONFIG.AWS_SECRETS_NAME,
+        User_Id,
+        "",
+        "",
+        [],
+        [Forecast_UUID]
+      );
+
+      console.log("🔄 Service status:", servicestatus);
+
+      // 2️⃣ Handle polling if necessary:
+      if (
+        servicestatus === "Endpoint request timed out" ||
+        (servicestatus && servicestatus.status === "Poll")
+      ) {
+        return poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+      }
+      return servicestatus;
+      /// import and save the forecast
     } else if (buttonname === "IMPORT_ASSUMPTIONS") {
       const S3downloadobject = await AuthorizationData(
         buttonname,
@@ -685,6 +717,7 @@ export async function service_orchestration(
           return poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
         }
         return servicestatus;
+
       }
     } else if (buttonname === "Agg_Load_Models") {
       console.log("📤 Preparing to load Aggregated Models");
@@ -735,95 +768,287 @@ export async function service_orchestration(
 
       console.log("✅ All downloads completed.");
       return { status: "SUCCESS", message: "Aggregated models downloaded." };
-    } else if (buttonname === "SAVE_FORECAST_AGG" || buttonname === "SAVE_LOCKED_FORECAST_AGG") {
+    } else if (buttonname === "SAVE_FORECAST_AGG" || buttonname === "SAVE_LOCKED_FORECAST_AGG" || buttonname === "SAVE_SANDBOX_AGG" || buttonname === "SANDBOXED_TO_INTERIM_FORECAST_AGG") {
       const buttonMapping = {
         SAVE_FORECAST_AGG: "SAVE_FORECAST",
         SAVE_LOCKED_FORECAST_AGG: "SAVE_LOCKED_FORECAST",
+        SAVE_SANDBOX_AGG: "SAVE_SANDBOX",
+        SANDBOXED_TO_INTERIM_FORECAST_AGG: "SANDBOXED_TO_INTERIM_FORECAST",
       };
       const mappedButtonName = buttonMapping[buttonname] || buttonname;
 
-      // 1) Fetch upload URLs
-      let S3Uploadobject;
-      try {
-        S3Uploadobject = await AuthorizationData(
-          "SAVE_FORECAST",
-          idToken,
-          CONFIG.AWS_SECRETS_NAME,
-          username,
-          UUID_Generated
-        );
-      } catch (err) {
-        console.error("❌ Failed to fetch S3 upload URLs:", err);
-        return { status: "error", message: err.message };
-      }
 
-      const UploadS3SaveForecastURL = S3Uploadobject["presigned urls"]["UPLOAD"]["SAVE_FORECAST"][UUID_Generated[0]];
-      const UploadS3INPUTFILEURL = S3Uploadobject["presigned urls"]["UPLOAD"]["INPUT_FILE"][UUID_Generated[0]];
+      if (mappedButtonName === "SANDBOXED_TO_INTERIM_FORECAST") {
+        console.log("📤 Preparing to lock sandboxed forecast");
 
-      // 2) Pivot / prepare the data
-      try {
-        LongformData = await pivotUpFlatArrayToAC(LongformData);
-      } catch (err) {
-        console.error("❌ Error pivoting data:", err);
-        return { status: "error", message: err.message };
-      }
-
-      // 3) Upload both files in parallel
-      let flag_flatfileupload, flat_inputfileupload;
-      try {
-        [flag_flatfileupload, flat_inputfileupload] = await Promise.all([
-          uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL),
-          uploadFileToS3("Input File", UploadS3INPUTFILEURL)
-        ]);
-      } catch (err) {
-        console.error("❌ Upload exception:", err);
-        return { status: "error", message: err.message };
-      }
-      // 4) Ensure at least one succeeded
-      if (!flag_flatfileupload && !flat_inputfileupload) {
-        console.error("❌ Both uploads failed");
-        return { status: "error", message: "Failed to upload forecast and input files." };
-      }
-
-      // 5) Call the service endpoint
-      let servicestatus;
-      try {
-        servicestatus = await servicerequest(
+        // 1️⃣ Call the service
+        const serviceStatus = await servicerequest(
           serviceorg_URL,
           mappedButtonName,
           UUID_Generated[0],
-          Model_UUID,
+          "",
           idToken,
           CONFIG.AWS_SECRETS_NAME,
           User_Id,
-          cycleName,
-          scenarioname,
-          constituent_ID
+          "",
+          "",
+          [],
+          [Forecast_UUID]
         );
-      } catch (err) {
-        console.error("❌ Service request error:", err);
-        return { status: "error", message: err.message };
-      }
+        console.log("🔄 Service status:", serviceStatus);
 
-      // 6) Handle polling if needed
-      let pollingResult = servicestatus;
-      if (
-        servicestatus === "Endpoint request timed out" ||
-        (servicestatus && servicestatus.status === "Poll")
-      ) {
-        console.log("⏱️ Service request requires polling");
-        try {
-          pollingResult = await poll(
+        // 2️⃣ Handle polling if necessary
+        let pollingStatus;
+        if (
+          serviceStatus === "Endpoint request timed out" ||
+          (serviceStatus && serviceStatus.status === "Poll")
+        ) {
+          const pollResponse = await poll(
             UUID_Generated[0],
             CONFIG.AWS_SECRETS_NAME,
             pollingUrl,
             idToken
           );
+          console.log("🔄 Poll response:", pollResponse);
+          pollingStatus = pollResponse.result ?? pollResponse;
+        } else {
+          pollingStatus =
+            typeof serviceStatus === "string"
+              ? serviceStatus
+              : serviceStatus.status ?? serviceStatus;
+        }
+
+        // 3️⃣ If polling didn’t finish with DONE, exit immediately
+        if (pollingStatus !== "DONE") {
+          console.error(`❌ Lock‑sandbox‑to‑interim failed: ${pollingStatus}`);
+          return {
+            status: "error",
+            message: `Lock‑sandbox‑to‑interim failed: ${pollingStatus}`
+          };
+        }
+
+        console.log("✅ Polling finished with DONE; proceeding.");
+      }
+      else {
+
+        // 1) Fetch upload URLs
+        let S3Uploadobject;
+        try {
+          S3Uploadobject = await AuthorizationData(
+            "SAVE_FORECAST",
+            idToken,
+            CONFIG.AWS_SECRETS_NAME,
+            username,
+            UUID_Generated
+          );
         } catch (err) {
-          console.error("❌ Polling error:", err);
+          console.error("❌ Failed to fetch S3 upload URLs:", err);
           return { status: "error", message: err.message };
         }
+
+        const UploadS3SaveForecastURL = S3Uploadobject["presigned urls"]["UPLOAD"]["SAVE_FORECAST"][UUID_Generated[0]];
+        const UploadS3INPUTFILEURL = S3Uploadobject["presigned urls"]["UPLOAD"]["INPUT_FILE"][UUID_Generated[0]];
+
+        // 2) Pivot / prepare the data
+        try {
+          LongformData = await pivotUpFlatArrayToAC(LongformData);
+        } catch (err) {
+          console.error("❌ Error pivoting data:", err);
+          return { status: "error", message: err.message };
+        }
+
+        // 3) Upload both files in parallel
+        let flag_flatfileupload, flat_inputfileupload;
+        try {
+          [flag_flatfileupload, flat_inputfileupload] = await Promise.all([
+            uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL),
+            uploadFileToS3("Input File", UploadS3INPUTFILEURL)
+          ]);
+        } catch (err) {
+          console.error("❌ Upload exception:", err);
+          return { status: "error", message: err.message };
+        }
+        // 4) Ensure at least one succeeded
+        if (!flag_flatfileupload && !flat_inputfileupload) {
+          console.error("❌ Both uploads failed");
+          return { status: "error", message: "Failed to upload forecast and input files." };
+        }
+
+        // 5) Call the service endpoint
+        let servicestatus;
+        try {
+          servicestatus = await servicerequest(
+            serviceorg_URL,
+            mappedButtonName,
+            UUID_Generated[0],
+            Model_UUID,
+            idToken,
+            CONFIG.AWS_SECRETS_NAME,
+            User_Id,
+            cycleName,
+            scenarioname,
+            constituent_ID
+          );
+        } catch (err) {
+          console.error("❌ Service request error:", err);
+          return { status: "error", message: err.message };
+        }
+
+        // 6) Handle polling if needed
+        var pollingResult = servicestatus;
+        if (
+          servicestatus === "Endpoint request timed out" ||
+          (servicestatus && servicestatus.status === "Poll")
+        ) {
+          console.log("⏱️ Service request requires polling");
+          try {
+            pollingResult = await poll(
+              UUID_Generated[0],
+              CONFIG.AWS_SECRETS_NAME,
+              pollingUrl,
+              idToken
+            );
+          } catch (err) {
+            console.error("❌ Polling error:", err);
+            return { status: "error", message: err.message };
+          }
+        }
       }
+      // sandbox aggregated forecast
+      const twoD = constituent_ID_SaveStatus
+        .map(str => {
+          const parts = str.split("|");
+          const status = parts[1]?.trim();
+          if (status !== "Interim") return null;
+
+          // Grab the UUID (with dashes) and just trim whitespace
+          const uuidRaw = parts[0].split(" - ").pop() || "";
+          const cleanUuid = uuidRaw.trim();
+
+          return [status, cleanUuid];
+        })
+        .filter(Boolean);
+
+      console.log(twoD);
+      /// this logic need to be changed to save the agg forecast and snadboxed forecast
+      if (buttonname === "SAVE_FORECAST_AGG" || buttonname === "SANDBOXED_TO_INTERIM_FORECAST_AGG") {
+        const list = Array.isArray(twoD) ? twoD : [];
+        const totalCount = list.length;
+        let completedCount = 0;
+        if (totalCount === 0) {
+          console.log("ℹ️ No interim forecasts to process, nothing to lock.");
+          return  "SUCCESS";
+        }
+
+        for (const [, cleanUuid] of twoD) {
+          try {
+            // 1️⃣ Create a unique request ID for this lock call
+            const requestID = uuidv4();
+
+            // 2️⃣ Hit the lock‐forecast endpoint with cleanUuid
+            const rawLockStatus = await servicerequest(
+              serviceorg_URL,
+              "SANDBOXED_TO_INTERIM_FORECAST",
+              requestID,
+              "",                   // no Model_UUID
+              idToken,
+              CONFIG.AWS_SECRETS_NAME,
+              User_Id,
+              "",                   // no cycleName
+              "",                   // no scenarioname
+              [],                   // no LongformData
+              [cleanUuid]             // the UUID from twoD
+            );
+
+            // 3️⃣ Normalize into a string
+            const status =
+              typeof rawLockStatus === "string"
+                ? rawLockStatus
+                : rawLockStatus.status || rawLockStatus;
+
+            // 4️⃣ If the service asks you to poll, do so
+            if (status === "Poll" || status === "Endpoint request timed out") {
+              await poll(requestID, CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+            }
+
+            // 5️⃣ Update your progress UI
+            completedCount++;
+            const pct = 60 + Math.round((completedCount / totalCount) * 30);
+            setPageValue(
+              "LoadingCircleComponent",
+              `${pct}% | Saving sandboxed forecasts…`
+            );
+          } catch (err) {
+            console.error("❌ Error locking forecast", cleanUuid, err);
+            return { status: "error", message: err.message };
+          }
+        }
+
+        // (Optionally) return a final success here
+        // return { status: "SUCCESS", message: "All sandboxed forecasts locked." };
+      }
+
+      /// for locking the sandbox cases 
+
+      if (buttonname === "SAVE_LOCKED_FORECAST_AGG") {
+        const list = Array.isArray(twoD) ? twoD : [];
+        const totalCount = list.length;
+        let completedCount = 0;
+        if (totalCount === 0) {
+          console.log("ℹ️ No interim forecasts to process, nothing to lock.");
+          return  "SUCCESS";
+        }
+
+        for (const [, cleanUuid] of twoD) {
+          try {
+            // 1️⃣ Create a unique request ID for this lock call
+            const requestID = uuidv4();
+
+            // 2️⃣ Hit the lock‐forecast endpoint with cleanUuid
+            const rawLockStatus = await servicerequest(
+              serviceorg_URL,
+              "SANDBOXED_TO_LOCKED_FORECAST",
+              requestID,
+              "",                   // no Model_UUID
+              idToken,
+              CONFIG.AWS_SECRETS_NAME,
+              User_Id,
+              "",                   // no cycleName
+              "",                   // no scenarioname
+              [],                   // no LongformData
+              [cleanUuid]             // the UUID from twoD
+            );
+
+            // 3️⃣ Normalize into a string
+            const status =
+              typeof rawLockStatus === "string"
+                ? rawLockStatus
+                : rawLockStatus.status || rawLockStatus;
+
+            // 4️⃣ If the service asks you to poll, do so
+            if (status === "Poll" || status === "Endpoint request timed out") {
+              await poll(requestID, CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+            }
+
+            // 5️⃣ Update your progress UI
+            completedCount++;
+            const pct = 60 + Math.round((completedCount / totalCount) * 30);
+            setPageValue(
+              "LoadingCircleComponent",
+              `${pct}% | Saving sandboxed forecasts…`
+            );
+          } catch (err) {
+            console.error("❌ Error locking forecast", cleanUuid, err);
+            return { status: "error", message: err.message };
+          }
+        }
+
+        // (Optionally) return a final success here
+        // return { status: "SUCCESS", message: "All sandboxed forecasts locked." };
+      }
+
+
+
 
       // 7) If locking multiple forecasts, propagate any errors there too
       if (buttonname === "SAVE_LOCKED_FORECAST_AGG") {

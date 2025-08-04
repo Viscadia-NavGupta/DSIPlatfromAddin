@@ -92,9 +92,12 @@ const FLSyncData = ({ setPageValue }) => {
   };
 
   const updateDropdownOptions = () => {
-    setFilteredSaveStatus([...new Set(fullData.map(r => r.save_status).filter(Boolean))]);
+    // Extract unique save_status, exclude 'Interim'
+    const statuses = [...new Set(fullData.map(r => r.save_status).filter(Boolean))]
+      .filter(status => status.toLowerCase() !== "interim");
+    setFilteredSaveStatus(statuses);
 
-    // 🚫 Exclude "ACTUALS" from cycle dropdown
+    // Exclude "ACTUALS" from cycle dropdown
     setFilteredCycles([
       ...new Set(
         fullData
@@ -115,7 +118,6 @@ const FLSyncData = ({ setPageValue }) => {
   const handleSyncData = async () => {
     const warn = { saveStatus: !saveStatus.length, cycle: !selectedCycle.length, asset: !selectedAsset.length };
     setWarnings(warn);
-    // excelconnections.unprotectWorkbookAndSheet("Setup","Overarching@123");
     if (warn.saveStatus || warn.cycle || warn.asset) return;
     setPageValue("LoadingCircleComponent", "Syncing data, please wait...");
 
@@ -135,7 +137,6 @@ const FLSyncData = ({ setPageValue }) => {
       );
       await excelconnections.MetaDataSyncwithoutheaders({ results1: filtered }, "cloud_backend_ds", "A2");
       await excelconnections.refreshPivotTable("Setup", "PivotTable3");
-      // excelconnections.protectSetupSheet("Overarching@123");
       setPageValue("SuccessMessagePage", "Data synced successfully.");
     } catch (e) {
       console.error("Sync Data Error:", e);
