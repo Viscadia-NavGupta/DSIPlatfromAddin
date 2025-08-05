@@ -346,7 +346,7 @@ const AggLockScenario = ({ setPageValue }) => {
       );
       console.timeEnd("save forecast");
 
-      if (saveFlag === "SUCCESS" || saveFlag.result === "DONE") {
+      if (saveFlag === "SUCCESS" || saveFlag.result === "DONE" ||  saveFlag.status ==="SUCCESS") {
         const message = `Forecast scenario saved & locked for model: ${heading.replace(
           "Save & Lock Aggregator Scenario for: ",
           ""

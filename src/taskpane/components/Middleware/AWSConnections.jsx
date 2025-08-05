@@ -937,7 +937,7 @@ export async function service_orchestration(
         let completedCount = 0;
         if (totalCount === 0) {
           console.log("ℹ️ No interim forecasts to process, nothing to lock.");
-          return  "SUCCESS";
+          return "SUCCESS";
         }
 
         for (const [, cleanUuid] of twoD) {
@@ -992,70 +992,47 @@ export async function service_orchestration(
 
       if (buttonname === "SAVE_LOCKED_FORECAST_AGG") {
         const list = Array.isArray(twoD) ? twoD : [];
-        const totalCount = list.length;
-        let completedCount = 0;
-        if (totalCount === 0) {
-          console.log("ℹ️ No interim forecasts to process, nothing to lock.");
-          return  "SUCCESS";
-        }
+        const totalInterim = list.length;
+        let completedInterim = 0;
 
-        for (const [, cleanUuid] of twoD) {
-          try {
-            // 1️⃣ Create a unique request ID for this lock call
-            const requestID = uuidv4();
+        if (totalInterim === 0) {
+          console.log("ℹ️ No interim forecasts to process via twoD.");
+        } else {
+          for (const [, cleanUuid] of list) {
+            try {
+              const requestID = uuidv4();
+              const rawLockStatus = await servicerequest(
+                serviceorg_URL,
+                "SANDBOXED_TO_LOCKED_FORECAST",
+                requestID,
+                "", idToken, CONFIG.AWS_SECRETS_NAME, User_Id, "", "", [], [cleanUuid]
+              );
 
-            // 2️⃣ Hit the lock‐forecast endpoint with cleanUuid
-            const rawLockStatus = await servicerequest(
-              serviceorg_URL,
-              "SANDBOXED_TO_LOCKED_FORECAST",
-              requestID,
-              "",                   // no Model_UUID
-              idToken,
-              CONFIG.AWS_SECRETS_NAME,
-              User_Id,
-              "",                   // no cycleName
-              "",                   // no scenarioname
-              [],                   // no LongformData
-              [cleanUuid]             // the UUID from twoD
-            );
+              const status =
+                typeof rawLockStatus === "string"
+                  ? rawLockStatus
+                  : rawLockStatus.status || rawLockStatus;
 
-            // 3️⃣ Normalize into a string
-            const status =
-              typeof rawLockStatus === "string"
-                ? rawLockStatus
-                : rawLockStatus.status || rawLockStatus;
+              console.log(`🔁 SANDBOXED_TO_LOCKED_FORECAST response for ${cleanUuid}:`, rawLockStatus);
 
-            // 4️⃣ If the service asks you to poll, do so
-            if (status === "Poll" || status === "Endpoint request timed out") {
-              await poll(requestID, CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+              if (status === "Poll" || status === "Endpoint request timed out") {
+                await poll(requestID, CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+              }
+
+              completedInterim++;
+              const pct = 30 + Math.round((completedInterim / totalInterim) * 30);
+              setPageValue("LoadingCircleComponent", `${pct}% | Locking sandboxed forecasts...`);
+            } catch (err) {
+              console.error("❌ Error locking forecast from twoD", cleanUuid, err);
+              return { status: "error", message: err.message };
             }
-
-            // 5️⃣ Update your progress UI
-            completedCount++;
-            const pct = 60 + Math.round((completedCount / totalCount) * 30);
-            setPageValue(
-              "LoadingCircleComponent",
-              `${pct}% | Saving sandboxed forecasts…`
-            );
-          } catch (err) {
-            console.error("❌ Error locking forecast", cleanUuid, err);
-            return { status: "error", message: err.message };
           }
         }
 
-        // (Optionally) return a final success here
-        // return { status: "SUCCESS", message: "All sandboxed forecasts locked." };
-      }
+        const totalMatched = matchedForecasts?.length || 0;
+        let completedMatched = 0;
 
-
-
-
-      // 7) If locking multiple forecasts, propagate any errors there too
-      if (buttonname === "SAVE_LOCKED_FORECAST_AGG") {
-        const totalCount = matchedForecasts?.length || 0;
-        let completedCount = 0;
-
-        for (const match of matchedForecasts) {
+        for (const match of matchedForecasts || []) {
           try {
             const RequestID = uuidv4();
             const newUUID = match.forecast_id.replace("forecast_", "");
@@ -1063,23 +1040,16 @@ export async function service_orchestration(
               serviceorg_URL,
               "LOCK_FORECAST",
               RequestID,
-              "",
-              idToken,
-              CONFIG.AWS_SECRETS_NAME,
-              User_Id,
-              "",
-              "",
-              [],
-              newUUID
+              "", idToken, CONFIG.AWS_SECRETS_NAME, User_Id, "", "", [], newUUID
             );
 
-            // Normalize into a single string status
             const status =
               typeof rawLockStatus === "string"
                 ? rawLockStatus
                 : rawLockStatus.status || rawLockStatus;
 
-            // Define all the statuses we consider “okay”
+            console.log(`🔁 LOCK_FORECAST response for ${newUUID}:`, rawLockStatus);
+
             const accepted = new Set([
               "Forecast is already locked",
               "Forecast locked successfully",
@@ -1089,23 +1059,26 @@ export async function service_orchestration(
             ]);
 
             if (!accepted.has(status)) {
+              console.warn(`⚠️ Unexpected status received for ${newUUID}:`, status);
               throw new Error(`Unexpected lock response: ${JSON.stringify(rawLockStatus)}`);
             }
 
-            // If we need to poll (either Poll or timed out), do it
             if (status === "Poll" || status === "Endpoint request timed out") {
               await poll(RequestID, CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
             }
 
-            // Update completion and UI
-            completedCount++;
-            const pct = 60 + Math.round((completedCount / totalCount) * 30);
-            setPageValue("LoadingCircleComponent", `${pct}% | Saving your forecast...`);
+            completedMatched++;
+            const pct = 60 + Math.round((completedMatched / totalMatched) * 30);
+            setPageValue("LoadingCircleComponent", `${pct}% | Locking matched forecasts...`);
           } catch (err) {
-            console.error("❌ Error locking forecast", match.forecast_id, err);
+            console.error("❌ Error locking matched forecast", match.forecast_id, err);
             return { status: "error", message: err.message };
           }
         }
+
+        const finalResult = { status: "SUCCESS", message: "All forecasts locked" };
+        console.log("✅ service_orchestration returning:", finalResult);
+        return finalResult;
       }
 
       // 8) If we get here, everything succeeded
