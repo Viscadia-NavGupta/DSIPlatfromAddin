@@ -1004,79 +1004,177 @@ export async function readNamedRangeToArray(namedRangeName) {
 
 // -------------------------------------------------input file  functions--------------------------------------------------
 
+// async function appendColumns(arr, numNewCols) {
+//   return Excel.run(async (context) => {
+//     let workbook = context.workbook;
+//     let namedItems = workbook.names;
+//     namedItems.load("items/name");
+
+//     await context.sync(); // Load Named Ranges once
+
+//     let namedRangeMap = {}; // Store named ranges in a key-value map
+//     let rangesToLoad = [];
+
+//     // Load named ranges and their addresses
+//     namedItems.items.forEach(nameItem => {
+//       let range = nameItem.getRangeOrNullObject(); // Avoid errors on missing ranges
+//       range.load(["address"]); // Load only address
+//       namedRangeMap[nameItem.name] = range; // Store reference
+//       rangesToLoad.push(range);
+//     });
+
+//     await context.sync(); // Sync to get addresses
+
+//     // Now populate the map with actual addresses
+//     for (let name in namedRangeMap) {
+//       if (!namedRangeMap[name].isNullObject) {
+//         namedRangeMap[name] = namedRangeMap[name].address;
+//       }
+//     }
+
+//     let oldCols = arr[0].length;
+//     let newCols = oldCols + numNewCols;
+
+//     // Step 1: Create a new array and replace Named Ranges for every element
+//     let newArr = arr.map(row =>
+//       row.map(cell => {
+//         if (typeof cell === "string") {
+//           cell = cell.replace(/^=/, ""); // Remove '=' if present
+//           if (namedRangeMap[cell]) {
+//             return namedRangeMap[cell]; // Replace with its address
+//           }
+//         }
+//         return cell;
+//       }).concat(new Array(numNewCols).fill("")) // Append new columns
+//     );
+
+//     // Step 2: Process arr[i][4] to count rows and columns
+//     for (let i = 0; i < arr.length; i++) {
+//       let element = newArr[i][3]; // Process only column index 4
+
+//       if (element && typeof element === "string") {
+//         element = element.replace(/^=/, ""); // Remove '=' if present
+
+//         // If it's a Named Range, replace with its reference
+//         if (namedRangeMap[element]) {
+//           element = namedRangeMap[element];
+//         }
+
+//         // Count rows and columns for the evaluated range
+//         let rangeInfo = getRangeDimensions(element);
+//         if (rangeInfo.rowCount > 0 && rangeInfo.colCount > 0) {
+//           newArr[i][oldCols] = rangeInfo.rowCount;
+//           newArr[i][oldCols + 1] = rangeInfo.colCount;
+//           newArr[i][oldCols + 2] = element; // Store processed address
+//         }
+//       }
+//     }
+
+//     return newArr;
+//   }).catch((error) => {
+//     console.error("Error in appendColumns:", error);
+//     return arr; // Return original array in case of error
+//   });
+// }
+// Assumes you already have:
+// async function extractNamedRanges() -> [["Sheet Name","Named Range","Address"], ...] (row 0 is header)
+
 async function appendColumns(arr, numNewCols) {
-  return Excel.run(async (context) => {
-    let workbook = context.workbook;
-    let namedItems = workbook.names;
-    namedItems.load("items/name");
+  try {
+    // 1) Pull safe named ranges once (no Excel.run here; extractNamedRanges handles it)
+    const table = await extractNamedRanges(); // [["Sheet Name","Named Range","Address"], ...]
+    if (!Array.isArray(table) || table.length < 2) return arr;
 
-    await context.sync(); // Load Named Ranges once
+    // 2) Build a robust, case-insensitive map (supports Workbook names and Sheet!LocalName)
+    const header  = table[0];
+    const sheetIx = header.findIndex(h => /sheet name/i.test(h));
+    const nameIx  = header.findIndex(h => /named range/i.test(h));
+    const addrIx  = header.findIndex(h => /address/i.test(h));
+    if (sheetIx === -1 || nameIx === -1 || addrIx === -1) return arr;
 
-    let namedRangeMap = {}; // Store named ranges in a key-value map
-    let rangesToLoad = [];
+    const map = Object.create(null);
+    const toKey = (s) => (s || "").trim().toLowerCase();
+    const unquote = (s) =>
+      s && s.startsWith("'") && s.endsWith("'") ? s.slice(1, -1) : (s || "");
 
-    // Load named ranges and their addresses
-    namedItems.items.forEach(nameItem => {
-      let range = nameItem.getRangeOrNullObject(); // Avoid errors on missing ranges
-      range.load(["address"]); // Load only address
-      namedRangeMap[nameItem.name] = range; // Store reference
-      rangesToLoad.push(range);
-    });
+    // Workbook names prefer the bare-name slot
+    for (let i = 1; i < table.length; i++) {
+      const sheet = table[i][sheetIx];
+      const nm    = table[i][nameIx];
+      const addr  = table[i][addrIx];
+      if (sheet === "Workbook" && nm && addr) map[toKey(nm)] = addr;
+    }
+    // Sheet-scoped names: add Sheet!Name and 'Sheet'!Name; fill bare if free
+    for (let i = 1; i < table.length; i++) {
+      let sheet = table[i][sheetIx];
+      const nm   = table[i][nameIx];
+      const addr = table[i][addrIx];
+      if (!nm || !addr || sheet === "Workbook") continue;
 
-    await context.sync(); // Sync to get addresses
-
-    // Now populate the map with actual addresses
-    for (let name in namedRangeMap) {
-      if (!namedRangeMap[name].isNullObject) {
-        namedRangeMap[name] = namedRangeMap[name].address;
-      }
+      sheet = unquote(sheet);
+      map[toKey(`${sheet}!${nm}`)]   = addr;
+      map[toKey(`'${sheet}'!${nm}`)] = addr;
+      if (!map[toKey(nm)]) map[toKey(nm)] = addr; // backfill bare local if not shadowed
     }
 
-    let oldCols = arr[0].length;
-    let newCols = oldCols + numNewCols;
+    // Helper to resolve a string cell to an address
+    const resolveToken = (s) => {
+      if (typeof s !== "string") return null;
+      // remove ALL '=' as requested, then trim
+      let tok = s.replace(/=/g, "").trim();
+      if (!tok) return null;
 
-    // Step 1: Create a new array and replace Named Ranges for every element
-    let newArr = arr.map(row =>
-      row.map(cell => {
-        if (typeof cell === "string") {
-          cell = cell.replace(/^=/, ""); // Remove '=' if present
-          if (namedRangeMap[cell]) {
-            return namedRangeMap[cell]; // Replace with its address
+      // direct hit
+      let addr = map[toKey(tok)];
+      if (addr) return addr;
+
+      // Sheet-qualified variants
+      const bang = tok.indexOf("!");
+      if (bang > 0) {
+        const sh = tok.slice(0, bang);
+        const nm = tok.slice(bang + 1);
+        const shUnq = unquote(sh);
+        addr = map[toKey(`${shUnq}!${nm}`)] || map[toKey(`'${shUnq}'!${nm}`)] || map[toKey(nm)];
+        if (addr) return addr;
+      }
+      return null;
+    };
+
+    // 3) Step 1: replace named tokens in every cell + append new columns
+    const oldCols = (arr && arr[0]) ? arr[0].length : 0;
+    const newCols = oldCols + numNewCols;
+    const newArr  = arr.map((row) =>
+      row
+        .map((cell) => {
+          if (typeof cell === "string") {
+            const addr = resolveToken(cell);
+            return addr ? addr : cell.replace(/=/g, "").trim(); // keep cleaned text if no match
           }
-        }
-        return cell;
-      }).concat(new Array(numNewCols).fill("")) // Append new columns
+          return cell;
+        })
+        .concat(new Array(numNewCols).fill(""))
     );
 
-    // Step 2: Process arr[i][4] to count rows and columns
-    for (let i = 0; i < arr.length; i++) {
-      let element = newArr[i][3]; // Process only column index 4
-
-      if (element && typeof element === "string") {
-        element = element.replace(/^=/, ""); // Remove '=' if present
-
-        // If it's a Named Range, replace with its reference
-        if (namedRangeMap[element]) {
-          element = namedRangeMap[element];
-        }
-
-        // Count rows and columns for the evaluated range
-        let rangeInfo = getRangeDimensions(element);
-        if (rangeInfo.rowCount > 0 && rangeInfo.colCount > 0) {
-          newArr[i][oldCols] = rangeInfo.rowCount;
-          newArr[i][oldCols + 1] = rangeInfo.colCount;
-          newArr[i][oldCols + 2] = element; // Store processed address
+    // 4) Step 2: use col index 3 to compute dims + store address/text
+    for (let i = 0; i < newArr.length; i++) {
+      const raw = newArr[i][3];
+      if (typeof raw === "string" && raw.trim()) {
+        const addr = resolveToken(raw) || raw.replace(/=/g, "").trim();
+        const { rowCount, colCount } = getRangeDimensions(addr);
+        if (rowCount > 0 && colCount > 0) {
+          newArr[i][oldCols]     = rowCount;
+          newArr[i][oldCols + 1] = colCount;
+          newArr[i][oldCols + 2] = addr;
         }
       }
     }
 
     return newArr;
-  }).catch((error) => {
-    console.error("Error in appendColumns:", error);
-    return arr; // Return original array in case of error
-  });
+  } catch (error) {
+    console.error("appendColumns (using extractNamedRanges) error:", error);
+    return arr;
+  }
 }
-
 
 
 // Function to determine row and column count
