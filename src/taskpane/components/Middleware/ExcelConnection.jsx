@@ -640,7 +640,7 @@ export async function generateLongFormData(region, DataModelNameRange) {
       // outputRange.format.autofitColumns();
       // outputRange.format.autofitRows();
       // await context.sync();
-      console.timeEnd("writing data");
+      // console.timeEnd("writing data");
       console.log(`Data processed successfully. Final row count: ${currentRow - 1}`);
       // Return the longFormData array from within Excel.run
       return longFormData;
@@ -653,62 +653,189 @@ export async function generateLongFormData(region, DataModelNameRange) {
 }
 
 
+// export async function extractNamedRanges() {
+//   try {
+//     return await Excel.run(async (context) => {
+//       let workbook = context.workbook;
+//       let namedRangesArray = [["Sheet Name", "Named Range", "Address"]];
+
+//       let workbookNamedRanges = workbook.names;
+//       workbookNamedRanges.load("items");
+//       await context.sync();
+
+//       let rangesToLoad = [];
+//       workbookNamedRanges.items.forEach((nameItem) => {
+//         let range = nameItem.getRangeOrNullObject();
+//         range.load(["address"]);
+//         namedRangesArray.push(["Workbook", nameItem.name, "Loading..."]);
+//         rangesToLoad.push({ name: nameItem.name, range, index: namedRangesArray.length - 1 });
+//       });
+
+//       await context.sync();
+//       rangesToLoad.forEach((item) => {
+//         namedRangesArray[item.index][2] = item.range.address || "No Address";
+//       });
+
+//       let worksheets = workbook.worksheets;
+//       worksheets.load("items");
+//       await context.sync();
+
+//       for (let sheet of worksheets.items) {
+//         let sheetNamedRanges = sheet.names;
+//         sheetNamedRanges.load("items");
+//         await context.sync();
+
+//         let sheetRangesToLoad = [];
+//         sheetNamedRanges.items.forEach((nameItem) => {
+//           let range = nameItem.getRangeOrNullObject();
+//           range.load(["address"]);
+//           let sheetName = sheet.name;
+//           if (sheetName.startsWith("'") || sheetName.endsWith("'")) {
+//             sheetName = sheetName.slice(1, -1);
+//           }
+//           namedRangesArray.push([sheetName, nameItem.name, "Loading..."]);
+//           sheetRangesToLoad.push({ name: nameItem.name, range, index: namedRangesArray.length - 1 });
+//         });
+
+//         await context.sync();
+//         sheetRangesToLoad.forEach((item) => {
+//           namedRangesArray[item.index][2] = item.range.address || "No Address";
+//         });
+//       }
+
+//       return namedRangesArray;
+//     });
+//   } catch (error) {
+//     return [];
+//   }
+// }
+
+///////////// new code for extractNamedRanges /////////////
+
+// Fast + fault-tolerant extractor.
+// - Batches resolution (≈ 1 big sync per 1k names) for speed
+// - Skips non-range & known-bad formulas
+// - If a batch still fails, it auto-splits to isolate/skip bad items (no crashes)
+// Returns ONLY: [["Sheet Name","Named Range","Address"], ...]
 export async function extractNamedRanges() {
-  try {
-    return await Excel.run(async (context) => {
-      let workbook = context.workbook;
-      let namedRangesArray = [["Sheet Name", "Named Range", "Address"]];
+  const out = [["Sheet Name", "Named Range", "Address"]];
 
-      let workbookNamedRanges = workbook.names;
-      workbookNamedRanges.load("items");
-      await context.sync();
+  // ----- micro helpers (inline for speed) -----
+  const isUnsafeFormula = (f) => {
+    if (!f) return false;
+    if (/#REF!/i.test(f)) return true;                // broken ref
+    if (/\[[^\]]+\]/.test(f)) return true;            // external link [Book.xlsx]
+    if (/[^\s!]+:[^\s!]+!/.test(f)) return true;      // 3D ref Sheet1:Sheet3!A1
+    if (/,/.test(f) && /!/.test(f)) return true;      // discontiguous union A1,B2
+    if (/\![A-Z]+:[A-Z]+$/.test(f)) return true;      // whole column  Sheet!A:A
+    if (/\!\d+:\d+$/.test(f)) return true;            // whole row     Sheet!1:1
+    return false;
+  };
+  const normSheet = (n) =>
+    n && n.startsWith("'") && n.endsWith("'") ? n.slice(1, -1) : (n || "");
 
-      let rangesToLoad = [];
-      workbookNamedRanges.items.forEach((nameItem) => {
-        let range = nameItem.getRangeOrNullObject();
-        range.load(["address"]);
-        namedRangesArray.push(["Workbook", nameItem.name, "Loading..."]);
-        rangesToLoad.push({ name: nameItem.name, range, index: namedRangesArray.length - 1 });
-      });
+  // Resolve a slice of candidates in one shot; on failure split until isolated.
+  async function resolveSlice(context, slice, minFallbackSize = 16) {
+    try {
+      const proxies = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        const r = slice[i].item.getRangeOrNullObject();
+        r.load("address,isNullObject");
+        proxies[i] = r;
+      }
+      await context.sync(); // one big round-trip
 
-      await context.sync();
-      rangesToLoad.forEach((item) => {
-        namedRangesArray[item.index][2] = item.range.address || "No Address";
-      });
-
-      let worksheets = workbook.worksheets;
-      worksheets.load("items");
-      await context.sync();
-
-      for (let sheet of worksheets.items) {
-        let sheetNamedRanges = sheet.names;
-        sheetNamedRanges.load("items");
-        await context.sync();
-
-        let sheetRangesToLoad = [];
-        sheetNamedRanges.items.forEach((nameItem) => {
-          let range = nameItem.getRangeOrNullObject();
-          range.load(["address"]);
-          let sheetName = sheet.name;
-          if (sheetName.startsWith("'") || sheetName.endsWith("'")) {
-            sheetName = sheetName.slice(1, -1);
+      for (let i = 0; i < slice.length; i++) {
+        const r = proxies[i];
+        if (r && !r.isNullObject) {
+          const c = slice[i];
+          out.push([c.sheet, c.name, r.address || ""]);
+        }
+      }
+    } catch (_) {
+      // If any bad ref slipped through this slice, binary-split to isolate quickly
+      if (slice.length <= minFallbackSize) {
+        // last-mile fallback: try items one by one (<=16 -> bounded cost)
+        for (let i = 0; i < slice.length; i++) {
+          try {
+            const r = slice[i].item.getRangeOrNullObject();
+            r.load("address,isNullObject");
+            await context.sync();
+            if (!r.isNullObject) out.push([slice[i].sheet, slice[i].name, r.address || ""]);
+          } catch {
+            // skip this single bad name silently
           }
-          namedRangesArray.push([sheetName, nameItem.name, "Loading..."]);
-          sheetRangesToLoad.push({ name: nameItem.name, range, index: namedRangesArray.length - 1 });
-        });
+        }
+        return;
+      }
+      const mid = slice.length >> 1;
+      await resolveSlice(context, slice.slice(0, mid), minFallbackSize);
+      await resolveSlice(context, slice.slice(mid), minFallbackSize);
+    }
+  }
 
-        await context.sync();
-        sheetRangesToLoad.forEach((item) => {
-          namedRangesArray[item.index][2] = item.range.address || "No Address";
-        });
+  try {
+    await Excel.run(async (context) => {
+      // Minor UI perf win during heavy batch
+      if (context.application?.suspendScreenUpdatingUntilNextSync) {
+        context.application.suspendScreenUpdatingUntilNextSync();
       }
 
-      return namedRangesArray;
+      const wb = context.workbook;
+      const wbNames = wb.names;
+      const sheets = wb.worksheets;
+
+      // 1) Load workbook names + sheet list (ONE sync)
+      wbNames.load("items/name,items/type,items/formula");
+      sheets.load("items/name");
+      await context.sync();
+
+      // 2) Load all sheet-scope names (ONE sync)
+      const sheetList = sheets.items;
+      for (let i = 0; i < sheetList.length; i++) {
+        sheetList[i].names.load("items/name,items/type,items/formula");
+      }
+      await context.sync();
+
+      // 3) Build candidate list (Range-type + safe formula)
+      const candidates = [];
+
+      // workbook-scope
+      const wbItems = wbNames.items;
+      for (let i = 0; i < wbItems.length; i++) {
+        const n = wbItems[i];
+        if (n.type === "Range" && !isUnsafeFormula(n.formula)) {
+          candidates.push({ sheet: "Workbook", name: n.name, item: n });
+        }
+      }
+      // sheet-scope
+      for (let s = 0; s < sheetList.length; s++) {
+        const sLabel = normSheet(sheetList[s].name);
+        const sItems = sheetList[s].names.items;
+        for (let j = 0; j < sItems.length; j++) {
+          const n = sItems[j];
+          if (n.type === "Range" && !isUnsafeFormula(n.formula)) {
+            candidates.push({ sheet: sLabel, name: n.name, item: n });
+          }
+        }
+      }
+
+      // 4) Resolve in large chunks with fault tolerance
+      const CHUNK = 1024; // tune: 512–2000 based on your environment
+      for (let i = 0; i < candidates.length; i += CHUNK) {
+        const slice = candidates.slice(i, i + CHUNK);
+        await resolveSlice(context, slice); // usually 1 sync per chunk
+      }
     });
-  } catch (error) {
-    return [];
+  } catch {
+    // ignore; return whatever we accumulated (header at minimum)
   }
+
+  return out;
 }
+
+
+/////////
 
 export async function setCalculationMode(mode) {
   try {
