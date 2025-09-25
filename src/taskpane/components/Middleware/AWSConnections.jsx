@@ -466,6 +466,56 @@ export async function Extract_Service_Request(
   }
 }
 
+export async function Extract_Light_Service_Request(
+  serviceURL = "",
+  buttonName = "",
+  UUID = "",
+  idToken = "",
+  secretName = "",
+  userId = "",
+  constituent_ID = [],
+  LightMetrics=[],
+) {
+  try {
+    const headers = {
+      Authorization: `Bearer ${idToken}`,
+      "Content-Type": "application/json",
+      Connection: "keep-alive",
+    };
+    const body = {
+      request_id: UUID,
+      buttonName,
+      secret_name: secretName,
+      user_id: userId,
+      forecast_id: constituent_ID,
+      lite_version: LightMetrics,
+    };
+    console.log("📤 Sending service request");
+    const response = await fetch(serviceURL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+    const data = await response.json();
+    console.log("✅ Service response received");
+    if (!response.ok) {
+      return data.message || `HTTP Error ${response.status}`;
+    }
+    return data.message || "Success (no message provided)";
+  } catch (error) {
+    console.error("🚨 Service request error:", error);
+    if (error.response) {
+      try {
+        const errorData = await error.response.json();
+        return errorData.message || `Error: ${error.response.status}`;
+      } catch {
+        return `Error: ${error.response.status}`;
+      }
+    }
+    return `Error: ${error.message}`;
+  }
+}
+
 // - end of fiucntion 
 
 
@@ -556,7 +606,8 @@ export async function service_orchestration(
   matchedForecasts = [],
   setPageValue,
   ForecastIDS = [],
-  constituent_ID_SaveStatus = []
+  constituent_ID_SaveStatus = [],
+  LightMetricsList=[],
 ) {
   console.log(`🚀 Service orchestration started: ${buttonname}`);
 
@@ -1176,7 +1227,99 @@ export async function service_orchestration(
         };
       }
     }
+    else if (buttonname === "EXTRACT_DASHBOARD_DATA_LIGHT") {
+      console.log("📤 preparing for Forecast Library Extract");
 
+      // 1) kick off the extract request
+      let Service_Result;
+      try {
+        Service_Result = await Extract_Light_Service_Request(
+          serviceorg_URL,
+          "EXTRACT_DASHBOARD_DATA",
+          UUID_Generated[0],
+          idToken,
+          CONFIG.AWS_SECRETS_NAME,
+          User_Id,
+          ForecastIDS,
+          LightMetricsList,
+        );
+      } catch (err) {
+        console.error("❌ Extract_Service_Request threw:", err);
+        return { status: "ERROR", message: err.message || "Service request failed" };
+      }
+      console.log("Service_Result", Service_Result);
+
+      // 1a) if the service itself returned an error status, bail
+      if (
+        !Service_Result ||
+        (typeof Service_Result === "object" && Service_Result.status === "ERROR") ||
+        (typeof Service_Result === "string" && Service_Result.toLowerCase().includes("error"))
+      ) {
+        const msg = Service_Result?.message || Service_Result || "Service request failed";
+        return { status: "ERROR", message: msg };
+      }
+
+      // 2) if it needs polling, do that
+      let pollingResult = Service_Result;
+      if (
+        Service_Result === "Endpoint request timed out" ||
+        (Service_Result && Service_Result.status === "Poll")
+      ) {
+        console.log("⏱️ Service request requires polling");
+        try {
+          pollingResult = await poll(
+            UUID_Generated[0],
+            CONFIG.AWS_SECRETS_NAME,
+            pollingUrl,
+            idToken
+          );
+        } catch (err) {
+          console.error("❌ Polling failed:", err);
+          return { status: "ERROR", message: err.message || "Polling failed" };
+        }
+      }
+
+      // 2a) if polling came back with error, bail
+      if (pollingResult?.status === "ERROR") {
+        return {
+          status: "ERROR",
+          message: pollingResult.message || "Polling returned an error",
+        };
+      }
+
+      // 3) fetch the presigned download link
+      let Extract_download;
+      try {
+        Extract_download = await AuthorizationData(
+          "EXTRACT_DASHBOARD_DATA",
+          idToken,
+          CONFIG.AWS_SECRETS_NAME,
+          username,
+          UUID_Generated
+        );
+      } catch (err) {
+        console.error("❌ AuthorizationData threw:", err);
+        return { status: "ERROR", message: err.message || "Failed to fetch download link" };
+      }
+      console.log("Extract_download", Extract_download);
+
+      const downloadUrls = Extract_download?.["presigned urls"]?.DOWNLOAD?.EXTRACT_DASHBOARD_DATA;
+      const ExtractS3_Downloadlink = downloadUrls && downloadUrls[UUID_Generated[0]];
+      await updateUrlInNamedRange(ExtractS3_Downloadlink);
+
+      // 3a) if we didn’t get a valid link, bail
+      if (!ExtractS3_Downloadlink) {
+        return {
+          status: "ERROR",
+          message: "Failed to retrieve download URL from service response",
+        };
+      } else {
+        return {
+          status: "SUCCESS",
+          message: "Aggregated models downloaded.",
+        };
+      }
+    }
     else if (buttonname === "IMPORT_ASSUMPTIONS_AGG") {
 
       let CONSTITUENT_AGG_ID = await ServiceRequest_Fetch_Constituent_ID(

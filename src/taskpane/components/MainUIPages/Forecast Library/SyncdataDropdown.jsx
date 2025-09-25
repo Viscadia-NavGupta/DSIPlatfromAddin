@@ -102,7 +102,7 @@ const FLSyncData = ({ setPageValue }) => {
       ...new Set(
         fullData
           .map(r => r.cycle_name)
-          .filter(name => Boolean(name) && name.toUpperCase() !== "ACTUALS")
+          .filter(name => Boolean(name))
       )
     ]);
 

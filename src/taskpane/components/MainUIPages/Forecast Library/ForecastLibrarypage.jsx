@@ -8,6 +8,7 @@ import { DataFrame } from "dataframe-js";
 import * as Excelconnections from "../../Middleware/ExcelConnection";
 import * as AWSconnections from "../../Middleware/AWSConnections";
 import CONFIG from "../../Middleware/AWSConnections";
+import { IoCodeDownloadOutline } from "react-icons/io5";
 
 import {
   HomePageContainer,
@@ -214,13 +215,87 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
     }
   };
 
+  const LoadAggModels_Light_FL = async () => {
+    const access = await AWSconnections.ButtonAccess("EXTRACT_DASHBOARD_DATA");
+    if (access?.message === "ACCESS DENIED") {
+      setPageValue(
+        "SaveForecastPageinterim",
+        "You do not have permission to use Forecast Library."
+      );
+      return;
+    }
+
+    let progress = 0;
+    setPageValue("LoadingCircleComponent", `${progress}% | Loading Data...`);
+    const intervalId = setInterval(() => {
+      progress = Math.min(progress + 3, 95);
+      setPageValue("LoadingCircleComponent", `${progress}% | Loading Data...`);
+    }, 2000);
+
+    try {
+      let ForecastIDS = await Excelconnections.calculateAndFetchColumnAN("Setup");
+      let LightData_Metrics_FL = await Excelconnections.getNamedRangeValues("FL_LightVersion_backend_NameList");
+      console.log("LightData_Metrics_FL", LightData_Metrics_FL);
+      ForecastIDS = ForecastIDS.map((item) => item.replace(/^forecast_/, ""));
+      await Excelconnections.setCalculationMode("manual");
+      const result = await AWSconnections.service_orchestration(
+        "EXTRACT_DASHBOARD_DATA_LIGHT",
+        "",
+        "",
+        "",
+        "",
+        "",
+        CONFIG.AWS_SECRETS_NAME,
+        "",
+        "",
+        [],
+        [],
+        [],
+        [],
+        setPageValue,
+        ForecastIDS,
+        [],
+        LightData_Metrics_FL
+      );
+
+      clearInterval(intervalId);
+      setPageValue("LoadingCircleComponent", `100% | Loading Data...`);
+      await new Promise((r) => setTimeout(r, 300));
+
+      if (result?.status === "SUCCESS") {
+        setPageValue(
+          "SuccessMessagePage",
+          "Data loaded successfully. Please press the 'Refresh Slicers' button to reflect latest changes"
+        );
+      } else {
+        const errMsg =
+          result?.message || "Some error occurred during load, please try again";
+        setPageValue("SaveForecastPageinterim", errMsg);
+      }
+    } catch (err) {
+      clearInterval(intervalId);
+      console.error("LoadAggModels error:", err);
+      setPageValue(
+        "SaveForecastPageinterim",
+        "Some error occurred during load, please try again"
+      );
+    }
+  };
+
   // 6️⃣ Modal handlers
   const handleLoadClick = () => setShowConfirmLoad(true);
   const handleConfirmLoad = async () => {
     setShowConfirmLoad(false);
     await LoadAggModels();
   };
+  const handleConfirmLoad_lightFL = async () => {
+    setShowConfirmLoad(false);
+    await LoadAggModels_Light_FL();
+  };
   const handleCancelLoad = () => setShowConfirmLoad(false);
+
+  // 7️⃣ NEW: Button 2 stub handler (logs only)
+  const handleButton2 = () => handleConfirmLoad_lightFL(true);
 
   const buttons = [
     {
@@ -230,9 +305,15 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
       disabled: false,
     },
     {
-      name: "Load Data",
+      name: "Load All Metircs",
       icon: <MdSaveAlt size={buttonSize.iconSize} />,
       action: handleLoadClick,
+      disabled: false,
+    },
+    {
+      name: "Load Key Metrics",
+      icon: <IoCodeDownloadOutline size={buttonSize.iconSize} />, // reuse icon; change if you want
+      action: handleButton2, // logs to console
       disabled: false,
     },
   ];

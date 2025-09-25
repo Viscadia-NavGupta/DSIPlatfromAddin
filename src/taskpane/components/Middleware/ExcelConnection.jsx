@@ -2017,3 +2017,16 @@ export async function protectSetupSheet(password) {
     console.error(`Error protecting Setup sheet: ${error}`);
   }
 }
+
+export async function getNamedRangeValues(namedRange) {
+  return Excel.run(async (context) => {
+    const range = context.workbook.names.getItem(namedRange).getRange();
+    range.load("values");
+    await context.sync();
+
+    // Return a 1D array of non-empty values (no Range object)
+    return range.values
+      .flat() // 2D -> 1D
+      .filter(v => v !== null && v !== undefined && (typeof v !== "string" || v.trim() !== ""));
+  });
+}
