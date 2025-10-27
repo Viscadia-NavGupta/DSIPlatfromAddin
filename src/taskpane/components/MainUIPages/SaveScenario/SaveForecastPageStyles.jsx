@@ -3,12 +3,16 @@ import { styled } from "@mui/system";
 export const Container = styled("div")({
   position: "relative",
   width: "100%",
+  height: "100vh",
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
-  justifyContent: "center",
+  justifyContent: "flex-start",
   fontFamily: "Roboto, sans-serif",
   fontWeight: 300,
+  overflowY: "auto",
+  padding: "0",
+  boxSizing: "border-box",
 });
 
 export const Heading = styled("h2")({
@@ -74,9 +78,64 @@ export const Input = styled("input")({
   backgroundColor: "#F7F7F7",
 });
 
+export const ForecasterNotesSection = styled("div")({
+  width: "100%",
+  maxWidth: "400px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "15px",
+  margin: "10px 0",
+});
+
+export const NotesLabel = styled("label")({
+  fontFamily: "Roboto, sans-serif",
+  fontWeight: 400,
+  fontSize: "14px",
+  color: "#4F4F4F",
+  marginBottom: "5px",
+});
+
+export const NotesTextArea = styled("textarea")({
+  width: "100%",
+  minHeight: "80px",
+  padding: "12px",
+  fontFamily: "Roboto, sans-serif",
+  fontWeight: 400,
+  fontSize: "14px",
+  lineHeight: "160%",
+  color: "#4F4F4F",
+  border: "1px solid #E0E0E0",
+  borderRadius: "8px",
+  boxSizing: "border-box",
+  backgroundColor: "#F7F7F7",
+  resize: "vertical",
+  "&:focus": {
+    outline: "none",
+    borderColor: "#B4322A",
+  },
+});
+
+export const DetailedNotesButton = styled("button")({
+  padding: "12px 24px",
+  width: "100%",
+  maxWidth: "400px",
+  fontFamily: "Roboto, sans-serif",
+  fontWeight: 400,
+  fontSize: "14px",
+  color: "#4F4F4F",
+  backgroundColor: "#E0E0E0",
+  borderRadius: "8px",
+  border: "1px solid #E0E0E0",
+  cursor: "pointer",
+  transition: "background 0.2s ease-in-out",
+  "&:hover": {
+    backgroundColor: "#D0D0D0",
+  },
+});
+
 export const SaveButton = styled("button")({
   padding: "14px 24px",
-  marginTop: "30px",
+  // marginTop: "30px",
   width: "100%",
   maxWidth: "400px",
   fontFamily: "Roboto, sans-serif",

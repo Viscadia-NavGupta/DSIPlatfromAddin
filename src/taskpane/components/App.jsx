@@ -29,6 +29,7 @@ import PowerbiManegment from "./MainUIPages/PowerBi Page/PowerBIPage";
 import SuccessMessagePage from "./MainUIPages/MiscPages/successMessagePage";
 import ModelManagementPage1 from "./MainUIPages/ModelBuilder/Modelbuilder";
 import MMSheetManagment from "./MainUIPages/Model Desinger/ModelDesigner";
+import DetailedNotesPage from "./MainUIPages/SaveScenario/DetailedNotesPage";
 function App() {
   const [page, setPage] = useState("UserLogin");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -37,6 +38,13 @@ function App() {
   const [loadingMessage, setLoadingMessage] = useState("Processing request...");
   const [saveForecastMessage, setSaveForecastMessage] = useState("Forecast is saved");
   const [resetEmail, setResetEmail] = useState("");
+  
+  // Detailed Notes states for SaveForecastPage and DetailedNotesPage
+  const [epidemiologyNotes, setEpidemiologyNotes] = useState("");
+  const [marketShareNotes, setMarketShareNotes] = useState("");
+  const [patientConversionNotes, setPatientConversionNotes] = useState("");
+  const [demandConversionNotes, setDemandConversionNotes] = useState("");
+  const [revenueConversionNotes, setRevenueConversionNotes] = useState("");
 
   // Unified page switcher
   const setPageValue = (value, message = "Processing request...") => {
@@ -217,7 +225,21 @@ function App() {
       case "InactiveFeature":
         return <InactiveFeature onBack={() => setPageValue("Home")} />;
       case "SaveForecastPage":
-        return <SaveForecastPage setPageValue={setPageValue} />;
+        return (
+          <SaveForecastPage 
+            setPageValue={setPageValue}
+            epidemiologyNotes={epidemiologyNotes}
+            setEpidemiologyNotes={setEpidemiologyNotes}
+            marketShareNotes={marketShareNotes}
+            setMarketShareNotes={setMarketShareNotes}
+            patientConversionNotes={patientConversionNotes}
+            setPatientConversionNotes={setPatientConversionNotes}
+            demandConversionNotes={demandConversionNotes}
+            setDemandConversionNotes={setDemandConversionNotes}
+            revenueConversionNotes={revenueConversionNotes}
+            setRevenueConversionNotes={setRevenueConversionNotes}
+          />
+        );
       case "SaveForecastPageinterim":
         return (
           <SaveForecastPageinterim
@@ -270,6 +292,22 @@ function App() {
           <AGGForecastManagementPage
             setPageValue={setPageValue}
             onBack={() => setPageValue("Home")}
+          />
+        );
+      case "DetailedNotesPage":
+        return (
+          <DetailedNotesPage
+            setPageValue={setPageValue}
+            epidemiologyNotes={epidemiologyNotes}
+            setEpidemiologyNotes={setEpidemiologyNotes}
+            marketShareNotes={marketShareNotes}
+            setMarketShareNotes={setMarketShareNotes}
+            patientConversionNotes={patientConversionNotes}
+            setPatientConversionNotes={setPatientConversionNotes}
+            demandConversionNotes={demandConversionNotes}
+            setDemandConversionNotes={setDemandConversionNotes}
+            revenueConversionNotes={revenueConversionNotes}
+            setRevenueConversionNotes={setRevenueConversionNotes}
           />
         );
       default:

@@ -3200,3 +3200,183 @@ export async function unhideSheets(sheetNames) {
     return false;
   }
 }
+
+/**
+ * Downloads Model Values Template from S3 and inserts data into Demand Summary (Values) sheet
+ * @returns {Promise<object>} - Success status and message
+ */
+export async function downloadModelValuesTemplate() {
+  const templateUrl = "https://vis-prod-download-bucket.s3.us-east-1.amazonaws.com/Template+Files/Model+Values-Template.xlsx";
+  const targetSheetName = "Demand Summary";
+  
+  try {
+    console.log("🔄 Starting Model Values Template download...");
+    console.time("⏱️ Model Values Template download");
+
+    // 1️⃣ Fetch the Excel file from S3
+    const buffer = await fetchData(templateUrl);
+    console.log("✅ Successfully downloaded template from S3");
+
+    // 2️⃣ Parse Excel file into 2D array
+    const rows = parseCsvOrXlsx(buffer, templateUrl);
+    if (!rows.length) {
+      throw new Error("❌ No data found in the template file");
+    }
+    
+    console.log(`📊 Template contains ${rows.length} rows × ${rows[0].length} columns`);
+
+    // 3️⃣ Insert data into Excel sheet (paste values only)
+    await Excel.run(async (context) => {
+      // Get or create the target sheet
+      let sheet = context.workbook.worksheets.getItemOrNullObject(targetSheetName);
+      await context.sync();
+      
+      if (sheet.isNullObject) {
+        // Create sheet if it doesn't exist
+        sheet = context.workbook.worksheets.add(targetSheetName);
+        console.log(`📝 Created new sheet: ${targetSheetName}`);
+      } else {
+        console.log(`📝 Found existing sheet: ${targetSheetName}`);
+      }
+
+      // Clear existing content in the sheet
+      const usedRange = sheet.getUsedRangeOrNullObject();
+      await context.sync();
+      if (!usedRange.isNullObject) {
+        usedRange.clear(Excel.ClearApplyTo.contents);
+        console.log("🧹 Cleared existing content");
+      }
+
+      // Suspend screen updating for performance
+      context.application.suspendScreenUpdatingUntilNextSync();
+      context.application.calculationMode = Excel.CalculationMode.manual;
+      await context.sync();
+
+      // Insert data starting from A1 - paste values only
+      const totalRows = rows.length;
+      const totalCols = rows[0].length;
+      const writeRange = sheet.getRangeByIndexes(0, 0, totalRows, totalCols);
+      
+      // Set only values (not formulas or formatting)
+      writeRange.values = rows;
+
+      // Sync the changes
+      await context.sync();
+
+      // Restore calculation mode
+      context.application.calculationMode = Excel.CalculationMode.automatic;
+      context.application.calculate(Excel.CalculationType.full);
+      await context.sync();
+
+      console.log(`✅ Successfully inserted ${totalRows} rows × ${totalCols} columns into ${targetSheetName}`);
+    });
+
+    console.timeEnd("⏱️ Model Values Template download");
+    
+    return {
+      success: true,
+      message: `Model outputs are refreshed in "${targetSheetName}" sheet`,
+      rowsInserted: rows.length,
+      columnsInserted: rows[0].length,
+      sheetName: targetSheetName
+    };
+    
+  } catch (error) {
+    console.error("❌ Error downloading Model Values Template:", error);
+    return {
+      success: false,
+      message: `Failed to download template: ${error.message}`,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Refreshes calculation sheets by hiding and unhiding them with a delay
+ * @returns {Promise<object>} - Success status and details of processed sheets
+ */
+export async function downloadCalculationSheetTemplate() {
+  const sheetsToRefresh = [
+    "Calculations | 1L",
+    "Calculations | 2L", 
+    "Calculations | 3L"
+  ];
+  
+  try {
+    console.log("🔄 Starting calculation sheets refresh...");
+    console.time("⏱️ Calculation sheets refresh");
+
+    // 1️⃣ Hide the specified calculation sheets
+    console.log("� Hiding calculation sheets...");
+    await Excel.run(async (context) => {
+      sheetsToRefresh.forEach(sheetName => {
+        try {
+          const sheet = context.workbook.worksheets.getItem(sheetName);
+          sheet.visibility = Excel.SheetVisibility.hidden;
+          console.log(`� Hiding sheet: "${sheetName}"`);
+        } catch (error) {
+          console.warn(`⚠️ Could not hide sheet "${sheetName}": ${error.message}`);
+        }
+      });
+      await context.sync();
+    });
+
+    // 2️⃣ Wait for 15 seconds
+    console.log("⏱️ Waiting 15 seconds before unhiding sheets...");
+    await new Promise(resolve => setTimeout(resolve, 15000));
+
+    // 3️⃣ Unhide the calculation sheets
+    console.log("👁️ Unhiding calculation sheets...");
+    const processedSheets = [];
+    
+    await Excel.run(async (context) => {
+      sheetsToRefresh.forEach(sheetName => {
+        try {
+          const sheet = context.workbook.worksheets.getItem(sheetName);
+          sheet.visibility = Excel.SheetVisibility.visible;
+          console.log(`👁️ Unhiding sheet: "${sheetName}"`);
+          processedSheets.push({
+            sheetName: sheetName,
+            status: "refreshed"
+          });
+        } catch (error) {
+          console.warn(`⚠️ Could not unhide sheet "${sheetName}": ${error.message}`);
+          processedSheets.push({
+            sheetName: sheetName,
+            error: error.message
+          });
+        }
+      });
+      await context.sync();
+    });
+
+    console.timeEnd("⏱️ Calculation sheets refresh");
+    
+    // 4️⃣ Prepare success message
+    const successfulSheets = processedSheets.filter(sheet => !sheet.error);
+    const failedSheets = processedSheets.filter(sheet => sheet.error);
+    
+    let message = `Calculation refreshed successfully. `;
+    message += `${successfulSheets.length} sheet(s) processed: ${successfulSheets.map(s => s.sheetName).join(", ")}`;
+    
+    if (failedSheets.length > 0) {
+      message += `. ${failedSheets.length} sheet(s) failed: ${failedSheets.map(s => s.sheetName).join(", ")}`;
+    }
+    
+    return {
+      success: true,
+      message: message,
+      sheetsProcessed: processedSheets.length,
+      successfulSheets: successfulSheets,
+      failedSheets: failedSheets
+    };
+    
+  } catch (error) {
+    console.error("❌ Error refreshing calculation sheets:", error);
+    return {
+      success: false,
+      message: `Failed to refresh calculation sheets: ${error.message}`,
+      error: error.message
+    };
+  }
+}
