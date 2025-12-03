@@ -304,14 +304,14 @@ const ForecastLibrarypage = ({ userName, setPageValue, onBack }) => {
       action: () => setPageValue("FLSyncData"),
       disabled: false,
     },
+    // {
+    //   name: "Load All Metircs",
+    //   icon: <MdSaveAlt size={buttonSize.iconSize} />,
+    //   action: handleLoadClick,
+    //   disabled: false,
+    // },
     {
-      name: "Load All Metircs",
-      icon: <MdSaveAlt size={buttonSize.iconSize} />,
-      action: handleLoadClick,
-      disabled: false,
-    },
-    {
-      name: "Load Key Metrics",
+      name: "Load Metrics",
       icon: <IoCodeDownloadOutline size={buttonSize.iconSize} />, // reuse icon; change if you want
       action: handleButton2, // logs to console
       disabled: false,
