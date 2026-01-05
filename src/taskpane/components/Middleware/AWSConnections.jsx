@@ -7,7 +7,7 @@ import * as Excelconnections from "./ExcelConnection";
 // =============================================================================
 //                         CONFIGURATION CONSTANTS
 // =============================================================================
-const ENV = "prod"; // Change to "prod" to switch environments
+const ENV = "dev"; // Change to "prod" to switch environments
 
 const CONFIG = {
   dev: {

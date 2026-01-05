@@ -71,7 +71,7 @@ const HomePage = ({ userName, setPageValue }) => {
       name: "Model Management",
       icon: <ModelBuilder width={buttonSize.iconSize} height={buttonSize.iconSize} />,
       action: () => ProdExcelConnections.generateLongFormData("US", "DataModel"),
-      disabled: true,
+      disabled: false,
     },
     {
       name: "Forecast Management",
