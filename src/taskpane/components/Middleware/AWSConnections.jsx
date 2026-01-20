@@ -7,7 +7,7 @@ import * as Excelconnections from "./ExcelConnection";
 // =============================================================================
 //                         CONFIGURATION CONSTANTS
 // =============================================================================
-const ENV = "prod"; // Change to "prod" to switch environments
+const ENV = "dev"; // Change to "prod" to switch environments
 
 const CONFIG = {
   dev: {
@@ -17,6 +17,7 @@ const CONFIG = {
     },
     AUTH_URL: "https://tj67lue8y7.execute-api.us-east-1.amazonaws.com/dev/sqldbquery",
     AWS_SECRETS_NAME: "dsivis-dev-remaining-secret",
+    LambdaA: "https://fofrwnzuv3.execute-api.us-east-1.amazonaws.com/default/",
     POLLING: {
       MAX_ATTEMPTS: 100,
       DELAY_MS: 5000,
@@ -33,6 +34,7 @@ const CONFIG = {
     },
     AUTH_URL: "https://29xxlo1ehl.execute-api.us-east-2.amazonaws.com/prod/sqldbquery",
     AWS_SECRETS_NAME: "DSI-prod-remaining-secrets",
+    LambdaA: "https://fofrwnzuv3.execute-api.us-east-1.amazonaws.com/default/",
     POLLING: {
       MAX_ATTEMPTS: 100,
       DELAY_MS: 5000,
@@ -44,6 +46,10 @@ const CONFIG = {
   },
 }[ENV];
 export default CONFIG;
+
+// Global access token from localStorage
+let accessToken_new = localStorage.getItem("accessToken");
+let User_id_new = localStorage.getItem("User_ID");
 
 // Simple in-memory cache for AWS metadata (to avoid repeated calls)
 let awsMetadataCache = {
@@ -608,6 +614,7 @@ export async function service_orchestration(
   ForecastIDS = [],
   constituent_ID_SaveStatus = [],
   LightMetricsList=[],
+  Forecaster_notes={},
 ) {
   console.log(`🚀 Service orchestration started: ${buttonname}`);
 
@@ -683,6 +690,13 @@ export async function service_orchestration(
         if (servicestatus === "Endpoint request timed out" || (servicestatus && servicestatus.status === "Poll")) {
           console.log("⏱️ Service request requires polling");
           return poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+        }
+        if (servicestatus === "SUCCESS" || servicestatus?.result === "DONE"){
+          console.log(Forecaster_notes);
+          const newUUID = uuidv4();
+          const UUID_Generated_new = `${newUUID}_${UUID_Generated[0]}`;
+
+          await updateForecastNotes(UUID_Generated_new, UUID_Generated[0], Forecaster_notes);
         }
         return servicestatus;
       }
@@ -3060,4 +3074,56 @@ function updateUrlInNamedRange(newUrl) {
       throw err;
     }
   });
+}
+
+/**
+ * Updates forecast notes via Lambda A API
+ * @param {string} request_id - Unique request identifier
+ * @param {string} forecast_id - Forecast UUID
+ * @param {object} notes - Notes object containing forecaster_notes and detailed categories
+ * @returns {Promise<object>} - API response data
+ */
+export async function updateForecastNotes(request_id, forecast_id, notes) {
+  try {
+    // Read fresh values from localStorage
+    const accessToken = localStorage.getItem("accessToken");
+    const userId = localStorage.getItem("User_ID");
+
+    // Parse notes if it's a string, otherwise use as-is
+    const notesObject = typeof notes === "string" ? JSON.parse(notes) : notes;
+
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    };
+
+    const body = {
+      request_id: request_id,
+      forecast_id: forecast_id,
+      user_id: parseInt(userId, 10),
+      notes: notesObject,
+    };
+
+    console.log("📤 Sending notes update request to Lambda A");
+    console.log("Request body:", JSON.stringify(body, null, 2));
+    
+    const response = await fetch(`${CONFIG.LambdaA}UpdateForecasterNotes`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json();
+    console.log("✅ Notes update response received");
+
+    if (!response.ok) {
+      console.error("❌ Notes update failed:", data);
+      return { status: "error", message: data.message || `HTTP Error ${response.status}` };
+    }
+
+    return { status: "success", data };
+  } catch (error) {
+    console.error("🚨 Notes update error:", error);
+    return { status: "error", message: error.message || String(error) };
+  }
 }

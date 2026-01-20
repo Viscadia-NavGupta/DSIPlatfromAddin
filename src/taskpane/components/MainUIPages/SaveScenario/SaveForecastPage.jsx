@@ -7,6 +7,21 @@ import {
   SelectDropdown,
   Input,
   SaveButton,
+  SectionLabel,
+  TextArea,
+  CharacterCount,
+  DetailedNotesButton,
+  DetailedNotesContainer,
+  DetailedNoteField,
+  DetailedNoteLabel,
+  DetailedTextArea,
+  BackButton,
+  CheckboxContainer,
+  Checkbox,
+  CheckboxLabel,
+  NotesWrapper,
+  BackButtonContainer,
+  DetailedHeading,
 } from "./SaveForecastPageStyles";
 import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
@@ -19,6 +34,15 @@ const SaveScenario = ({ setPageValue }) => {
   const [selectedCycle, setSelectedCycle] = useState("");
   const [scenarioName, setScenarioName] = useState("");
   const [saveInterimToPowerBI, setSaveInterimToPowerBI] = useState(false);
+  const [forecasterNotes, setForecasterNotes] = useState("");
+  const [showDetailedNotes, setShowDetailedNotes] = useState(false);
+  const [detailedNotes, setDetailedNotes] = useState({
+    epidemiology: "",
+    marketShareAssumptions: "",
+    patientConversion: "",
+    demandConversion: "",
+    revenueConversion: "",
+  });
   const [heading, setHeading] = useState("Active Sheet Name");
   const [isOutputSheet, setIsOutputSheet] = useState(false);
   const [cycleItems, setCycleItems] = useState([]);
@@ -37,21 +61,14 @@ const SaveScenario = ({ setPageValue }) => {
     const df = dataFrames.dfResult1;
     if (!df) return new Set();
     return new Set(
-      df.toCollection().map((r) =>
-        `${r.model_id}|${r.cycle_name}|${r.scenario_name
-          .toString()
-          .trim()
-          .toLowerCase()}`
-      )
+      df.toCollection().map((r) => `${r.model_id}|${r.cycle_name}|${r.scenario_name.toString().trim().toLowerCase()}`)
     );
   }, [dataFrames.dfResult1]);
 
   const checkScenarioExists = useCallback(
     (modelId, cycleName, name) => {
       if (!dataFrames.dfResult1) return false;
-      return scenarioSet.has(
-        `${modelId}|${cycleName}|${name.trim().toLowerCase()}`
-      );
+      return scenarioSet.has(`${modelId}|${cycleName}|${name.trim().toLowerCase()}`);
     },
     [scenarioSet]
   );
@@ -65,9 +82,7 @@ const SaveScenario = ({ setPageValue }) => {
         sheets.load("items/name");
         await context.sync();
 
-        const mdSheet = sheets.items.find(
-          (s) => s.name.toLowerCase() === "cloud_backend_md"
-        );
+        const mdSheet = sheets.items.find((s) => s.name.toLowerCase() === "cloud_backend_md");
         if (!mdSheet) {
           setIsOutputSheet(false);
           return;
@@ -87,10 +102,7 @@ const SaveScenario = ({ setPageValue }) => {
         setIsOutputSheet(true);
 
         if (ranges.ModelType.values[0][0] === "AGGREGATOR") {
-          setPageValue(
-            "AggSaveScenario",
-            "Loading scenario for Aggregator model..."
-          );
+          setPageValue("AggSaveScenario", "Loading scenario for Aggregator model...");
         }
       });
     } catch {
@@ -129,10 +141,7 @@ const SaveScenario = ({ setPageValue }) => {
   useEffect(() => {
     (async () => {
       try {
-        await Promise.all([
-          checkofCloudBackendSheet(),
-          fetchDataFromLambda(),
-        ]);
+        await Promise.all([checkofCloudBackendSheet(), fetchDataFromLambda()]);
       } finally {
         setLoading(false);
       }
@@ -142,13 +151,9 @@ const SaveScenario = ({ setPageValue }) => {
   // ─── Validate access ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!loading && modelIDValue && dataFrames.dfResult3) {
-      const ok = dataFrames.dfResult3
-        .toCollection()
-        .some((m) => m.model_id === modelIDValue);
+      const ok = dataFrames.dfResult3.toCollection().some((m) => m.model_id === modelIDValue);
       if (!ok) {
-        setModelIDError(
-          "Access to current model is not authorized. Please reach out to support team."
-        );
+        setModelIDError("Access to current model is not authorized. Please reach out to support team.");
         setIsOutputSheet(false);
       } else {
         setModelIDError("");
@@ -169,12 +174,11 @@ const SaveScenario = ({ setPageValue }) => {
             // if (/^cycle name:/i.test(line))
             //   setSelectedCycle(line.split(/cycle name:/i)[1].trim());
 
-            if (/^scenario name:/i.test(line))
-              setScenarioName(line.split(/scenario name:/i)[1].trim());
+            if (/^scenario name:/i.test(line)) setScenarioName(line.split(/scenario name:/i)[1].trim());
           });
         }
       })
-      .catch(() => { });
+      .catch(() => {});
   }, [isOutputSheet]);
 
   // ─── Save handler ─────────────────────────────────────────────────────────
@@ -185,10 +189,7 @@ const SaveScenario = ({ setPageValue }) => {
     // 1. Permission
     const access = await AWSconnections.ButtonAccess("SAVE_FORECAST");
     if (access?.message === "ACCESS DENIED") {
-      setPageValue(
-        "SaveForecastPageinterim",
-        "You do not have permission to save forecast."
-      );
+      setPageValue("SaveForecastPageinterim", "You do not have permission to save forecast.");
       console.timeEnd("Total save time");
       return;
     }
@@ -203,10 +204,7 @@ const SaveScenario = ({ setPageValue }) => {
           r.scenario_name.toLowerCase() === scenarioName.toLowerCase()
       );
     if (existing && existing.save_status !== "Interim") {
-      setPageValue(
-        "SaveForecastPageinterim",
-        "Scenario name already exists… choose a different one."
-      );
+      setPageValue("SaveForecastPageinterim", "Scenario name already exists… choose a different one.");
       console.timeEnd("Total save time");
       return;
     }
@@ -226,10 +224,7 @@ const SaveScenario = ({ setPageValue }) => {
     setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
     let longformData, outputbackend_data;
     if (specialModelIds.includes(modelIDValue)) {
-      longformData = await excelfunctions.generateLongFormData(
-        "US",
-        "DataModel"
-      );
+      longformData = await excelfunctions.generateLongFormData("US", "DataModel");
       await excelfunctions.saveData();
     } else {
       const [lf, , ob] = await Promise.all([
@@ -242,8 +237,21 @@ const SaveScenario = ({ setPageValue }) => {
     }
 
     // 5. Orchestrate
-    let saveFlag, strippedForecastId = null;
+    let saveFlag,
+      strippedForecastId = null;
     setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
+
+    // Create notes JSON body
+    const notesBody = {
+      forecaster_notes: forecasterNotes,
+      epidemiology: detailedNotes.epidemiology,
+      market_share_assumptions: detailedNotes.marketShareAssumptions,
+      patient_conversion: detailedNotes.patientConversion,
+      demand_conversion: detailedNotes.demandConversion,
+      revenue_conversion: detailedNotes.revenueConversion,
+    };
+    console.log("notes:", JSON.stringify(notesBody, null, 2));
+
     if (actionType === "SANDBOXED_TO_INTERIM_FORECAST") {
       const rawId = existing?.forecast_id ?? "";
       strippedForecastId = rawId.replace(/^forecast_/, "");
@@ -261,7 +269,11 @@ const SaveScenario = ({ setPageValue }) => {
         [],
         [],
         [],
-        setPageValue
+        setPageValue,
+        [],
+        [],
+        [],
+        JSON.stringify(notesBody)
       );
     } else {
       saveFlag = await AWSconnections.service_orchestration(
@@ -278,7 +290,11 @@ const SaveScenario = ({ setPageValue }) => {
         [],
         [],
         [],
-        setPageValue
+        setPageValue,
+        [],
+        [],
+        [],
+        JSON.stringify(notesBody)
       );
     }
 
@@ -291,20 +307,11 @@ const SaveScenario = ({ setPageValue }) => {
       setPageValue("SuccessMessagePage", msg);
       const statusLabel = saveInterimToPowerBI ? "Interim + BI" : "Interim";
 
-
-      await AWSconnections.writeMetadataToNamedCell(
-        "last_scn_update",
-        selectedCycle,
-        scenarioName,
-        statusLabel
-      );
+      await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, scenarioName, statusLabel);
       await excelfunctions.setCalculationMode("automatic");
       console.log("strippedForecastId:", strippedForecastId);
     } else {
-      setPageValue(
-        "SaveForecastPageinterim",
-        "Some error occurred while saving, please try again"
-      );
+      setPageValue("SaveForecastPageinterim", "Some error occurred while saving, please try again");
     }
 
     console.timeEnd("Total save time");
@@ -314,78 +321,164 @@ const SaveScenario = ({ setPageValue }) => {
     selectedCycle,
     scenarioName,
     saveInterimToPowerBI,
+    forecasterNotes,
+    detailedNotes,
     setPageValue,
     heading,
   ]);
 
   // ─── Render / early returns ────────────────────────────────────────────────
-  if (loading)
-    return <MessageBox>Connecting to data lake, please wait…</MessageBox>;
+  if (loading) return <MessageBox>Connecting to data lake, please wait…</MessageBox>;
   if (modelIDError) return <MessageBox>{modelIDError}</MessageBox>;
   if (!isOutputSheet)
     return (
       <MessageBox>
-        Current workbook is not a compatible forecast model. Please open the latest
-        ADC models to use this feature.
+        Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature.
       </MessageBox>
     );
 
   const isDisabled = !selectedCycle || !scenarioName;
+  const maxCharacters = 500;
+  const remainingCharacters = maxCharacters - forecasterNotes.length;
+
+  const handleDetailedNoteChange = (field, value) => {
+    setDetailedNotes((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
   return (
     <Container>
-      <Heading>{heading}</Heading>
-      <DropdownContainer>
-        <SelectDropdown
-          value={selectedCycle}
-          onChange={(e) => setSelectedCycle(e.target.value)}
-        >
-          <option value="" disabled>
-            Select Cycle
-          </option>
-          {cycleItems.map((c, i) => (
-            <option key={i} value={c}>
-              {c}
-            </option>
-          ))}
-        </SelectDropdown>
-        <Input
-          type="text"
-          placeholder="Enter Scenario Name"
-          value={scenarioName}
-          onChange={(e) => setScenarioName(e.target.value)}
-        />
-      </DropdownContainer>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          alignSelf: "flex-start",
-          margin: "0.5rem 0",
-        }}
-      >
-        <input
-          id="saveInterimToPowerBI"
-          type="checkbox"
-          checked={saveInterimToPowerBI}
-          onChange={(e) => setSaveInterimToPowerBI(e.target.checked)}
-          style={{ accentColor: saveInterimToPowerBI ? "green" : undefined }}
-        />
-        <label htmlFor="saveInterimToPowerBI" style={{ marginLeft: "0.5rem" }}>
-          Save interim to PowerBI
-        </label>
-      </div>
-      <SaveButton
-        onClick={handleSaveClick}
-        disabled={isDisabled}
-        style={
-          isDisabled
-            ? { backgroundColor: "#ccc", cursor: "not-allowed" }
-            : {}
-        }
-      >
-        Save
-      </SaveButton>
+      {!showDetailedNotes ? (
+        <>
+          <Heading>{heading}</Heading>
+          <DropdownContainer>
+            <SelectDropdown value={selectedCycle} onChange={(e) => setSelectedCycle(e.target.value)}>
+              <option value="" disabled>
+                Select Cycle
+              </option>
+              {cycleItems.map((c, i) => (
+                <option key={i} value={c}>
+                  {c}
+                </option>
+              ))}
+            </SelectDropdown>
+            <Input
+              type="text"
+              placeholder="Enter Scenario Name"
+              value={scenarioName}
+              onChange={(e) => setScenarioName(e.target.value)}
+            />
+          </DropdownContainer>
+
+          <CheckboxContainer>
+            <Checkbox
+              id="saveInterimToPowerBI"
+              type="checkbox"
+              checked={saveInterimToPowerBI}
+              onChange={(e) => setSaveInterimToPowerBI(e.target.checked)}
+              style={{ accentColor: saveInterimToPowerBI ? "green" : undefined }}
+            />
+            <CheckboxLabel htmlFor="saveInterimToPowerBI">Save interim to PowerBI</CheckboxLabel>
+          </CheckboxContainer>
+
+          <NotesWrapper>
+            <SectionLabel>Forecaster Notes</SectionLabel>
+            <TextArea
+              placeholder="Add your notes here..."
+              value={forecasterNotes}
+              onChange={(e) => {
+                if (e.target.value.length <= maxCharacters) {
+                  setForecasterNotes(e.target.value);
+                }
+              }}
+              maxLength={maxCharacters}
+            />
+            <CharacterCount isNearLimit={remainingCharacters < 50}>
+              {remainingCharacters} characters remaining
+            </CharacterCount>
+          </NotesWrapper>
+
+          {forecasterNotes.trim() && (
+            <DetailedNotesButton onClick={() => setShowDetailedNotes(true)} type="button">
+              Add Detailed Notes
+            </DetailedNotesButton>
+          )}
+
+          <SaveButton
+            onClick={handleSaveClick}
+            disabled={isDisabled}
+            style={isDisabled ? { backgroundColor: "#ccc", cursor: "not-allowed" } : {}}
+          >
+            Save
+          </SaveButton>
+        </>
+      ) : (
+        <>
+          <BackButtonContainer>
+            <BackButton onClick={() => setShowDetailedNotes(false)} type="button">
+              ←
+            </BackButton>
+            <DetailedHeading>{heading}</DetailedHeading>
+          </BackButtonContainer>
+
+          <DetailedNotesContainer>
+            <DetailedNoteField>
+              <DetailedNoteLabel>Epidemiology</DetailedNoteLabel>
+              <DetailedTextArea
+                placeholder="-"
+                value={detailedNotes.epidemiology}
+                onChange={(e) => handleDetailedNoteChange("epidemiology", e.target.value)}
+              />
+            </DetailedNoteField>
+
+            <DetailedNoteField>
+              <DetailedNoteLabel>Market Share Assumptions</DetailedNoteLabel>
+              <DetailedTextArea
+                placeholder="-"
+                value={detailedNotes.marketShareAssumptions}
+                onChange={(e) => handleDetailedNoteChange("marketShareAssumptions", e.target.value)}
+              />
+            </DetailedNoteField>
+
+            <DetailedNoteField>
+              <DetailedNoteLabel>Patient Conversion</DetailedNoteLabel>
+              <DetailedTextArea
+                placeholder="-"
+                value={detailedNotes.patientConversion}
+                onChange={(e) => handleDetailedNoteChange("patientConversion", e.target.value)}
+              />
+            </DetailedNoteField>
+
+            <DetailedNoteField>
+              <DetailedNoteLabel>Demand Conversion</DetailedNoteLabel>
+              <DetailedTextArea
+                placeholder="-"
+                value={detailedNotes.demandConversion}
+                onChange={(e) => handleDetailedNoteChange("demandConversion", e.target.value)}
+              />
+            </DetailedNoteField>
+
+            <DetailedNoteField>
+              <DetailedNoteLabel>Revenue Conversion</DetailedNoteLabel>
+              <DetailedTextArea
+                placeholder="-"
+                value={detailedNotes.revenueConversion}
+                onChange={(e) => handleDetailedNoteChange("revenueConversion", e.target.value)}
+              />
+            </DetailedNoteField>
+          </DetailedNotesContainer>
+
+          <SaveButton
+            onClick={handleSaveClick}
+            disabled={isDisabled}
+            style={isDisabled ? { backgroundColor: "#ccc", cursor: "not-allowed" } : {}}
+          >
+            Save
+          </SaveButton>
+        </>
+      )}
     </Container>
   );
 };
