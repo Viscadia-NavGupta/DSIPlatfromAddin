@@ -73,8 +73,8 @@ function App() {
         (async () => {
           const f = localStorage.getItem("firstName"),
             l = localStorage.getItem("lastName");
-          if (f && l) {
-            setUserName(`${f} ${l}`.trim());
+          if (f) {
+            setUserName(`${f}`.trim());
             return;
           }
           try {
@@ -83,7 +83,7 @@ function App() {
               last = decoded.family_name || "";
             localStorage.setItem("firstName", first);
             localStorage.setItem("lastName", last);
-            setUserName(`${first} ${last}`.trim());
+            setUserName(`${first}`.trim());
           } catch (e) {
             console.warn("Token decode error:", e);
           }
@@ -145,7 +145,7 @@ function App() {
 
         const f = localStorage.getItem("firstName"),
           l = localStorage.getItem("lastName");
-        if (f && l) setUserName(`${f} ${l}`.trim());
+        if (f) setUserName(`${f}`.trim());
       } catch (err) {
         const msg = err.message || "";
         if (

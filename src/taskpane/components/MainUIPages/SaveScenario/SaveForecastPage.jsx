@@ -22,6 +22,12 @@ import {
   NotesWrapper,
   BackButtonContainer,
   DetailedHeading,
+  Overlay,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ConfirmButton,
 } from "./SaveForecastPageStyles";
 import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
@@ -50,6 +56,8 @@ const SaveScenario = ({ setPageValue }) => {
   const [modelIDValue, setModelIDValue] = useState("");
   const [modelType, setModelType] = useState("");
   const [modelIDError, setModelIDError] = useState("");
+  const [showNotesPrompt, setShowNotesPrompt] = useState(false);
+  const [showDetailedNotesPrompt, setShowDetailedNotesPrompt] = useState(false);
   const [dataFrames, setDataFrames] = useState({
     dfResult1: null,
     dfResult2: null,
@@ -182,7 +190,25 @@ const SaveScenario = ({ setPageValue }) => {
   }, [isOutputSheet]);
 
   // ─── Save handler ─────────────────────────────────────────────────────────
-  const handleSaveClick = useCallback(async () => {
+  const handleSaveClick = useCallback(() => {
+    // Check if forecaster notes are empty
+    if (!forecasterNotes.trim()) {
+      setShowNotesPrompt(true);
+      return;
+    }
+
+    // Check if detailed notes are all empty
+    const hasDetailedNotes = Object.values(detailedNotes).some(note => note.trim());
+    if (!hasDetailedNotes) {
+      setShowDetailedNotesPrompt(true);
+      return;
+    }
+
+    // Proceed with save
+    proceedWithSave();
+  }, [forecasterNotes, detailedNotes]);
+
+  const proceedWithSave = useCallback(async () => {
     console.time("Total save time");
     setPageValue("LoadingCircleComponent", "0% | Checking Access...");
 
@@ -241,7 +267,7 @@ const SaveScenario = ({ setPageValue }) => {
       strippedForecastId = null;
     setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
 
-    // Create notes JSON body
+    // Create notes JSON body for Lambda API
     const notesBody = {
       forecaster_notes: forecasterNotes,
       epidemiology: detailedNotes.epidemiology,
@@ -251,6 +277,33 @@ const SaveScenario = ({ setPageValue }) => {
       revenue_conversion: detailedNotes.revenueConversion,
     };
     console.log("notes:", JSON.stringify(notesBody, null, 2));
+
+    // Create Excel notes JSON body
+    const currentDate = new Date().toLocaleDateString("en-US");
+    const firstName = localStorage.getItem("firstName") || "";
+    // const lastName = localStorage.getItem("lastName") || "";
+    const ownerName = `${firstName}`.trim();
+    const statusLabel = saveInterimToPowerBI ? "Interim + BI" : "Interim";
+
+    const excelNotesBody = {
+      basic_details: {
+        cycle_name: selectedCycle,
+        status: statusLabel,
+        scenario_name: scenarioName,
+        saved_at: currentDate,
+        loaded_at: currentDate,
+        owner: ownerName,
+      },
+      forecaster_notes: forecasterNotes,
+      detailed_notes: {
+        epidemiology: detailedNotes.epidemiology,
+        market_share: detailedNotes.marketShareAssumptions,
+        patient_conversion: detailedNotes.patientConversion,
+        demand_conversion: detailedNotes.demandConversion,
+        revenue_conversion: detailedNotes.revenueConversion,
+      },
+    };
+    console.log("Excel notes body:", JSON.stringify(excelNotesBody, null, 2));
 
     if (actionType === "SANDBOXED_TO_INTERIM_FORECAST") {
       const rawId = existing?.forecast_id ?? "";
@@ -297,7 +350,7 @@ const SaveScenario = ({ setPageValue }) => {
         JSON.stringify(notesBody)
       );
     }
-
+    //  saveFlag = "SUCCESS"; /// just for testing
     // 6. Finalize
     const msg = `Forecast scenario saved for\nModel: ${heading.replace(
       "Save Scenario for: ",
@@ -306,7 +359,24 @@ const SaveScenario = ({ setPageValue }) => {
     if (saveFlag === "SUCCESS" || saveFlag?.result === "DONE") {
       setPageValue("SuccessMessagePage", msg);
       const statusLabel = saveInterimToPowerBI ? "Interim + BI" : "Interim";
-
+      
+      // Write notes to Excel named ranges
+      const excelWriteResult = await AWSconnections.writeForecastNotesToExcel(excelNotesBody);
+      console.log("Excel notes write result:", excelWriteResult);
+      
+      // Submit model forecast notes and get changelog data
+      console.log("📤 Fetching forecast changelog for model:", modelIDValue);
+      const notesSubmissionResponse = await AWSconnections.submitModelForecastNotes(modelIDValue, strippedForecastId);
+      console.log("Notes submission response:", notesSubmissionResponse);
+      
+      // Write changelog to Excel if successful
+      if (notesSubmissionResponse.status === "success" && notesSubmissionResponse.data) {
+        const changelogResult = await AWSconnections.writeForecastChangelogToExcel(notesSubmissionResponse.data);
+        console.log("Changelog write result:", changelogResult);
+      } else {
+        console.warn("⚠️ Failed to fetch changelog data:", notesSubmissionResponse.message);
+      }
+      
       await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, scenarioName, statusLabel);
       await excelfunctions.setCalculationMode("automatic");
       console.log("strippedForecastId:", strippedForecastId);
@@ -326,6 +396,19 @@ const SaveScenario = ({ setPageValue }) => {
     setPageValue,
     heading,
   ]);
+
+  const handleDetailedNotesYes = () => {
+    setShowDetailedNotesPrompt(false);
+    proceedWithSave();
+  };
+
+  const handleDetailedNotesNo = () => {
+    setShowDetailedNotesPrompt(false);
+  };
+
+  const handleNotesPromptOk = () => {
+    setShowNotesPrompt(false);
+  };
 
   // ─── Render / early returns ────────────────────────────────────────────────
   if (loading) return <MessageBox>Connecting to data lake, please wait…</MessageBox>;
@@ -478,6 +561,42 @@ const SaveScenario = ({ setPageValue }) => {
             Save
           </SaveButton>
         </>
+      )}
+
+      {/* Prompt: Forecaster Notes Required */}
+      {showNotesPrompt && (
+        <Overlay>
+          <Modal>
+            <ModalHeader>Forecaster Notes Required</ModalHeader>
+            <ModalBody>
+              Please add forecaster notes before saving.
+            </ModalBody>
+            <ModalFooter>
+              <ConfirmButton onClick={handleNotesPromptOk}>OK</ConfirmButton>
+            </ModalFooter>
+          </Modal>
+        </Overlay>
+      )}
+
+      {/* Prompt: Add Detailed Notes? */}
+      {showDetailedNotesPrompt && (
+        <Overlay>
+          <Modal>
+            <ModalHeader>Add Detailed Notes?</ModalHeader>
+            <ModalBody>
+              You have entered overall notes but no detailed notes. Do you want to continue saving without detailed notes?
+            </ModalBody>
+            <ModalFooter>
+              <ConfirmButton onClick={handleDetailedNotesYes}>Yes</ConfirmButton>
+              <ConfirmButton
+                style={{ backgroundColor: "#63666A" }}
+                onClick={handleDetailedNotesNo}
+              >
+                No
+              </ConfirmButton>
+            </ModalFooter>
+          </Modal>
+        </Overlay>
       )}
     </Container>
   );

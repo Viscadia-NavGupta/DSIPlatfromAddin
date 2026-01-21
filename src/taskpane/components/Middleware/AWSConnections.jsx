@@ -3127,3 +3127,301 @@ export async function updateForecastNotes(request_id, forecast_id, notes) {
     return { status: "error", message: error.message || String(error) };
   }
 }
+
+/**
+ * Submits model forecast notes via Lambda A API
+ * @param {string} model_id - Model UUID
+ * @param {string} [forecast_id] - Optional forecast UUID
+ * @returns {Promise<object>} - API response data
+ */
+export async function submitModelForecastNotes(model_id, forecast_id = null) {
+  try {
+    // Auto-generate request ID
+    const request_id = uuidv4();
+    
+    // Read fresh values from localStorage
+    const accessToken = localStorage.getItem("accessToken");
+    const userId = localStorage.getItem("User_ID");
+
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    };
+
+    const body = {
+      request_id: request_id,
+      user_id: parseInt(userId, 10),
+      model_id: model_id,
+    };
+
+    // Add forecast_id only if provided
+    if (forecast_id) {
+      body.forecast_id = forecast_id;
+    }
+
+    console.log("📤 Sending model forecast notes submission to Lambda A");
+    console.log("Request body:", JSON.stringify(body, null, 2));
+    
+    const response = await fetch(`${CONFIG.LambdaA}ModelForecastNotesSubmissions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json();
+    console.log("✅ Model forecast notes submission response received");
+
+    if (!response.ok) {
+      console.error("❌ Model forecast notes submission failed:", data);
+      return { status: "error", message: data.message || `HTTP Error ${response.status}` };
+    }
+
+    return { status: "success", data };
+  } catch (error) {
+    console.error("🚨 Model forecast notes submission error:", error);
+    return { status: "error", message: error.message || String(error) };
+  }
+}
+
+/**
+ * Writes forecast metadata to Excel named ranges
+ * 
+ * Expected JSON structure:
+ * {
+ *   "basic_details": {
+ *     "cycle_name": "FY25 Oct LE",
+ *     "status": "Interim + BI",
+ *     "scenario_name": "Pre-Oct LE Aug-25 Actuals",
+ *     "saved_at": "10/10/2025",
+ *     "loaded_at": "10/10/2025",
+ *     "owner": "Rob Hernandez"
+ *   },
+ *   "forecaster_notes": "Patient and revenue outlook improves...",
+ *   "detailed_notes": {
+ *     "epidemiology": "~3% annual growth...",
+ *     "market_share": "Uptake to ~45%...",
+ *     "patient_conversion": "DOT ~6.5 months...",
+ *     "demand_conversion": "Compliance ~92%...",
+ *     "revenue_conversion": "---"
+ *   }
+ * }
+ * 
+ * @param {object} jsonBody - JSON data containing basic_details, forecaster_notes, and detailed_notes
+ * @returns {Promise<object>} - Success status and details
+ */
+export async function writeForecastNotesToExcel(jsonBody) {
+  return Excel.run(async (context) => {
+    try {
+      console.log("📝 Writing forecast notes to Excel named ranges");
+      console.log("Data to write:", JSON.stringify(jsonBody, null, 2));
+
+      // Get all three named ranges
+      const scnInfoRange = context.workbook.names.getItemOrNullObject("rng.scninfo");
+      const fcNotesRange = context.workbook.names.getItemOrNullObject("rng.fcnotes");
+      const detailedNotesRange = context.workbook.names.getItemOrNullObject("rng.detailednotes");
+
+      const scnInfoCell = scnInfoRange.getRange();
+      const fcNotesCell = fcNotesRange.getRange();
+      const detailedNotesCell = detailedNotesRange.getRange();
+
+      // Load to check if they exist
+      scnInfoRange.load("name");
+      fcNotesRange.load("name");
+      detailedNotesRange.load("name");
+      await context.sync();
+
+      const results = {
+        scninfo: { success: false, message: "" },
+        fcnotes: { success: false, message: "" },
+        detailednotes: { success: false, message: "" }
+      };
+
+      // 1. Write Basic Details (rng.scninfo) - F8:F13 (6 rows x 1 column)
+      if (!scnInfoRange.isNullObject && jsonBody.basic_details) {
+        const basicData = [
+          [jsonBody.basic_details.cycle_name || ""],
+          [jsonBody.basic_details.status || ""],
+          [jsonBody.basic_details.scenario_name || ""],
+          [jsonBody.basic_details.saved_at || ""],
+          [jsonBody.basic_details.loaded_at || ""],
+          [jsonBody.basic_details.owner || ""]
+        ];
+        scnInfoCell.values = basicData;
+        results.scninfo = { success: true, message: "Basic details written" };
+        console.log("✅ Basic details written to rng.scninfo");
+      } else {
+        results.scninfo = { success: false, message: "Named range not found or data missing" };
+        console.warn("⚠️ rng.scninfo not found or basic_details missing");
+      }
+
+      // 2. Write Forecaster Notes (rng.fcnotes) - F15 (single cell)
+      if (!fcNotesRange.isNullObject && jsonBody.forecaster_notes !== undefined) {
+        fcNotesCell.values = [[jsonBody.forecaster_notes || ""]];
+        results.fcnotes = { success: true, message: "Forecaster notes written" };
+        console.log("✅ Forecaster notes written to rng.fcnotes");
+      } else {
+        results.fcnotes = { success: false, message: "Named range not found or data missing" };
+        console.warn("⚠️ rng.fcnotes not found or forecaster_notes missing");
+      }
+
+      // 3. Write Detailed Notes (rng.detailednotes) - F17:F21 (5 rows x 1 column)
+      if (!detailedNotesRange.isNullObject && jsonBody.detailed_notes) {
+        const detailedData = [
+          [jsonBody.detailed_notes.epidemiology || ""],
+          [jsonBody.detailed_notes.market_share || ""],
+          [jsonBody.detailed_notes.patient_conversion || ""],
+          [jsonBody.detailed_notes.demand_conversion || ""],
+          [jsonBody.detailed_notes.revenue_conversion || ""]
+        ];
+        detailedNotesCell.values = detailedData;
+        results.detailednotes = { success: true, message: "Detailed notes written" };
+        console.log("✅ Detailed notes written to rng.detailednotes");
+      } else {
+        results.detailednotes = { success: false, message: "Named range not found or data missing" };
+        console.warn("⚠️ rng.detailednotes not found or detailed_notes missing");
+      }
+
+      await context.sync();
+
+      const allSuccess = results.scninfo.success && results.fcnotes.success && results.detailednotes.success;
+      
+      console.log("📊 Write results:", results);
+      return {
+        status: allSuccess ? "success" : "partial",
+        message: allSuccess ? "All forecast notes written successfully" : "Some ranges failed to write",
+        details: results
+      };
+
+    } catch (error) {
+      console.error("🚨 Error writing forecast notes to Excel:", error);
+      return {
+        status: "error",
+        message: error.message || String(error)
+      };
+    }
+  });
+}
+
+/**
+ * Writes forecast changelog data to Excel table starting from named range
+ * 
+ * Column mapping:
+ * D: cycle_name
+ * E: save_status
+ * F: scenario_name
+ * G: (blank column)
+ * H: forecast_generation_timestamp (converted to EST)
+ * I: first_name + last_name
+ * J: forecaster_notes
+ * 
+ * @param {object} responseBody - API response containing forecasts array
+ * @returns {Promise<object>} - Success status and row count
+ */
+export async function writeForecastChangelogToExcel(responseBody) {
+  return Excel.run(async (context) => {
+    try {
+      console.log("📝 Writing forecast changelog to Excel table");
+      
+      // Validate input
+      if (!responseBody || !Array.isArray(responseBody.forecasts) || responseBody.forecasts.length === 0) {
+        console.warn("⚠️ No forecasts data to write");
+        return {
+          status: "error",
+          message: "No forecasts data provided"
+        };
+      }
+
+      // Get the named range (starting cell D26)
+      const startRange = context.workbook.names.getItemOrNullObject("rng.changelogtbl");
+      startRange.load("name");
+      await context.sync();
+
+      if (startRange.isNullObject) {
+        console.error("❌ Named range 'rng.changelogtbl' not found");
+        return {
+          status: "error",
+          message: "Named range 'rng.changelogtbl' not found"
+        };
+      }
+
+      // Get the starting cell
+      const startCell = startRange.getRange();
+      startCell.load(["rowIndex", "columnIndex"]);
+      await context.sync();
+
+      const startRow = startCell.rowIndex + 1; // Start one row below the named range
+      const startCol = startCell.columnIndex; // This should be column D (index 3)
+
+      // Helper function to convert UTC to EST
+      const convertToEST = (utcTimestamp) => {
+        if (!utcTimestamp) return "";
+        try {
+          const date = new Date(utcTimestamp);
+          // Convert to EST (UTC-5) - adjust for DST if needed
+          const estDate = new Date(date.toLocaleString("en-US", { timeZone: "America/New_York" }));
+          // Format as MM/DD/YYYY HH:MM AM/PM
+          return estDate.toLocaleString("en-US", {
+            month: "2-digit",
+            day: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true
+          });
+        } catch (error) {
+          console.warn("⚠️ Error converting timestamp:", error);
+          return "";
+        }
+      };
+
+      // Helper function to concatenate name
+      const getFullName = (firstName, lastName) => {
+        const first = firstName || "";
+        const last = lastName || "";
+        return `${first} ${last}`.trim();
+      };
+
+      // Build the data array
+      // Each row: [cycle_name, save_status, scenario_name, blank, timestamp_EST, full_name, forecaster_notes]
+      const dataRows = responseBody.forecasts.map(forecast => [
+        forecast.cycle_name || "",                                    // Column D
+        forecast.save_status || "",                                   // Column E
+        forecast.scenario_name || "",                                 // Column F
+        "",                                                            // Column G (blank)
+        convertToEST(forecast.forecast_generation_timestamp),         // Column H
+        getFullName(forecast.first_name, forecast.last_name),        // Column I
+        forecast.forecaster_notes || ""                               // Column J
+      ]);
+
+      console.log(`📊 Writing ${dataRows.length} rows to changelog table`);
+
+      // Get the worksheet
+      const sheet = startCell.worksheet;
+      
+      // Write data starting from the named range
+      const writeRange = sheet.getRangeByIndexes(
+        startRow,
+        startCol,
+        dataRows.length,
+        7 // 7 columns (D through J)
+      );
+      
+      writeRange.values = dataRows;
+      await context.sync();
+
+      console.log("✅ Forecast changelog written successfully");
+      return {
+        status: "success",
+        message: `Successfully wrote ${dataRows.length} forecast records`,
+        rows_written: dataRows.length
+      };
+
+    } catch (error) {
+      console.error("🚨 Error writing forecast changelog to Excel:", error);
+      return {
+        status: "error",
+        message: error.message || String(error)
+      };
+    }
+  });
+}

@@ -301,3 +301,72 @@ export const DetailedHeading = styled(Heading)({
   fontSize: "clamp(0.875rem, 2.5vw, 1rem)",
   flexGrow: 1,
 });
+
+// Modal Components
+export const Overlay = styled("div")({
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "rgba(0, 0, 0, 0.5)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 1000,
+});
+
+export const Modal = styled("div")({
+  backgroundColor: "#FFFFFF",
+  borderRadius: "0.5rem",
+  padding: "1.5rem",
+  maxWidth: "90%",
+  width: "25rem",
+  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+  display: "flex",
+  flexDirection: "column",
+  gap: "1rem",
+});
+
+export const ModalHeader = styled("h3")({
+  fontFamily: "Roboto, sans-serif",
+  fontWeight: 500,
+  fontSize: "clamp(1rem, 2.5vw, 1.125rem)",
+  color: "#63676B",
+  margin: 0,
+});
+
+export const ModalBody = styled("p")({
+  fontFamily: "Roboto, sans-serif",
+  fontWeight: 400,
+  fontSize: "clamp(0.813rem, 2vw, 0.875rem)",
+  color: "#4F4F4F",
+  margin: 0,
+  lineHeight: "160%",
+});
+
+export const ModalFooter = styled("div")({
+  display: "flex",
+  gap: "0.75rem",
+  justifyContent: "flex-end",
+  marginTop: "0.5rem",
+});
+
+export const ConfirmButton = styled("button")({
+  padding: "0.625rem 1.25rem",
+  fontFamily: "Roboto, sans-serif",
+  fontWeight: 500,
+  fontSize: "clamp(0.813rem, 2vw, 0.875rem)",
+  color: "#FFFFFF",
+  backgroundColor: "#BD302B",
+  borderRadius: "0.5rem",
+  border: "none",
+  cursor: "pointer",
+  transition: "background 0.2s ease-in-out",
+  "&:hover": {
+    backgroundColor: "#8A1F1A",
+  },
+  "&:active": {
+    transform: "scale(0.98)",
+  },
+});
