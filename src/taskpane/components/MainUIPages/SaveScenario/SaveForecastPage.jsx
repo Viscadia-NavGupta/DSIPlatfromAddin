@@ -357,7 +357,7 @@ const SaveScenario = ({ setPageValue }) => {
       ""
     )}\nCycle: ${selectedCycle}\nScenario: ${scenarioName}`;
     if (saveFlag === "SUCCESS" || saveFlag?.result === "DONE") {
-      setPageValue("SuccessMessagePage", msg);
+      
       const statusLabel = saveInterimToPowerBI ? "Interim + BI" : "Interim";
       
       // Write notes to Excel named ranges
@@ -380,6 +380,7 @@ const SaveScenario = ({ setPageValue }) => {
       await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, scenarioName, statusLabel);
       await excelfunctions.setCalculationMode("automatic");
       console.log("strippedForecastId:", strippedForecastId);
+      setPageValue("SuccessMessagePage", msg);
     } else {
       setPageValue("SaveForecastPageinterim", "Some error occurred while saving, please try again");
     }

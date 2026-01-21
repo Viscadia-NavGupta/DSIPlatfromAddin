@@ -94,9 +94,7 @@ const LoadScenario = ({ setPageValue }) => {
         sheets.load("items/name");
         await context.sync();
 
-        const MetaDataSheet = sheets.items.find(
-          (sheet) => sheet.name.toLowerCase() === "cloud_backend_md"
-        );
+        const MetaDataSheet = sheets.items.find((sheet) => sheet.name.toLowerCase() === "cloud_backend_md");
 
         if (MetaDataSheet) {
           const ModelName = MetaDataSheet.getRange("B5");
@@ -173,19 +171,19 @@ const LoadScenario = ({ setPageValue }) => {
   const handleSelect = (key, value) => {
     if (key === "saveStatus") {
       setSaveStatus(value);
-      const filteredBySaveStatus = fullData.filter(row => row.save_status === value);
-      const availableCycles = [...new Set(filteredBySaveStatus.map(row => row.cycle_name))];
-      const availableScenarios = [...new Set(filteredBySaveStatus.map(row => row.scenario_name))];
+      const filteredBySaveStatus = fullData.filter((row) => row.save_status === value);
+      const availableCycles = [...new Set(filteredBySaveStatus.map((row) => row.cycle_name))];
+      const availableScenarios = [...new Set(filteredBySaveStatus.map((row) => row.scenario_name))];
       if (!availableCycles.includes(selectedCycle)) setSelectedCycle(null);
       if (!availableScenarios.includes(selectedScenario)) setSelectedScenario(null);
     }
 
     if (key === "cycle") {
       setSelectedCycle(value);
-      const filteredByCycle = fullData.filter(row =>
-        (!saveStatus || row.save_status === saveStatus) && row.cycle_name === value
+      const filteredByCycle = fullData.filter(
+        (row) => (!saveStatus || row.save_status === saveStatus) && row.cycle_name === value
       );
-      const availableScenarios = [...new Set(filteredByCycle.map(row => row.scenario_name))];
+      const availableScenarios = [...new Set(filteredByCycle.map((row) => row.scenario_name))];
       if (!availableScenarios.includes(selectedScenario)) setSelectedScenario(null);
     }
 
@@ -214,12 +212,11 @@ const LoadScenario = ({ setPageValue }) => {
     if (!saveStatus || !selectedCycle || !selectedScenario) return;
 
     const forecastIdArray = fullData
-      .filter(row =>
-        row.save_status === saveStatus &&
-        row.cycle_name === selectedCycle &&
-        row.scenario_name === selectedScenario
+      .filter(
+        (row) =>
+          row.save_status === saveStatus && row.cycle_name === selectedCycle && row.scenario_name === selectedScenario
       )
-      .map(row => row.forecast_id.replace("forecast_", ""));
+      .map((row) => row.forecast_id.replace("forecast_", ""));
 
     if (forecastIdArray.length === 0) return;
 
@@ -255,8 +252,67 @@ const LoadScenario = ({ setPageValue }) => {
 
         await progressPromise;
 
-       await AWSconnections.writeMetadataToNamedCell("last_scn_update",selectedCycle,selectedScenario,saveStatus);
+        await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, forecastIdArray, saveStatus);
+        
+        // Submit model forecast notes and get changelog data
+        console.log("📤 Fetching forecast changelog for model:", modelIDValue);
+        const notesSubmissionResponse = await AWSconnections.submitModelForecastNotes(modelIDValue, "");
+        console.log("Notes submission response:", notesSubmissionResponse);
 
+        // Write changelog to Excel if successful
+        if (notesSubmissionResponse.status === "success" && notesSubmissionResponse.data) {
+          const changelogResult = await AWSconnections.writeForecastChangelogToExcel(notesSubmissionResponse.data);
+          console.log("Changelog write result:", changelogResult);
+        } else {
+          console.warn("⚠️ Failed to fetch changelog data:", notesSubmissionResponse.message);
+        }
+
+        /// scenario level notes
+
+        console.log("📤 Fetching forecast changelog for model:", modelIDValue);
+        const notesSubmissionResponse1 = await AWSconnections.submitModelForecastNotes(modelIDValue, `forecast_${forecastIdArray[0]}`);
+        console.log("Notes submission response:", notesSubmissionResponse1);
+
+        // Transform and write scenario-level notes to Excel
+        if (notesSubmissionResponse1.status === "success" && notesSubmissionResponse1.data?.forecasts?.length > 0) {
+          const forecast = notesSubmissionResponse1.data.forecasts[0];
+          
+          // Format timestamp to readable date
+          const formatDate = (timestamp) => {
+            if (!timestamp) return "";
+            const date = new Date(timestamp);
+            return date.toLocaleDateString('en-US');
+          };
+
+          // Transform response to match writeForecastNotesToExcel format
+          const transformedData = {
+            basic_details: {
+              cycle_name: forecast.cycle_name || "",
+              status: forecast.save_status || "",
+              scenario_name: forecast.scenario_name || "",
+              saved_at: formatDate(forecast.forecast_generation_timestamp),
+              loaded_at: new Date().toLocaleDateString('en-US'),
+              owner: `${forecast.first_name || ""} ${forecast.last_name || ""}`.trim()
+            },
+            forecaster_notes: forecast.forecaster_notes || "",
+            detailed_notes: {
+              epidemiology: forecast.epidemiology || "",
+              market_share: forecast.market_share_assumptions || "",
+              patient_conversion: forecast.patient_conversion || "",
+              demand_conversion: forecast.demand_conversion || "",
+              revenue_conversion: forecast.revenue_conversion || ""
+            }
+          };
+
+          const writeResult = await AWSconnections.writeForecastNotesToExcel(transformedData);
+          console.log("Scenario notes write result:", writeResult);
+        } else {
+          console.warn("⚠️ Failed to fetch scenario-level notes:", notesSubmissionResponse1.message);
+        }
+
+        // end of scenario level notes --------------------
+
+        //---------------------
         // Step 3: Complete at 100%
         setImportProgress(100);
         setPageValue("LoadingCircleComponent", "100% | Import completed");
@@ -270,7 +326,6 @@ const LoadScenario = ({ setPageValue }) => {
         ].join("\n");
         setPageValue("SuccessMessagePage", message);
         excelconnections.setCalculationMode("automatic");
-
       } else {
         console.error("Scenario Import Failed:", Downloadflag);
       }
@@ -293,11 +348,13 @@ const LoadScenario = ({ setPageValue }) => {
                   onClick={() => setDropdownOpen({ ...dropdownOpen, [key]: !dropdownOpen[key] })}
                   style={warnings[key] ? { border: "1px solid red" } : {}}
                 >
-                  {{
-                    saveStatus: saveStatus || "Select Save Status",
-                    cycle: selectedCycle || "Select Cycle",
-                    scenario: selectedScenario || "Select Scenario",
-                  }[key]}
+                  {
+                    {
+                      saveStatus: saveStatus || "Select Save Status",
+                      cycle: selectedCycle || "Select Cycle",
+                      scenario: selectedScenario || "Select Scenario",
+                    }[key]
+                  }
                   <DropdownArrow>
                     <RiArrowDropDownLine size={24} />
                   </DropdownArrow>
@@ -321,7 +378,9 @@ const LoadScenario = ({ setPageValue }) => {
           <SaveButton onClick={handleImportClick}>Import Scenario</SaveButton>
         </>
       ) : (
-        <MessageBox>Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature.</MessageBox>
+        <MessageBox>
+          Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature.
+        </MessageBox>
       )}
     </Container>
   );
