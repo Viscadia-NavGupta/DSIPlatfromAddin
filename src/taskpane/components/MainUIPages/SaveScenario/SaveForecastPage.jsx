@@ -518,7 +518,7 @@ const SaveScenario = ({ setPageValue }) => {
             </DetailedNoteField>
 
             <DetailedNoteField>
-              <DetailedNoteLabel>Market Share Assumptions</DetailedNoteLabel>
+              <DetailedNoteLabel>Market Share</DetailedNoteLabel>
               <DetailedTextArea
                 placeholder="-"
                 value={detailedNotes.marketShareAssumptions}
@@ -527,7 +527,7 @@ const SaveScenario = ({ setPageValue }) => {
             </DetailedNoteField>
 
             <DetailedNoteField>
-              <DetailedNoteLabel>Patient Conversion</DetailedNoteLabel>
+              <DetailedNoteLabel>Persistency & Dosing</DetailedNoteLabel>
               <DetailedTextArea
                 placeholder="-"
                 value={detailedNotes.patientConversion}
@@ -536,7 +536,7 @@ const SaveScenario = ({ setPageValue }) => {
             </DetailedNoteField>
 
             <DetailedNoteField>
-              <DetailedNoteLabel>Demand Conversion</DetailedNoteLabel>
+              <DetailedNoteLabel>Compliance & Access</DetailedNoteLabel>
               <DetailedTextArea
                 placeholder="-"
                 value={detailedNotes.demandConversion}
@@ -545,7 +545,7 @@ const SaveScenario = ({ setPageValue }) => {
             </DetailedNoteField>
 
             <DetailedNoteField>
-              <DetailedNoteLabel>Revenue Conversion</DetailedNoteLabel>
+              <DetailedNoteLabel>WAC & GTN</DetailedNoteLabel>
               <DetailedTextArea
                 placeholder="-"
                 value={detailedNotes.revenueConversion}
@@ -585,7 +585,7 @@ const SaveScenario = ({ setPageValue }) => {
           <Modal>
             <ModalHeader>Add Detailed Notes?</ModalHeader>
             <ModalBody>
-              You have entered overall notes but no detailed notes. Do you want to continue saving without detailed notes?
+              Detailed notes are not included. Would you like to proceed with saving?
             </ModalBody>
             <ModalFooter>
               <ConfirmButton onClick={handleDetailedNotesYes}>Yes</ConfirmButton>
