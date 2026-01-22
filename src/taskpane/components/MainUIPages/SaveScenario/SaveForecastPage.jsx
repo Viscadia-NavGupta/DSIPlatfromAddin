@@ -485,7 +485,7 @@ const SaveScenario = ({ setPageValue }) => {
           </NotesWrapper>
 
           {forecasterNotes.trim() && (
-            <DetailedNotesButton onClick={() => setShowDetailedNotes(true)} type="button">
+            <DetailedNotesButton onClick={() => setShowDetailedNotes(true)} type="button" style={{ border: "1px solid #bd302b" }}>
               Add Detailed Notes
             </DetailedNotesButton>
           )}

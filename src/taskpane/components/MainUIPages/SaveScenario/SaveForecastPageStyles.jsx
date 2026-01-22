@@ -155,7 +155,7 @@ export const DetailedNotesButton = styled("button")({
   color: "#63676B",
   backgroundColor: "#E0E0E0",
   borderRadius: "0.5rem",
-  border: "none",
+  border: "Red",
   cursor: "pointer",
   transition: "background 0.2s ease-in-out",
   "&:hover": {
