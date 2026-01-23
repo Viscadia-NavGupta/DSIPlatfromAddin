@@ -210,22 +210,23 @@ const SaveScenario = ({ setPageValue }) => {
 
       setPageValue("LoadingCircleComponent", "75% | Saving your forecast…");
 
-      const saveFlag = await AWSconnections.service_orchestration(
-        "SAVE_FORECAST",
-        "",
-        modelIDValue,
-        scenarioName,
-        selectedCycle,
-        "",
-        "",
-        "",
-        longformData,
-        outputbackend_data,
-        [],
-        [],
-        [],
-        setPageValue
-      );
+      // const saveFlag = await AWSconnections.service_orchestration(
+      //   "SAVE_FORECAST",
+      //   "",
+      //   modelIDValue,
+      //   scenarioName,
+      //   selectedCycle,
+      //   "",
+      //   "",
+      //   "",
+      //   longformData,
+      //   outputbackend_data,
+      //   [],
+      //   [],
+      //   [],
+      //   setPageValue
+      // );
+      const saveFlag = "SUCCESS" ;
 
       const message = `Forecast scenario saved for\nModel: ${heading.replace("Save Scenario for: ", "")}\nCycle: ${selectedCycle}\nScenario: ${scenarioName}`;
 

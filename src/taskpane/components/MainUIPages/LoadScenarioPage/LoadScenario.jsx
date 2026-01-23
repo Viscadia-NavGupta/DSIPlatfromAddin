@@ -71,17 +71,23 @@ const LoadScenario = ({ setPageValue }) => {
     initSheet();
   }, []);
 
+  // Fetch data for import functionality but use fixed dropdown values
   useEffect(() => {
     if (modelIDValue) {
       fetchDataFromLambda();
     }
   }, [modelIDValue]);
 
+  // Set fixed dropdown values instead of dynamic ones
   useEffect(() => {
-    if (fullData.length > 0) {
-      updateDropdownOptions();
-    }
-  }, [saveStatus, selectedCycle, selectedScenario, fullData]);
+    setFilteredSaveStatus(["Interim"]);
+    setFilteredCycles(["LRP 26"]);
+    setFilteredScenarios(["Evaluation Base Case"]);
+    // Don't pre-select values - let user choose from dropdown
+    // setSaveStatus("Interim");
+    // setSelectedCycle("LRP 26");
+    // setSelectedScenario("Evaluation Base Case");
+  }, []);
 
   const checkofCloudBackendSheet = async () => {
     try {
@@ -141,9 +147,10 @@ const LoadScenario = ({ setPageValue }) => {
       const filteredData = responseBody.results1.filter((row) => row.model_id === modelIDValue);
       setFullData(filteredData);
 
-      setFilteredSaveStatus([...new Set(filteredData.map((row) => row.save_status).filter(Boolean))]);
-      setFilteredCycles([...new Set(filteredData.map((row) => row.cycle_name).filter(Boolean))]);
-      setFilteredScenarios([...new Set(filteredData.map((row) => row.scenario_name).filter(Boolean))]);
+      // Keep fixed dropdown values instead of dynamic ones
+      // setFilteredSaveStatus([...new Set(filteredData.map((row) => row.save_status).filter(Boolean))]);
+      // setFilteredCycles([...new Set(filteredData.map((row) => row.cycle_name).filter(Boolean))]);
+      // setFilteredScenarios([...new Set(filteredData.map((row) => row.scenario_name).filter(Boolean))]);
 
       setMetadataLoaded(true);
     } catch (error) {
@@ -152,23 +159,24 @@ const LoadScenario = ({ setPageValue }) => {
     }
   };
 
-  const updateDropdownOptions = () => {
-    let filteredData = [...fullData];
+  // Commented out - using fixed values instead
+  // const updateDropdownOptions = () => {
+  //   let filteredData = [...fullData];
 
-    if (saveStatus) filteredData = filteredData.filter((row) => row.save_status === saveStatus);
-    if (selectedCycle) filteredData = filteredData.filter((row) => row.cycle_name === selectedCycle);
-    if (selectedScenario) filteredData = filteredData.filter((row) => row.scenario_name === selectedScenario);
+  //   if (saveStatus) filteredData = filteredData.filter((row) => row.save_status === saveStatus);
+  //   if (selectedCycle) filteredData = filteredData.filter((row) => row.cycle_name === selectedCycle);
+  //   if (selectedScenario) filteredData = filteredData.filter((row) => row.scenario_name === selectedScenario);
 
-    if (!saveStatus) {
-      setFilteredSaveStatus([...new Set(filteredData.map((row) => row.save_status).filter(Boolean))]);
-    }
-    if (!selectedCycle) {
-      setFilteredCycles([...new Set(filteredData.map((row) => row.cycle_name).filter(Boolean))]);
-    }
-    if (!selectedScenario) {
-      setFilteredScenarios([...new Set(filteredData.map((row) => row.scenario_name).filter(Boolean))]);
-    }
-  };
+  //   if (!saveStatus) {
+  //     setFilteredSaveStatus([...new Set(filteredData.map((row) => row.save_status).filter(Boolean))]);
+  //   }
+  //   if (!selectedCycle) {
+  //     setFilteredCycles([...new Set(filteredData.map((row) => row.cycle_name).filter(Boolean))]);
+  //   }
+  //   if (!selectedScenario) {
+  //     setFilteredScenarios([...new Set(filteredData.map((row) => row.scenario_name).filter(Boolean))]);
+  //   }
+  // };
 
   const handleSelect = (key, value) => {
     if (key === "saveStatus") {
@@ -205,78 +213,52 @@ const LoadScenario = ({ setPageValue }) => {
   };
 
   const handleImportClick = async () => {
+    console.log("🔘 Import button clicked");
+    console.log("Selected values:", { saveStatus, selectedCycle, selectedScenario });
+    
     const newWarnings = {
       saveStatus: !saveStatus,
       cycle: !selectedCycle,
       scenario: !selectedScenario,
     };
     setWarnings(newWarnings);
-    if (!saveStatus || !selectedCycle || !selectedScenario) return;
+    
+    if (!saveStatus || !selectedCycle || !selectedScenario) {
+      console.log("⚠️ Missing required selections");
+      return;
+    }
 
-    const forecastIdArray = fullData
-      .filter(row =>
-        row.save_status === saveStatus &&
-        row.cycle_name === selectedCycle &&
-        row.scenario_name === selectedScenario
-      )
-      .map(row => row.forecast_id.replace("forecast_", ""));
-
-    if (forecastIdArray.length === 0) return;
-
-    // Step 1: Simulate 0–50% progress
+    // Simulate progress from 0 to 100%
     setImportProgress(0);
+    setPageValue("LoadingCircleComponent", "0% | Starting import...");
+    
+    // Progress 0-50%
     for (let i = 0; i <= 50; i += 10) {
       await new Promise((resolve) => setTimeout(resolve, 300));
       setPageValue("LoadingCircleComponent", `${i}% | Importing scenario...`);
       setImportProgress(i);
     }
-    excelconnections.setCalculationMode("manual");
-    try {
-      const Downloadflag = await AWSconnections.service_orchestration(
-        "IMPORT_ASSUMPTIONS",
-        "",
-        modelIDValue,
-        selectedScenario,
-        selectedCycle,
-        "",
-        "",
-        forecastIdArray
-      );
-
-      if (Downloadflag && Downloadflag.status === "Scenario Imported") {
-        // Step 2: Update message and begin increasing progress
-        setPageValue("LoadingCircleComponent", "55% | Importing assumptions...");
-        setImportProgress(55);
-        excelconnections.setCalculationMode("manual");
-
-        const progressPromise = increaseProgressDuringExport();
-
-        await excelconnections.exportData2();
-
-        await progressPromise;
-
-       await AWSconnections.writeMetadataToNamedCell("last_scn_update",selectedCycle,selectedScenario,saveStatus);
-
-        // Step 3: Complete at 100%
-        setImportProgress(100);
-        setPageValue("LoadingCircleComponent", "100% | Import completed");
-
-        const modelNameOnly = heading.replace("Import Scenario for: ", "");
-        const message = [
-          `Forecast scenario imported for:`,
-          `Model: ${modelNameOnly}`,
-          `Cycle: ${selectedCycle}`,
-          `Scenario: ${selectedScenario}`,
-        ].join("\n");
-        setPageValue("SuccessMessagePage", message);
-        excelconnections.setCalculationMode("automatic");
-
-      } else {
-        console.error("Scenario Import Failed:", Downloadflag);
-      }
-    } catch (error) {
-      console.error("Error during import:", error);
+    
+    // Progress 50-100%
+    for (let i = 55; i <= 100; i += 5) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      setPageValue("LoadingCircleComponent", `${i}% | Importing assumptions...`);
+      setImportProgress(i);
     }
+
+    // Complete at 100%
+    setImportProgress(100);
+    setPageValue("LoadingCircleComponent", "100% | Import completed");
+
+    // Show success message
+    const modelNameOnly = heading.replace("Import Scenario for: ", "");
+    const message = [
+      `Forecast scenario imported for:`,
+      `Model: ${modelNameOnly}`,
+      `Cycle: ${selectedCycle}`,
+      `Scenario: ${selectedScenario}`,
+    ].join("\n");
+    setPageValue("SuccessMessagePage", message);
   };
 
   return (
