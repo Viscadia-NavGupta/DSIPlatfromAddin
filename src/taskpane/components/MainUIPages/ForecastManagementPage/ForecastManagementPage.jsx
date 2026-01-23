@@ -5,6 +5,7 @@ import { FaArrowLeft } from "react-icons/fa";
 import { MdSaveAlt, MdOutlineSave, MdOutlineCalculate } from "react-icons/md";
 import { CiLock } from "react-icons/ci";
 import { RiFlowChart } from "react-icons/ri";
+import { HiCpuChip } from "react-icons/hi2";
 import { DataFrame } from "dataframe-js";
 
 import { specialModelIds } from "../../Middleware/Model Config";
@@ -104,6 +105,21 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
   // ─── NEW: Compute handler ────────────────────────────────────────────────────
   const handleCompute = async () => {
     try {
+      setPageValue("LoadingCircleComponent", "Computing...");
+      
+      // Call the new downloadModelValuesTemplate function
+      const result = await AWSConnections.downloadModelValuesTemplate();
+      
+      if (result.success) {
+        console.log("✅ Template download successful:", result);
+        setPageValue("SuccessMessagePage", result.message);
+      } else {
+        console.error("❌ Template download failed:", result.error);
+        setPageValue("SuccessMessagePage", `Error: ${result.message}`);
+      }
+      
+      /* 
+      // ─── COMMENTED OUT: Original computation code ─────────────────────────────
       setPageValue("LoadingCircleComponent", "Calculating Results...");
       await ExcelFunctions.setCalculationMode("manual");
       const result = await AWSConnections.service_orchestration("RUN_COMPUTATION");
@@ -111,28 +127,52 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
       await ExcelFunctions.setCalculationMode("automatic");
       setPageValue("SuccessMessagePage", "Forecast Data Updated Successfully");
       // you can add further success UI/notifications here
+      */
+      
     } catch (err) {
-      console.error("Error during computation:", err);
-      // you can show a MessageBox or toast here
+      console.error("Error during template download:", err);
+      setPageValue("SuccessMessagePage", `Error: ${err.message}`);
     }
   };
 
   // ─── NEW: Calculations handler ───────────────────────────────────────────────
   const handleCalculations = async () => {
-    setPageValue("LoadingCircleComponent", "Generating Calculations...");
-    // wait 5 seconds
-    await new Promise((resolve) => setTimeout(resolve, 15000));
+    try {
+      setPageValue("LoadingCircleComponent", "Generating Calculation...");
+      
+      // Call the new downloadCalculationSheetTemplate function
+      const result = await AWSConnections.downloadCalculationSheetTemplate();
+      
+      if (result.success) {
+        console.log("✅ Calculation sheets refresh successful:", result);
+        setPageValue("SuccessMessagePage", result.message);
+      } else {
+        console.error("❌ Calculation sheets refresh failed:", result.error);
+        setPageValue("SuccessMessagePage", `Error: ${result.message}`);
+      }
+      
+      /* 
+      // ─── COMMENTED OUT: Original calculations code ─────────────────────────────
+      setPageValue("LoadingCircleComponent", "Generating Calculations...");
+      // wait 5 seconds
+      await new Promise((resolve) => setTimeout(resolve, 15000));
 
-    // then unhide
-    AWSConnections.unhideSheets([
-      "Calculation Tabs>>",
-      "Calculations | 1L",
-      "Calculations | 2L",
-      "Calculations | 3L",
-      "Calculations | 4L+",
-      "Event Modeling",
-    ]);
-    setPageValue("SuccessMessagePage", "Calculations generated successfully");
+      // then unhide
+      AWSConnections.unhideSheets([
+        "Calculation Tabs>>",
+        "Calculations | 1L",
+        "Calculations | 2L", 
+        "Calculations | 3L",
+        "Calculations | 4L+",
+        "Event Modeling",
+      ]);
+      setPageValue("SuccessMessagePage", "Calculations generated successfully");
+      */
+      
+    } catch (err) {
+      console.error("Error during calculation template download:", err);
+      setPageValue("SuccessMessagePage", `Error: ${err.message}`);
+    }
   };
 
   // ─── 6️⃣ Button definitions ─────────────────────────────────────────────────
@@ -146,7 +186,7 @@ const ForecastManagementPage = ({ userName, setPageValue, onBack }) => {
       },
       {
         name: "Compute",
-        icon: <RiFlowChart size={buttonSize.iconSize} />,
+        icon: <HiCpuChip size={buttonSize.iconSize} />,
         action: handleCompute,
         disabled: !saveLockEnabled,
       },

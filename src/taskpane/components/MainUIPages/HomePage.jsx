@@ -71,7 +71,7 @@ const HomePage = ({ userName, setPageValue }) => {
       name: "Model Management",
       icon: <ModelBuilder width={buttonSize.iconSize} height={buttonSize.iconSize} />,
       action: () => setPageValue("ModelManagementPage1"),
-      disabled: false,
+      disabled: true,
     },
     {
       name: "Forecast Management",

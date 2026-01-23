@@ -41,7 +41,7 @@ export const MainContentContainer = styled("main")({
   flexGrow: 1, // Ensures it fills available space
   height: "100%", // Fills container height
   overflow: "hidden", // Prevents unnecessary scrollbars
-  padding: "1rem", // Keeps spacing consistent
+  padding: ".75rem", // Keeps spacing consistent
   boxSizing: "border-box",
 });
 

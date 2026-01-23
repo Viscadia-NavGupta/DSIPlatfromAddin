@@ -1,1 +1,4 @@
-node_modules
+node_modulesdist/
+*.js.map
+.env
+.DS_Store
