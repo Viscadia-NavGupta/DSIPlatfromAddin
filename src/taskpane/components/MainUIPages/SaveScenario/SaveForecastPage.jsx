@@ -247,39 +247,39 @@ const SaveScenario = ({
     // 4. Prepare data
     await excelfunctions.setCalculationMode("manual");
     setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
-    let longformData, outputbackend_data;
-    if (specialModelIds.includes(modelIDValue)) {
-      longformData = await excelfunctions.generateLongFormData(
-        "US",
-        "DataModel"
-      );
-      await excelfunctions.saveData();
-    } else {
-      const [lf, , ob] = await Promise.all([
-        excelfunctions.generateLongFormData("US", "DataModel"),
-        excelfunctions.saveData(),
-        excelfunctions.readNamedRangeToArray("aggregator_data"),
-      ]);
-      longformData = lf;
-      outputbackend_data = ob;
-    }
+    // let longformData, outputbackend_data;
+    // if (specialModelIds.includes(modelIDValue)) {
+    //   longformData = await excelfunctions.generateLongFormData(
+    //     "US",
+    //     "DataModel"
+    //   );
+    //   await excelfunctions.saveData();
+    // } else {
+    //   const [lf, , ob] = await Promise.all([
+    //     // excelfunctions.generateLongFormData("US", "DataModel"),
+    //     // excelfunctions.saveData(),
+    //     // excelfunctions.readNamedRangeToArray("aggregator_data"),
+    //   ]);
+    //   longformData = lf;
+    //   outputbackend_data = ob;
+    // }
 
 
-      if (specialModelIds.includes(modelIDValue)) {
-        longformData = await excelfucntions.generateLongFormData(
-          "US",
-          "DataModel"
-        );
-        await excelfucntions.saveData();
-      } else {
-        const [lf, , ob] = await Promise.all([
-          excelfucntions.generateLongFormData("US", "DataModel"),
-          excelfucntions.saveData(),
-          excelfucntions.readNamedRangeToArray("aggregator_data"),
-        ]);
-        longformData = lf;
-        outputbackend_data = ob;
-      }
+    //   if (specialModelIds.includes(modelIDValue)) {
+    //     longformData = await excelfucntions.generateLongFormData(
+    //       "US",
+    //       "DataModel"
+    //     );
+    //     await excelfucntions.saveData();
+    //   } else {
+    //     const [lf, , ob] = await Promise.all([
+    //       excelfucntions.generateLongFormData("US", "DataModel"),
+    //       excelfucntions.saveData(),
+    //       excelfucntions.readNamedRangeToArray("aggregator_data"),
+    //     ]);
+    //     longformData = lf;
+    //     outputbackend_data = ob;
+    //   }
 
       setPageValue("LoadingCircleComponent", "75% | Saving your forecast…");
 
