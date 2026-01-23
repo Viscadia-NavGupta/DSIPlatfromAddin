@@ -264,7 +264,7 @@ const SaveScenario = ({
       outputbackend_data = ob;
     }
 
-<<<<<<< HEAD
+
       if (specialModelIds.includes(modelIDValue)) {
         longformData = await excelfucntions.generateLongFormData(
           "US",
@@ -300,49 +300,6 @@ const SaveScenario = ({
       //   setPageValue
       // );
       const saveFlag = "SUCCESS" ;
-=======
-    // 5. Orchestrate
-    let saveFlag, strippedForecastId = null;
-    setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
-    if (actionType === "SANDBOXED_TO_INTERIM_FORECAST") {
-      const rawId = existing?.forecast_id ?? "";
-      strippedForecastId = rawId.replace(/^forecast_/, "");
-      saveFlag = await AWSconnections.service_orchestration(
-        actionType,
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        strippedForecastId,
-        [],
-        [],
-        [],
-        [],
-        [],
-        setPageValue
-      );
-    } else {
-      saveFlag = await AWSconnections.service_orchestration(
-        actionType,
-        "",
-        modelIDValue,
-        scenarioName,
-        selectedCycle,
-        "",
-        "",
-        "",
-        longformData,
-        outputbackend_data,
-        [],
-        [],
-        [],
-        setPageValue
-      );
-    }
->>>>>>> 186b0751b0eaa754a52d934a588f7c064ce018aa
-
     // 6. Finalize
     const msg = `Forecast scenario saved for\nModel: ${heading.replace(
       "Save Scenario for: ",
