@@ -252,7 +252,7 @@ const LoadScenario = ({ setPageValue }) => {
 
         await progressPromise;
 
-        await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, forecastIdArray, saveStatus);
+        await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, selectedScenario, saveStatus);
         
         // Submit model forecast notes and get changelog data
         console.log("📤 Fetching forecast changelog for model:", modelIDValue);
