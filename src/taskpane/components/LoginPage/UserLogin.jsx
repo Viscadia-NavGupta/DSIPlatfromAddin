@@ -93,7 +93,7 @@ const LoginPage = ({ setPageValue, handleLogin, errorMessage, setErrorMessage })
 
       <FooterContainer>
         <FooterTextContainer>
-          <span>© 2025 Viscadia. All rights reserved.</span>
+          <span>© 2026 Viscadia. All rights reserved.</span>
         </FooterTextContainer>
         <FooterImageContainer>
           <img src="/../assets/ViscadiaFlow-Low.png" alt="Footer Background" />
