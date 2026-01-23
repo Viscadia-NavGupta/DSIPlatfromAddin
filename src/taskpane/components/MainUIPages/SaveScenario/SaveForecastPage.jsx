@@ -7,10 +7,27 @@ import {
   SelectDropdown,
   Input,
   SaveButton,
-  ForecasterNotesSection,
-  NotesLabel,
-  NotesTextArea,
+  SectionLabel,
+  TextArea,
+  CharacterCount,
   DetailedNotesButton,
+  DetailedNotesContainer,
+  DetailedNoteField,
+  DetailedNoteLabel,
+  DetailedTextArea,
+  BackButton,
+  CheckboxContainer,
+  Checkbox,
+  CheckboxLabel,
+  NotesWrapper,
+  BackButtonContainer,
+  DetailedHeading,
+  Overlay,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ConfirmButton,
 } from "./SaveForecastPageStyles";
 import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
@@ -18,23 +35,20 @@ import * as excelfunctions from "../../Middleware/ExcelConnection";
 import { specialModelIds } from "../../Middleware/Model Config";
 import CONFIG from "../../Middleware/AWSConnections";
 
-const SaveScenario = ({ 
-  setPageValue,
-  epidemiologyNotes,
-  setEpidemiologyNotes,
-  marketShareNotes,
-  setMarketShareNotes,
-  patientConversionNotes,
-  setPatientConversionNotes,
-  demandConversionNotes,
-  setDemandConversionNotes,
-  revenueConversionNotes,
-  setRevenueConversionNotes
-}) => {
+const SaveScenario = ({ setPageValue }) => {
   // ─── State ────────────────────────────────────────────────────────────────
   const [selectedCycle, setSelectedCycle] = useState("");
   const [scenarioName, setScenarioName] = useState("");
   const [saveInterimToPowerBI, setSaveInterimToPowerBI] = useState(false);
+  const [forecasterNotes, setForecasterNotes] = useState("");
+  const [showDetailedNotes, setShowDetailedNotes] = useState(false);
+  const [detailedNotes, setDetailedNotes] = useState({
+    epidemiology: "",
+    marketShareAssumptions: "",
+    patientConversion: "",
+    demandConversion: "",
+    revenueConversion: "",
+  });
   const [heading, setHeading] = useState("Active Sheet Name");
   const [isOutputSheet, setIsOutputSheet] = useState(false);
   const [cycleItems, setCycleItems] = useState([]);
@@ -42,33 +56,27 @@ const SaveScenario = ({
   const [modelIDValue, setModelIDValue] = useState("");
   const [modelType, setModelType] = useState("");
   const [modelIDError, setModelIDError] = useState("");
+  const [showNotesPrompt, setShowNotesPrompt] = useState(false);
+  const [showDetailedNotesPrompt, setShowDetailedNotesPrompt] = useState(false);
   const [dataFrames, setDataFrames] = useState({
     dfResult1: null,
     dfResult2: null,
     dfResult3: null,
   });
-  const [forecasterNotes, setForecasterNotes] = useState("");
 
   // ─── Build scenario lookup ────────────────────────────────────────────────
   const scenarioSet = useMemo(() => {
     const df = dataFrames.dfResult1;
     if (!df) return new Set();
     return new Set(
-      df.toCollection().map((r) =>
-        `${r.model_id}|${r.cycle_name}|${r.scenario_name
-          .toString()
-          .trim()
-          .toLowerCase()}`
-      )
+      df.toCollection().map((r) => `${r.model_id}|${r.cycle_name}|${r.scenario_name.toString().trim().toLowerCase()}`)
     );
   }, [dataFrames.dfResult1]);
 
   const checkScenarioExists = useCallback(
     (modelId, cycleName, name) => {
       if (!dataFrames.dfResult1) return false;
-      return scenarioSet.has(
-        `${modelId}|${cycleName}|${name.trim().toLowerCase()}`
-      );
+      return scenarioSet.has(`${modelId}|${cycleName}|${name.trim().toLowerCase()}`);
     },
     [scenarioSet]
   );
@@ -82,9 +90,7 @@ const SaveScenario = ({
         sheets.load("items/name");
         await context.sync();
 
-        const mdSheet = sheets.items.find(
-          (s) => s.name.toLowerCase() === "cloud_backend_md"
-        );
+        const mdSheet = sheets.items.find((s) => s.name.toLowerCase() === "cloud_backend_md");
         if (!mdSheet) {
           setIsOutputSheet(false);
           return;
@@ -104,10 +110,7 @@ const SaveScenario = ({
         setIsOutputSheet(true);
 
         if (ranges.ModelType.values[0][0] === "AGGREGATOR") {
-          setPageValue(
-            "AggSaveScenario",
-            "Loading scenario for Aggregator model..."
-          );
+          setPageValue("AggSaveScenario", "Loading scenario for Aggregator model...");
         }
       });
     } catch {
@@ -146,10 +149,7 @@ const SaveScenario = ({
   useEffect(() => {
     (async () => {
       try {
-        await Promise.all([
-          checkofCloudBackendSheet(),
-          fetchDataFromLambda(),
-        ]);
+        await Promise.all([checkofCloudBackendSheet(), fetchDataFromLambda()]);
       } finally {
         setLoading(false);
       }
@@ -159,13 +159,9 @@ const SaveScenario = ({
   // ─── Validate access ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!loading && modelIDValue && dataFrames.dfResult3) {
-      const ok = dataFrames.dfResult3
-        .toCollection()
-        .some((m) => m.model_id === modelIDValue);
+      const ok = dataFrames.dfResult3.toCollection().some((m) => m.model_id === modelIDValue);
       if (!ok) {
-        setModelIDError(
-          "Access to current model is not authorized. Please reach out to support team."
-        );
+        setModelIDError("Access to current model is not authorized. Please reach out to support team.");
         setIsOutputSheet(false);
       } else {
         setModelIDError("");
@@ -186,32 +182,40 @@ const SaveScenario = ({
             // if (/^cycle name:/i.test(line))
             //   setSelectedCycle(line.split(/cycle name:/i)[1].trim());
 
-            if (/^scenario name:/i.test(line))
-              setScenarioName(line.split(/scenario name:/i)[1].trim());
+            if (/^scenario name:/i.test(line)) setScenarioName(line.split(/scenario name:/i)[1].trim());
           });
         }
       })
-      .catch(() => { });
+      .catch(() => {});
   }, [isOutputSheet]);
 
-  // ─── Add Detailed Notes handler ───────────────────────────────────────────
-  const handleAddDetailedNotes = useCallback(() => {
-    // Navigate to the DetailedNotesPage
-    setPageValue("DetailedNotesPage");
-  }, [setPageValue]);
-
   // ─── Save handler ─────────────────────────────────────────────────────────
-  const handleSaveClick = useCallback(async () => {
+  const handleSaveClick = useCallback(() => {
+    // Check if forecaster notes are empty
+    if (!forecasterNotes.trim()) {
+      setShowNotesPrompt(true);
+      return;
+    }
+
+    // Check if detailed notes are all empty
+    const hasDetailedNotes = Object.values(detailedNotes).some(note => note.trim());
+    if (!hasDetailedNotes) {
+      setShowDetailedNotesPrompt(true);
+      return;
+    }
+
+    // Proceed with save
+    proceedWithSave();
+  }, [forecasterNotes, detailedNotes]);
+
+  const proceedWithSave = useCallback(async () => {
     console.time("Total save time");
     setPageValue("LoadingCircleComponent", "0% | Checking Access...");
 
     // 1. Permission
     const access = await AWSconnections.ButtonAccess("SAVE_FORECAST");
     if (access?.message === "ACCESS DENIED") {
-      setPageValue(
-        "SaveForecastPageinterim",
-        "You do not have permission to save forecast."
-      );
+      setPageValue("SaveForecastPageinterim", "You do not have permission to save forecast.");
       console.timeEnd("Total save time");
       return;
     }
@@ -226,10 +230,7 @@ const SaveScenario = ({
           r.scenario_name.toLowerCase() === scenarioName.toLowerCase()
       );
     if (existing && existing.save_status !== "Interim") {
-      setPageValue(
-        "SaveForecastPageinterim",
-        "Scenario name already exists… choose a different one."
-      );
+      setPageValue("SaveForecastPageinterim", "Scenario name already exists… choose a different one.");
       console.timeEnd("Total save time");
       return;
     }
@@ -249,80 +250,145 @@ const SaveScenario = ({
     setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
     // let longformData, outputbackend_data;
     // if (specialModelIds.includes(modelIDValue)) {
-    //   longformData = await excelfunctions.generateLongFormData(
-    //     "US",
-    //     "DataModel"
-    //   );
+    //   longformData = await excelfunctions.generateLongFormData("US", "DataModel");
     //   await excelfunctions.saveData();
     // } else {
     //   const [lf, , ob] = await Promise.all([
-    //     // excelfunctions.generateLongFormData("US", "DataModel"),
-    //     // excelfunctions.saveData(),
-    //     // excelfunctions.readNamedRangeToArray("aggregator_data"),
+    //     excelfunctions.generateLongFormData("US", "DataModel"),
+    //     excelfunctions.saveData(),
+    //     excelfunctions.readNamedRangeToArray("aggregator_data"),
     //   ]);
     //   longformData = lf;
     //   outputbackend_data = ob;
     // }
 
+    // 5. Orchestrate
+    let saveFlag,
+      strippedForecastId = null;
+    setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
 
-    //   if (specialModelIds.includes(modelIDValue)) {
-    //     longformData = await excelfucntions.generateLongFormData(
-    //       "US",
-    //       "DataModel"
-    //     );
-    //     await excelfucntions.saveData();
-    //   } else {
-    //     const [lf, , ob] = await Promise.all([
-    //       excelfucntions.generateLongFormData("US", "DataModel"),
-    //       excelfucntions.saveData(),
-    //       excelfucntions.readNamedRangeToArray("aggregator_data"),
-    //     ]);
-    //     longformData = lf;
-    //     outputbackend_data = ob;
-    //   }
+    // Create notes JSON body for Lambda API
+    const notesBody = {
+      forecaster_notes: forecasterNotes,
+      epidemiology: detailedNotes.epidemiology,
+      market_share_assumptions: detailedNotes.marketShareAssumptions,
+      patient_conversion: detailedNotes.patientConversion,
+      demand_conversion: detailedNotes.demandConversion,
+      revenue_conversion: detailedNotes.revenueConversion,
+    };
+    console.log("notes:", JSON.stringify(notesBody, null, 2));
 
-      setPageValue("LoadingCircleComponent", "75% | Saving your forecast…");
+    // Create Excel notes JSON body
+    const currentDate = new Date().toLocaleDateString("en-US");
+    const firstName = localStorage.getItem("firstName") || "";
+    // const lastName = localStorage.getItem("lastName") || "";
+    const ownerName = `${firstName}`.trim();
+    const statusLabel = saveInterimToPowerBI ? "Interim + BI" : "Interim";
 
-      // const saveFlag = await AWSconnections.service_orchestration(
-      //   "SAVE_FORECAST",
-      //   "",
-      //   modelIDValue,
-      //   scenarioName,
-      //   selectedCycle,
-      //   "",
-      //   "",
-      //   "",
-      //   longformData,
-      //   outputbackend_data,
-      //   [],
-      //   [],
-      //   [],
-      //   setPageValue
-      // );
-      const saveFlag = "SUCCESS" ;
+    const excelNotesBody = {
+      basic_details: {
+        cycle_name: selectedCycle,
+        status: statusLabel,
+        scenario_name: scenarioName,
+        saved_at: currentDate,
+        loaded_at: currentDate,
+        owner: ownerName,
+      },
+      forecaster_notes: forecasterNotes,
+      detailed_notes: {
+        epidemiology: detailedNotes.epidemiology,
+        market_share: detailedNotes.marketShareAssumptions,
+        patient_conversion: detailedNotes.patientConversion,
+        demand_conversion: detailedNotes.demandConversion,
+        revenue_conversion: detailedNotes.revenueConversion,
+      },
+    };
+    console.log("Excel notes body:", JSON.stringify(excelNotesBody, null, 2));
+
+    // Set strippedForecastId if updating existing interim forecast
+    if (actionType === "SANDBOXED_TO_INTERIM_FORECAST") {
+      const rawId = existing?.forecast_id ?? "";
+      strippedForecastId = rawId.replace(/^forecast_/, "");
+    }
+
+    // Commented out for testing - AWS service orchestration calls
+    // if (actionType === "SANDBOXED_TO_INTERIM_FORECAST") {
+    //   saveFlag = await AWSconnections.service_orchestration(
+    //     actionType,
+    //     "",
+    //     "",
+    //     "",
+    //     "",
+    //     "",
+    //     "",
+    //     strippedForecastId,
+    //     [],
+    //     [],
+    //     [],
+    //     [],
+    //     [],
+    //     setPageValue,
+    //     [],
+    //     [],
+    //     [],
+    //     JSON.stringify(notesBody)
+    //   );
+    // } else {
+    //   saveFlag = await AWSconnections.service_orchestration(
+    //     actionType,
+    //     "",
+    //     modelIDValue,
+    //     scenarioName,
+    //     selectedCycle,
+    //     "",
+    //     "",
+    //     "",
+    //     longformData,
+    //     outputbackend_data,
+    //     [],
+    //     [],
+    //     [],
+    //     setPageValue,
+    //     [],
+    //     [],
+    //     [],
+    //     JSON.stringify(notesBody)
+    //   );
+    // }
+    
+    saveFlag = "SUCCESS"; /// just for testing
     // 6. Finalize
     const msg = `Forecast scenario saved for\nModel: ${heading.replace(
       "Save Scenario for: ",
       ""
     )}\nCycle: ${selectedCycle}\nScenario: ${scenarioName}`;
     if (saveFlag === "SUCCESS" || saveFlag?.result === "DONE") {
-      setPageValue("SuccessMessagePage", msg);
+      
       const statusLabel = saveInterimToPowerBI ? "Interim + BI" : "Interim";
-
-
-      await AWSconnections.writeMetadataToNamedCell(
-        "last_scn_update",
-        selectedCycle,
-        scenarioName,
-        statusLabel
-      );
+      
+      // Write notes to Excel named ranges
+      // const excelWriteResult = await AWSconnections.writeForecastNotesToExcel(excelNotesBody);
+      // console.log("Excel notes write result:", excelWriteResult);
+      
+      // Submit model forecast notes and get changelog data
+      console.log("📤 Fetching forecast changelog for model:", modelIDValue);
+      // const notesSubmissionResponse = await AWSconnections.submitModelForecastNotes(modelIDValue, strippedForecastId);
+      // console.log("Notes submission response:", notesSubmissionResponse);
+      
+      // // Write changelog to Excel if successful
+      // if (notesSubmissionResponse.status === "success" && notesSubmissionResponse.data) {
+      //   const changelogResult = await AWSconnections.writeForecastChangelogToExcel(notesSubmissionResponse.data);
+      //   console.log("Changelog write result:", changelogResult);
+      // } else {
+      //   console.warn("⚠️ Failed to fetch changelog data:", notesSubmissionResponse.message);
+      // }
+      
+      // await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, scenarioName, statusLabel);
       await excelfunctions.setCalculationMode("automatic");
       console.log("strippedForecastId:", strippedForecastId);
+      setPageValue("SuccessMessagePage", msg);
     } else {
-      setPageValue(
-        "SaveForecastPageinterim",
-        "Some error occurred while saving, please try again"
-      );
+      setPageValue("SaveForecastPageinterim", "Some error occurred while saving, please try again");
     }
 
     console.timeEnd("Total save time");
@@ -332,91 +398,213 @@ const SaveScenario = ({
     selectedCycle,
     scenarioName,
     saveInterimToPowerBI,
+    forecasterNotes,
+    detailedNotes,
     setPageValue,
     heading,
   ]);
 
+  const handleDetailedNotesYes = () => {
+    setShowDetailedNotesPrompt(false);
+    proceedWithSave();
+  };
+
+  const handleDetailedNotesNo = () => {
+    setShowDetailedNotesPrompt(false);
+  };
+
+  const handleNotesPromptOk = () => {
+    setShowNotesPrompt(false);
+  };
+
   // ─── Render / early returns ────────────────────────────────────────────────
-  if (loading)
-    return <MessageBox>Connecting to data lake, please wait…</MessageBox>;
+  if (loading) return <MessageBox>Connecting to data lake, please wait…</MessageBox>;
   if (modelIDError) return <MessageBox>{modelIDError}</MessageBox>;
   if (!isOutputSheet)
     return (
       <MessageBox>
-        Current workbook is not a compatible forecast model. Please open the latest
-        ADC models to use this feature.
+        Current workbook is not a compatible forecast model. Please open the latest ADC models to use this feature.
       </MessageBox>
     );
 
   const isDisabled = !selectedCycle || !scenarioName;
+  const maxCharacters = 500;
+  const remainingCharacters = maxCharacters - forecasterNotes.length;
+
+  const handleDetailedNoteChange = (field, value) => {
+    setDetailedNotes((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
   return (
     <Container>
-      <Heading>{heading}</Heading>
-      <DropdownContainer>
-        <SelectDropdown
-          value={selectedCycle}
-          onChange={(e) => setSelectedCycle(e.target.value)}
-        >
-          <option value="" disabled>
-            Select Cycle
-          </option>
-          {cycleItems.map((c, i) => (
-            <option key={i} value={c}>
-              {c}
-            </option>
-          ))}
-        </SelectDropdown>
-        <Input
-          type="text"
-          placeholder="Enter Scenario Name"
-          value={scenarioName}
-          onChange={(e) => setScenarioName(e.target.value)}
-        />
-      </DropdownContainer>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          alignSelf: "flex-start",
-          margin: "0.2rem 0",
-        }}
-      >
-        <input
-          id="saveInterimToPowerBI"
-          type="checkbox"
-          checked={saveInterimToPowerBI}
-          onChange={(e) => setSaveInterimToPowerBI(e.target.checked)}
-          style={{ accentColor: saveInterimToPowerBI ? "green" : undefined }}
-        />
-        <label htmlFor="saveInterimToPowerBI" style={{ marginLeft: "0.5rem" }}>
-          Save interim to PowerBI
-        </label>
-      </div>
+      {!showDetailedNotes ? (
+        <>
+          <Heading>{heading}</Heading>
+          <DropdownContainer>
+            <SelectDropdown value={selectedCycle} onChange={(e) => setSelectedCycle(e.target.value)}>
+              <option value="" disabled>
+                Select Cycle
+              </option>
+              {cycleItems.map((c, i) => (
+                <option key={i} value={c}>
+                  {c}
+                </option>
+              ))}
+            </SelectDropdown>
+            <Input
+              type="text"
+              placeholder="Enter Scenario Name"
+              value={scenarioName}
+              onChange={(e) => setScenarioName(e.target.value)}
+            />
+          </DropdownContainer>
 
-      <ForecasterNotesSection>
-        <NotesLabel>Forecaster Notes</NotesLabel>
-        <NotesTextArea
-          placeholder="Updated the share assumptions and pushed the launch date ahead by 3 months."
-          value={forecasterNotes}
-          onChange={(e) => setForecasterNotes(e.target.value)}
-        />
-        <DetailedNotesButton onClick={handleAddDetailedNotes}>
-          Add Detailed Notes
-        </DetailedNotesButton>
-      </ForecasterNotesSection>
+          <CheckboxContainer>
+            <Checkbox
+              id="saveInterimToPowerBI"
+              type="checkbox"
+              checked={saveInterimToPowerBI}
+              onChange={(e) => setSaveInterimToPowerBI(e.target.checked)}
+              style={{ accentColor: saveInterimToPowerBI ? "green" : undefined }}
+            />
+            <CheckboxLabel htmlFor="saveInterimToPowerBI">Save interim to PowerBI</CheckboxLabel>
+          </CheckboxContainer>
 
-      <SaveButton
-        onClick={handleSaveClick}
-        disabled={isDisabled}
-        style={
-          isDisabled
-            ? { backgroundColor: "#ccc", cursor: "not-allowed" }
-            : {}
-        }
-      >
-        Save
-      </SaveButton>
+          <NotesWrapper>
+            <SectionLabel>Forecaster Notes</SectionLabel>
+            <TextArea
+              placeholder="Add your notes here..."
+              value={forecasterNotes}
+              onChange={(e) => {
+                if (e.target.value.length <= maxCharacters) {
+                  setForecasterNotes(e.target.value);
+                }
+              }}
+              maxLength={maxCharacters}
+            />
+            <CharacterCount isNearLimit={remainingCharacters < 50}>
+              {remainingCharacters} characters remaining
+            </CharacterCount>
+          </NotesWrapper>
+
+          {forecasterNotes.trim() && (
+            <DetailedNotesButton onClick={() => setShowDetailedNotes(true)} type="button" style={{ border: "1px solid #bd302b" }}>
+              Add Detailed Notes
+            </DetailedNotesButton>
+          )}
+
+          <SaveButton
+            onClick={handleSaveClick}
+            disabled={isDisabled}
+            style={isDisabled ? { backgroundColor: "#ccc", cursor: "not-allowed" } : {}}
+          >
+            Save
+          </SaveButton>
+        </>
+      ) : (
+        <>
+          <BackButtonContainer>
+            <BackButton onClick={() => setShowDetailedNotes(false)} type="button">
+              ←
+            </BackButton>
+            <DetailedHeading>{heading}</DetailedHeading>
+          </BackButtonContainer>
+
+          <DetailedNotesContainer>
+            <DetailedNoteField>
+              <DetailedNoteLabel>Epidemiology</DetailedNoteLabel>
+              <DetailedTextArea
+                placeholder="-"
+                value={detailedNotes.epidemiology}
+                onChange={(e) => handleDetailedNoteChange("epidemiology", e.target.value)}
+              />
+            </DetailedNoteField>
+
+            <DetailedNoteField>
+              <DetailedNoteLabel>Market Share</DetailedNoteLabel>
+              <DetailedTextArea
+                placeholder="-"
+                value={detailedNotes.marketShareAssumptions}
+                onChange={(e) => handleDetailedNoteChange("marketShareAssumptions", e.target.value)}
+              />
+            </DetailedNoteField>
+
+            <DetailedNoteField>
+              <DetailedNoteLabel>Persistency & Dosing</DetailedNoteLabel>
+              <DetailedTextArea
+                placeholder="-"
+                value={detailedNotes.patientConversion}
+                onChange={(e) => handleDetailedNoteChange("patientConversion", e.target.value)}
+              />
+            </DetailedNoteField>
+
+            <DetailedNoteField>
+              <DetailedNoteLabel>Compliance & Access</DetailedNoteLabel>
+              <DetailedTextArea
+                placeholder="-"
+                value={detailedNotes.demandConversion}
+                onChange={(e) => handleDetailedNoteChange("demandConversion", e.target.value)}
+              />
+            </DetailedNoteField>
+
+            <DetailedNoteField>
+              <DetailedNoteLabel>WAC & GTN</DetailedNoteLabel>
+              <DetailedTextArea
+                placeholder="-"
+                value={detailedNotes.revenueConversion}
+                onChange={(e) => handleDetailedNoteChange("revenueConversion", e.target.value)}
+              />
+            </DetailedNoteField>
+          </DetailedNotesContainer>
+
+          <SaveButton
+            onClick={handleSaveClick}
+            disabled={isDisabled}
+            style={isDisabled ? { backgroundColor: "#ccc", cursor: "not-allowed" } : {}}
+          >
+            Save
+          </SaveButton>
+        </>
+      )}
+
+      {/* Prompt: Forecaster Notes Required */}
+      {showNotesPrompt && (
+        <Overlay>
+          <Modal>
+            <ModalHeader>Forecaster Notes Required</ModalHeader>
+            <ModalBody>
+              Please add forecaster notes before saving.
+            </ModalBody>
+            <ModalFooter>
+              <ConfirmButton onClick={handleNotesPromptOk}>OK</ConfirmButton>
+            </ModalFooter>
+          </Modal>
+        </Overlay>
+      )}
+
+      {/* Prompt: Add Detailed Notes? */}
+      {showDetailedNotesPrompt && (
+        <Overlay>
+          <Modal>
+            <ModalHeader>Add Detailed Notes?</ModalHeader>
+            <ModalBody>
+              Detailed notes are not included. Would you like to proceed with saving?
+            </ModalBody>
+            <ModalFooter>
+              <ConfirmButton onClick={handleDetailedNotesYes}>Yes</ConfirmButton>
+              <ConfirmButton
+                style={{ backgroundColor: "#63666A" }}
+                onClick={handleDetailedNotesNo}
+              >
+                No
+              </ConfirmButton>
+            </ModalFooter>
+          </Modal>
+        </Overlay>
+      )}
     </Container>
   );
 };
