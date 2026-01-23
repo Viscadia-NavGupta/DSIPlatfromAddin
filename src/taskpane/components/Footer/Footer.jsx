@@ -8,7 +8,7 @@ const Footer = ({ setPageValue }) => {
   };
   return (
     <FooterContainer>
-      <FooterLeft>© 2025 Viscadia. All rights reserved.</FooterLeft>
+      <FooterLeft>© 2026 Viscadia. All rights reserved.</FooterLeft>
       <FooterRight>
         {/* <a href="#">Privacy Policy</a> */}
         <a href="#" onClick={goToContact}>
