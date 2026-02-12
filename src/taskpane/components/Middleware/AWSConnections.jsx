@@ -7,7 +7,7 @@ import * as Excelconnections from "./ExcelConnection";
 // =============================================================================
 //                         CONFIGURATION CONSTANTS
 // =============================================================================
-const ENV = "dev"; // Change to "prod" to switch environments
+const ENV = "prod"; // Change to "prod" to switch environments
 
 const CONFIG = {
   dev: {
@@ -34,7 +34,7 @@ const CONFIG = {
     },
     AUTH_URL: "https://29xxlo1ehl.execute-api.us-east-2.amazonaws.com/prod/sqldbquery",
     AWS_SECRETS_NAME: "DSI-prod-remaining-secrets",
-    LambdaA: "https://fofrwnzuv3.execute-api.us-east-1.amazonaws.com/default/",
+    LambdaA: "https://3wmhrf981j.execute-api.us-east-2.amazonaws.com/default/",
     POLLING: {
       MAX_ATTEMPTS: 100,
       DELAY_MS: 5000,
@@ -242,7 +242,7 @@ export async function AuthorizationData(buttonname, idToken, secretName, emailId
   } catch (error) {
     console.error("🚨 Authorization error:", error);
     // Return error instead of throwing
-    return { status: 'error', message: error.message || String(error) };
+    return { status: "error", message: error.message || String(error) };
   }
 }
 
@@ -431,7 +431,7 @@ export async function Extract_Service_Request(
   idToken = "",
   secretName = "",
   userId = "",
-  constituent_ID = [],
+  constituent_ID = []
 ) {
   try {
     const headers = {
@@ -480,7 +480,7 @@ export async function Extract_Light_Service_Request(
   secretName = "",
   userId = "",
   constituent_ID = [],
-  LightMetrics=[],
+  LightMetrics = []
 ) {
   try {
     const headers = {
@@ -522,10 +522,9 @@ export async function Extract_Light_Service_Request(
   }
 }
 
-// - end of fiucntion 
+// - end of fiucntion
 
-
-// service request fro constituent id for load agg 
+// service request fro constituent id for load agg
 export async function ServiceRequest_Fetch_Constituent_ID(
   serviceURL = "",
   buttonName = "FETCH_AGG_CONSTITUENTS",
@@ -534,7 +533,7 @@ export async function ServiceRequest_Fetch_Constituent_ID(
   secretName = "",
   userId = "",
   constituent_ID = "",
-  Model_id,
+  Model_id
 ) {
   try {
     const headers = {
@@ -576,12 +575,7 @@ export async function ServiceRequest_Fetch_Constituent_ID(
   }
 }
 
-
-
-
-// end of fucntion 
-
-
+// end of fucntion
 
 /**
  * Orchestrates service requests with file handling.
@@ -613,8 +607,8 @@ export async function service_orchestration(
   setPageValue,
   ForecastIDS = [],
   constituent_ID_SaveStatus = [],
-  LightMetricsList=[],
-  Forecaster_notes={},
+  LightMetricsList = [],
+  Forecaster_notes = {}
 ) {
   console.log(`🚀 Service orchestration started: ${buttonname}`);
 
@@ -623,14 +617,13 @@ export async function service_orchestration(
     const idToken = localStorage.getItem("idToken");
     const User_Id = parseInt(localStorage.getItem("User_ID"), 10);
 
-    // fetch AWS secrets from meta data 
+    // fetch AWS secrets from meta data
 
     let AWSsecrets = await AuthorizationData("FETCH_METADATA", idToken, CONFIG.AWS_SECRETS_NAME, username);
     if (AWSsecrets?.message === "The incoming token has expired") {
       console.warn("🔄 Token expired, refreshing...");
       await AWSrefreshtoken();
       AWSsecrets = await AuthorizationData("FETCH_METADATA", idToken, CONFIG.AWS_SECRETS_NAME, username);
-
     }
 
     if (!AWSsecrets || !AWSsecrets.results) {
@@ -642,10 +635,9 @@ export async function service_orchestration(
     const serviceorg_URL = secretsObject.ServOrch;
     const pollingUrl = secretsObject.Polling;
 
-
     if (buttonname === "SAVE_FORECAST" || buttonname === "SAVE_LOCKED_FORECAST" || buttonname === "SAVE_SANDBOX") {
       console.log("📤 Preparing forecast upload");
-      // save_forecast is used to get the s3 objects to upload the lifes 
+      // save_forecast is used to get the s3 objects to upload the lifes
       const S3Uploadobejct = await AuthorizationData(
         "SAVE_FORECAST",
         idToken,
@@ -658,7 +650,7 @@ export async function service_orchestration(
       const UploadS3INPUTFILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["INPUT_FILE"][UUID_Generated[0]];
       const UploadOUTPUT_FILEURL = S3Uploadobejct["presigned urls"]["UPLOAD"]["OUTPUT_FILE"][UUID_Generated[0]];
 
-      // horizontal format conversion 
+      // horizontal format conversion
       LongformData = await pivotUpFlatArrayToAC(LongformData);
 
       // uploading files to s3
@@ -686,12 +678,11 @@ export async function service_orchestration(
           scenarioname
         );
 
-
         if (servicestatus === "Endpoint request timed out" || (servicestatus && servicestatus.status === "Poll")) {
           console.log("⏱️ Service request requires polling");
           return poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
         }
-        if (servicestatus === "SUCCESS" || servicestatus?.result === "DONE"){
+        if (servicestatus === "SUCCESS" || servicestatus?.result === "DONE") {
           console.log(Forecaster_notes);
           const newUUID = uuidv4();
           const UUID_Generated_new = `${newUUID}_${UUID_Generated[0]}`;
@@ -701,7 +692,7 @@ export async function service_orchestration(
         return servicestatus;
       }
     }
-    /// cahnge for save interim to snadbox 
+    /// cahnge for save interim to snadbox
     else if (buttonname === "SANDBOXED_TO_INTERIM_FORECAST") {
       console.log("📤 Preparing to lock sandboxed forecast");
 
@@ -722,11 +713,15 @@ export async function service_orchestration(
       console.log("🔄 Service status:", servicestatus);
 
       // 2️⃣ Handle polling if necessary:
-      if (
-        servicestatus === "Endpoint request timed out" ||
-        (servicestatus && servicestatus.status === "Poll")
-      ) {
+      if (servicestatus === "Endpoint request timed out" || (servicestatus && servicestatus.status === "Poll")) {
         return poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
+      }
+      if (servicestatus === "SUCCESS" || servicestatus?.result === "DONE") {
+        console.log(Forecaster_notes);
+        const newUUID = uuidv4();
+        const UUID_Generated_new = `${newUUID}_${UUID_Generated[0]}`;
+
+        await updateForecastNotes(UUID_Generated_new, [Forecast_UUID], Forecaster_notes);
       }
       return servicestatus;
       /// import and save the forecast
@@ -782,7 +777,6 @@ export async function service_orchestration(
           return poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
         }
         return servicestatus;
-
       }
     } else if (buttonname === "Agg_Load_Models") {
       console.log("📤 Preparing to load Aggregated Models");
@@ -824,7 +818,7 @@ export async function service_orchestration(
           // Immediately return an error response
           return {
             status: "error",
-            message: `Failed to download ${sheetName}: ${error.message}`
+            message: `Failed to download ${sheetName}: ${error.message}`,
           };
         }
       }
@@ -833,7 +827,12 @@ export async function service_orchestration(
 
       console.log("✅ All downloads completed.");
       return { status: "SUCCESS", message: "Aggregated models downloaded." };
-    } else if (buttonname === "SAVE_FORECAST_AGG" || buttonname === "SAVE_LOCKED_FORECAST_AGG" || buttonname === "SAVE_SANDBOX_AGG" || buttonname === "SANDBOXED_TO_INTERIM_FORECAST_AGG") {
+    } else if (
+      buttonname === "SAVE_FORECAST_AGG" ||
+      buttonname === "SAVE_LOCKED_FORECAST_AGG" ||
+      buttonname === "SAVE_SANDBOX_AGG" ||
+      buttonname === "SANDBOXED_TO_INTERIM_FORECAST_AGG"
+    ) {
       const buttonMapping = {
         SAVE_FORECAST_AGG: "SAVE_FORECAST",
         SAVE_LOCKED_FORECAST_AGG: "SAVE_LOCKED_FORECAST",
@@ -841,7 +840,8 @@ export async function service_orchestration(
         SANDBOXED_TO_INTERIM_FORECAST_AGG: "SANDBOXED_TO_INTERIM_FORECAST",
       };
       const mappedButtonName = buttonMapping[buttonname] || buttonname;
-
+      
+      var pollingResult;
 
       if (mappedButtonName === "SANDBOXED_TO_INTERIM_FORECAST") {
         console.log("📤 Preparing to lock sandboxed forecast");
@@ -863,39 +863,24 @@ export async function service_orchestration(
         console.log("🔄 Service status:", serviceStatus);
 
         // 2️⃣ Handle polling if necessary
-        let pollingStatus;
-        if (
-          serviceStatus === "Endpoint request timed out" ||
-          (serviceStatus && serviceStatus.status === "Poll")
-        ) {
-          const pollResponse = await poll(
-            UUID_Generated[0],
-            CONFIG.AWS_SECRETS_NAME,
-            pollingUrl,
-            idToken
-          );
+        if (serviceStatus === "Endpoint request timed out" || (serviceStatus && serviceStatus.status === "Poll")) {
+          const pollResponse = await poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
           console.log("🔄 Poll response:", pollResponse);
-          pollingStatus = pollResponse.result ?? pollResponse;
+          pollingResult = pollResponse.result ?? pollResponse;
         } else {
-          pollingStatus =
-            typeof serviceStatus === "string"
-              ? serviceStatus
-              : serviceStatus.status ?? serviceStatus;
+          pollingResult = typeof serviceStatus === "string" ? serviceStatus : (serviceStatus.status ?? serviceStatus);
         }
-
         // 3️⃣ If polling didn’t finish with DONE, exit immediately
-        if (pollingStatus !== "DONE") {
-          console.error(`❌ Lock‑sandbox‑to‑interim failed: ${pollingStatus}`);
+        if (pollingResult !== "DONE") {
+          console.error(`❌ Lock‑sandbox‑to‑interim failed: ${pollingResult}`);
           return {
             status: "error",
-            message: `Lock‑sandbox‑to‑interim failed: ${pollingStatus}`
+            message: `Lock‑sandbox‑to‑interim failed: ${pollingResult}`,
           };
         }
 
         console.log("✅ Polling finished with DONE; proceeding.");
-      }
-      else {
-
+      } else {
         // 1) Fetch upload URLs
         let S3Uploadobject;
         try {
@@ -927,7 +912,7 @@ export async function service_orchestration(
         try {
           [flag_flatfileupload, flat_inputfileupload] = await Promise.all([
             uploadFileToS3FromArray(LongformData, "Test", UploadS3SaveForecastURL),
-            uploadFileToS3("Input File", UploadS3INPUTFILEURL)
+            uploadFileToS3("Input File", UploadS3INPUTFILEURL),
           ]);
         } catch (err) {
           console.error("❌ Upload exception:", err);
@@ -960,19 +945,11 @@ export async function service_orchestration(
         }
 
         // 6) Handle polling if needed
-        var pollingResult = servicestatus;
-        if (
-          servicestatus === "Endpoint request timed out" ||
-          (servicestatus && servicestatus.status === "Poll")
-        ) {
+        pollingResult = servicestatus;
+        if (servicestatus === "Endpoint request timed out" || (servicestatus && servicestatus.status === "Poll")) {
           console.log("⏱️ Service request requires polling");
           try {
-            pollingResult = await poll(
-              UUID_Generated[0],
-              CONFIG.AWS_SECRETS_NAME,
-              pollingUrl,
-              idToken
-            );
+            pollingResult = await poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
           } catch (err) {
             console.error("❌ Polling error:", err);
             return { status: "error", message: err.message };
@@ -981,7 +958,7 @@ export async function service_orchestration(
       }
       // sandbox aggregated forecast
       const twoD = constituent_ID_SaveStatus
-        .map(str => {
+        .map((str) => {
           const parts = str.split("|");
           const status = parts[1]?.trim();
           if (status !== "Interim") return null;
@@ -1002,10 +979,9 @@ export async function service_orchestration(
         let completedCount = 0;
         if (totalCount === 0) {
           console.log("ℹ️ No interim forecasts to process, nothing to lock.");
-          return "SUCCESS";
-        }
-
-        for (const [, cleanUuid] of twoD) {
+          // Don't return early - continue to update forecaster notes
+        } else {
+          for (const [, cleanUuid] of twoD) {
           try {
             // 1️⃣ Create a unique request ID for this lock call
             const requestID = uuidv4();
@@ -1015,21 +991,18 @@ export async function service_orchestration(
               serviceorg_URL,
               "SANDBOXED_TO_INTERIM_FORECAST",
               requestID,
-              "",                   // no Model_UUID
+              "", // no Model_UUID
               idToken,
               CONFIG.AWS_SECRETS_NAME,
               User_Id,
-              "",                   // no cycleName
-              "",                   // no scenarioname
-              [],                   // no LongformData
-              [cleanUuid]             // the UUID from twoD
+              "", // no cycleName
+              "", // no scenarioname
+              [], // no LongformData
+              [cleanUuid] // the UUID from twoD
             );
 
             // 3️⃣ Normalize into a string
-            const status =
-              typeof rawLockStatus === "string"
-                ? rawLockStatus
-                : rawLockStatus.status || rawLockStatus;
+            const status = typeof rawLockStatus === "string" ? rawLockStatus : rawLockStatus.status || rawLockStatus;
 
             // 4️⃣ If the service asks you to poll, do so
             if (status === "Poll" || status === "Endpoint request timed out") {
@@ -1039,21 +1012,19 @@ export async function service_orchestration(
             // 5️⃣ Update your progress UI
             completedCount++;
             const pct = 60 + Math.round((completedCount / totalCount) * 30);
-            setPageValue(
-              "LoadingCircleComponent",
-              `${pct}% | Saving sandboxed forecasts…`
-            );
+            setPageValue("LoadingCircleComponent", `${pct}% | Saving sandboxed forecasts…`);
           } catch (err) {
             console.error("❌ Error locking forecast", cleanUuid, err);
             return { status: "error", message: err.message };
           }
+        }
         }
 
         // (Optionally) return a final success here
         // return { status: "SUCCESS", message: "All sandboxed forecasts locked." };
       }
 
-      /// for locking the sandbox cases 
+      /// for locking the sandbox cases
 
       if (buttonname === "SAVE_LOCKED_FORECAST_AGG") {
         const list = Array.isArray(twoD) ? twoD : [];
@@ -1070,13 +1041,17 @@ export async function service_orchestration(
                 serviceorg_URL,
                 "SANDBOXED_TO_LOCKED_FORECAST",
                 requestID,
-                "", idToken, CONFIG.AWS_SECRETS_NAME, User_Id, "", "", [], [cleanUuid]
+                "",
+                idToken,
+                CONFIG.AWS_SECRETS_NAME,
+                User_Id,
+                "",
+                "",
+                [],
+                [cleanUuid]
               );
 
-              const status =
-                typeof rawLockStatus === "string"
-                  ? rawLockStatus
-                  : rawLockStatus.status || rawLockStatus;
+              const status = typeof rawLockStatus === "string" ? rawLockStatus : rawLockStatus.status || rawLockStatus;
 
               console.log(`🔁 SANDBOXED_TO_LOCKED_FORECAST response for ${cleanUuid}:`, rawLockStatus);
 
@@ -1105,13 +1080,17 @@ export async function service_orchestration(
               serviceorg_URL,
               "LOCK_FORECAST",
               RequestID,
-              "", idToken, CONFIG.AWS_SECRETS_NAME, User_Id, "", "", [], newUUID
+              "",
+              idToken,
+              CONFIG.AWS_SECRETS_NAME,
+              User_Id,
+              "",
+              "",
+              [],
+              newUUID
             );
 
-            const status =
-              typeof rawLockStatus === "string"
-                ? rawLockStatus
-                : rawLockStatus.status || rawLockStatus;
+            const status = typeof rawLockStatus === "string" ? rawLockStatus : rawLockStatus.status || rawLockStatus;
 
             console.log(`🔁 LOCK_FORECAST response for ${newUUID}:`, rawLockStatus);
 
@@ -1141,15 +1120,46 @@ export async function service_orchestration(
           }
         }
 
-        const finalResult = { status: "SUCCESS", message: "All forecasts locked" };
-        console.log("✅ service_orchestration returning:", finalResult);
-        return finalResult;
+        console.log("✅ All forecasts locked, proceeding to notes update");
+      }
+      // updateting forecaster notes for agg forecast
+
+      console.log("🔍 Checking pollingResult for forecaster notes update:");
+      console.log("  pollingResult:", pollingResult);
+      console.log("  pollingResult?.result:", pollingResult?.result);
+      console.log("  buttonname:", buttonname);
+
+      if (pollingResult === "SUCCESS" || pollingResult === "DONE" || pollingResult?.result === "DONE") {
+        console.log("✅ Entering forecaster notes update block");
+        console.log(Forecaster_notes);
+        
+        console.log("🔍 Debugging UUID values:");
+        console.log("  UUID_Generated array:", UUID_Generated);
+        console.log("  UUID_Generated[0]:", UUID_Generated[0]);
+        
+        const newUUID = uuidv4();
+        console.log("  newUUID:", newUUID);
+        
+        const UUID_Generated_new = `${newUUID}_${UUID_Generated[0]}`;
+        console.log("  UUID_Generated_new:", UUID_Generated_new);
+
+        // SANDBOXED_TO_INTERIM_FORECAST_AGG locks existing forecast (use Forecast_UUID)
+        // Other AGG operations create new forecast (use UUID_Generated[0])
+        const forecastIdParam =
+          buttonname === "SANDBOXED_TO_INTERIM_FORECAST_AGG"
+            ? [Forecast_UUID]
+            : UUID_Generated[0];
+        
+        console.log("  forecastIdParam:", forecastIdParam);
+
+        await updateForecastNotes(UUID_Generated_new, forecastIdParam, Forecaster_notes);
+      } else {
+        console.log("❌ Forecaster notes update skipped - pollingResult did not match conditions");
       }
 
       // 8) If we get here, everything succeeded
       return pollingResult;
-    }
-    else if (buttonname === "EXTRACT_DASHBOARD_DATA") {
+    } else if (buttonname === "EXTRACT_DASHBOARD_DATA") {
       console.log("📤 preparing for Forecast Library Extract");
 
       // 1) kick off the extract request
@@ -1182,18 +1192,10 @@ export async function service_orchestration(
 
       // 2) if it needs polling, do that
       let pollingResult = Service_Result;
-      if (
-        Service_Result === "Endpoint request timed out" ||
-        (Service_Result && Service_Result.status === "Poll")
-      ) {
+      if (Service_Result === "Endpoint request timed out" || (Service_Result && Service_Result.status === "Poll")) {
         console.log("⏱️ Service request requires polling");
         try {
-          pollingResult = await poll(
-            UUID_Generated[0],
-            CONFIG.AWS_SECRETS_NAME,
-            pollingUrl,
-            idToken
-          );
+          pollingResult = await poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
         } catch (err) {
           console.error("❌ Polling failed:", err);
           return { status: "ERROR", message: err.message || "Polling failed" };
@@ -1240,8 +1242,7 @@ export async function service_orchestration(
           message: "Aggregated models downloaded.",
         };
       }
-    }
-    else if (buttonname === "EXTRACT_DASHBOARD_DATA_LIGHT") {
+    } else if (buttonname === "EXTRACT_DASHBOARD_DATA_LIGHT") {
       console.log("📤 preparing for Forecast Library Extract");
 
       // 1) kick off the extract request
@@ -1255,7 +1256,7 @@ export async function service_orchestration(
           CONFIG.AWS_SECRETS_NAME,
           User_Id,
           ForecastIDS,
-          LightMetricsList,
+          LightMetricsList
         );
       } catch (err) {
         console.error("❌ Extract_Service_Request threw:", err);
@@ -1275,18 +1276,10 @@ export async function service_orchestration(
 
       // 2) if it needs polling, do that
       let pollingResult = Service_Result;
-      if (
-        Service_Result === "Endpoint request timed out" ||
-        (Service_Result && Service_Result.status === "Poll")
-      ) {
+      if (Service_Result === "Endpoint request timed out" || (Service_Result && Service_Result.status === "Poll")) {
         console.log("⏱️ Service request requires polling");
         try {
-          pollingResult = await poll(
-            UUID_Generated[0],
-            CONFIG.AWS_SECRETS_NAME,
-            pollingUrl,
-            idToken
-          );
+          pollingResult = await poll(UUID_Generated[0], CONFIG.AWS_SECRETS_NAME, pollingUrl, idToken);
         } catch (err) {
           console.error("❌ Polling failed:", err);
           return { status: "ERROR", message: err.message || "Polling failed" };
@@ -1333,22 +1326,27 @@ export async function service_orchestration(
           message: "Aggregated models downloaded.",
         };
       }
-    }
-    else if (buttonname === "IMPORT_ASSUMPTIONS_AGG") {
-
+    } else if (buttonname === "IMPORT_ASSUMPTIONS_AGG") {
       let CONSTITUENT_AGG_ID = await ServiceRequest_Fetch_Constituent_ID(
-        serviceorg_URL, "FETCH_AGG_CONSTITUENTS", UUID_Generated[0], idToken, CONFIG.AWS_SECRETS_NAME, User_Id, Forecast_UUID[0], Model_UUID);
+        serviceorg_URL,
+        "FETCH_AGG_CONSTITUENTS",
+        UUID_Generated[0],
+        idToken,
+        CONFIG.AWS_SECRETS_NAME,
+        User_Id,
+        Forecast_UUID[0],
+        Model_UUID
+      );
       const prefixes = [];
       const Download_uuids = [];
 
-      CONSTITUENT_AGG_ID.forEach(str => {
+      CONSTITUENT_AGG_ID.forEach((str) => {
         // split on " - "
         const parts = str.split(" - ");
         // parts[0] is the prefix, parts[1] is the UUID
         prefixes.push(parts[0]?.trim());
         Download_uuids.push(parts[1]?.trim());
       });
-
 
       const S3downloadobject_OutputBackend = await AuthorizationData(
         "IMPORT_ASSUMPTIONS",
@@ -1358,7 +1356,8 @@ export async function service_orchestration(
         Download_uuids
       );
 
-      const Downloadconstituent_ID_URL = S3downloadobject_OutputBackend?.["presigned urls"]?.["DOWNLOAD"]?.["OUTPUT_FILE"];
+      const Downloadconstituent_ID_URL =
+        S3downloadobject_OutputBackend?.["presigned urls"]?.["DOWNLOAD"]?.["OUTPUT_FILE"];
       if (!Downloadconstituent_ID_URL) {
         console.error("❌ No download URLs received");
         return { status: "error", message: "No download URLs received" };
@@ -1387,7 +1386,7 @@ export async function service_orchestration(
           // Immediately return an error response
           return {
             status: "error",
-            message: `Failed to download ${sheetName}: ${error.message}`
+            message: `Failed to download ${sheetName}: ${error.message}`,
           };
         }
       }
@@ -1490,12 +1489,14 @@ export async function uploadFileToS3(sheetName, uploadURL) {
 
     // 2) Build CSV blob with UTF-8 BOM
     console.time("⏱️ CSV creation");
-    const csvLines = values.map(row =>
-      row.map(cell => {
-        if (cell === null || cell === undefined) return "";
-        const s = String(cell);
-        return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-      }).join(",")
+    const csvLines = values.map((row) =>
+      row
+        .map((cell) => {
+          if (cell === null || cell === undefined) return "";
+          const s = String(cell);
+          return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        })
+        .join(",")
     );
     const csvContent = csvLines.join("\n");
     console.timeEnd("⏱️ CSV creation");
@@ -1521,7 +1522,7 @@ export async function uploadFileToS3(sheetName, uploadURL) {
             "Cache-Control": "no-cache",
           },
           body: blob,
-          signal: controller.signal
+          signal: controller.signal,
         });
         clearTimeout(timeoutId);
         console.timeEnd(`⏱️ Upload attempt ${attempt}`);
@@ -1549,7 +1550,7 @@ export async function uploadFileToS3(sheetName, uploadURL) {
       // if not last attempt, wait 15s before retrying
       if (attempt < 3) {
         console.log(`🔄 Retrying upload in 15 seconds (attempt ${attempt + 1}/3)`);
-        await new Promise(res => setTimeout(res, 30_000));
+        await new Promise((res) => setTimeout(res, 30_000));
       }
     }
 
@@ -1557,7 +1558,6 @@ export async function uploadFileToS3(sheetName, uploadURL) {
     throw lastError;
   });
 }
-
 
 /**
  * Downloads an Excel file from S3 and inserts its data into a target Excel sheet.
@@ -1640,7 +1640,6 @@ function parseCsvOrXlsx(buffer, url) {
 export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, format = "csv") {
   try {
     console.time("⏱️ Total array upload");
-
 
     if (!dataArray || dataArray.length === 0) {
       console.error("🚨 No data provided for upload");
@@ -1733,7 +1732,7 @@ export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, fo
         }
       } catch (err) {
         clearTimeout(timeout);
-        if (err.name === 'AbortError') {
+        if (err.name === "AbortError") {
           console.warn("⚠️ Upload timed out");
         } else {
           console.error(`🚨 Upload error on attempt ${attempt}:`, err);
@@ -1747,7 +1746,6 @@ export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, fo
 
     console.error("❌ All upload attempts failed", lastError);
     return false;
-
   } catch (error) {
     console.error("🚨 Unexpected error in uploadFileToS3FromArray:", error);
     return false;
@@ -1757,7 +1755,6 @@ export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, fo
     }
   }
 }
-
 
 //////////////// this is start of working code ----------------------------------------------------------------------------
 // export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, format = "csv") {
@@ -1840,8 +1837,6 @@ export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, fo
 //   }
 // }
 /// this is end of working code------------------------------------------------------------------------
-
-
 
 // export async function uploadFileToS3FromArray(dataArray, fileName, uploadURL, format = "csv") {
 //   try {
@@ -2122,7 +2117,7 @@ export async function AggDownloadS3(s3Url, sheetName, startCell = "B4") {
     // ensure UTF-8 BOM (codepage 65001) for text contents
     const workbook = XLSX.read(new Uint8Array(arrayBuffer), {
       type: "array",
-      codepage: 65001
+      codepage: 65001,
     });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     let rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
@@ -2132,7 +2127,7 @@ export async function AggDownloadS3(s3Url, sheetName, startCell = "B4") {
 
     // Normalize rows so each row has the same number of columns
     const maxCols = rows.reduce((max, row) => Math.max(max, row.length), 0);
-    rows = rows.map(row => {
+    rows = rows.map((row) => {
       if (row.length < maxCols) {
         return [...row, ...Array(maxCols - row.length).fill("")];
       }
@@ -2168,7 +2163,7 @@ export async function AggDownloadS3(s3Url, sheetName, startCell = "B4") {
   }
 
   async function insertParsedData(rows, sheetName, startCell) {
-    await Excel.run(async context => {
+    await Excel.run(async (context) => {
       const sheet = context.workbook.worksheets.getItemOrNullObject(sheetName);
       await context.sync();
       if (sheet.isNullObject) {
@@ -2203,7 +2198,6 @@ export async function AggDownloadS3(s3Url, sheetName, startCell = "B4") {
     return { success: false, newSheetName: null };
   }
 }
-
 
 export const sync_MetaData_AGG = async (setPageValue) => {
   console.log("Update Actuals button clicked");
@@ -2268,9 +2262,6 @@ export function combineArrays(arr1, matchedModel, extra1, extra2, extra3, extra4
   return result;
 }
 
-
-
-
 /**
  * Pivot your flat “timeline/value” rows up into two‐row groups,
  * using a fixed 20-column header (flow_name…RowType) and then
@@ -2293,15 +2284,30 @@ export function pivotUpFlatArrayToAC(flatData) {
 
   // 1) fixed headers: 19 data cols + RowType
   const fixedHeaders = [
-    "flow_name", "region", "output_name", "input_output",
-    "level_1", "level_2", "level_3", "level_4", "level_5",
-    "level_6", "level_7", "level_8", "level_9", "level_10",
-    "level_11", "level_12", "level_13", "level_14", "level_15",
-    "RowType"
+    "flow_name",
+    "region",
+    "output_name",
+    "input_output",
+    "level_1",
+    "level_2",
+    "level_3",
+    "level_4",
+    "level_5",
+    "level_6",
+    "level_7",
+    "level_8",
+    "level_9",
+    "level_10",
+    "level_11",
+    "level_12",
+    "level_13",
+    "level_14",
+    "level_15",
+    "RowType",
   ];
 
   // 2) case-insensitive lookup of the timeline/value columns
-  const headersLC = flatData[0].map(h => String(h).toLowerCase());
+  const headersLC = flatData[0].map((h) => String(h).toLowerCase());
   const timelineIndex = headersLC.indexOf("timeline");
   const valueIndex = headersLC.indexOf("value");
   if (timelineIndex < 0 || valueIndex < 0) {
@@ -2344,46 +2350,31 @@ export function pivotUpFlatArrayToAC(flatData) {
   }
 
   // 5) build the single top header: fixed + maxHeads × "Timeline"
-  const header = [
-    ...fixedHeaders,
-    ...Array(maxHeads).fill("Timeline")
-  ];
+  const header = [...fixedHeaders, ...Array(maxHeads).fill("Timeline")];
 
   // 6) emit the pivoted rows, padding shorter groups
   const result = [header];
   for (let { base, heads, vals } of summaries) {
     const pad = maxHeads - heads.length;
-    result.push([
-      ...base,
-      "Timeline",
-      ...heads,
-      ...Array(pad).fill("")
-    ]);
-    result.push([
-      ...base,
-      "Value",
-      ...vals,
-      ...Array(pad).fill("")
-    ]);
+    result.push([...base, "Timeline", ...heads, ...Array(pad).fill("")]);
+    result.push([...base, "Value", ...vals, ...Array(pad).fill("")]);
   }
 
   return result;
 }
 
-
 // this fucntion is checking if the user has access to the button or not
 // SAVE_FORECAST,SAVE_LOCKED_FORECAST, UNLOCK_FORECAST, LOCK_FORECAST, FETCH_ASSUMPTIONS, FETCH_METADATA, DELETE_FORECAST
 export async function ButtonAccess(buttonname) {
   // grab everything AuthorizationData needs:
-  const emailId = localStorage.getItem('username');
-  const idToken = localStorage.getItem('idToken');
+  const emailId = localStorage.getItem("username");
+  const idToken = localStorage.getItem("idToken");
   const secretName = CONFIG.AWS_SECRETS_NAME;
-  const UUID = [uuidv4()];               // wrap in array
+  const UUID = [uuidv4()]; // wrap in array
 
   // just call your working function:
   return AuthorizationData(buttonname, idToken, secretName, emailId, UUID);
 }
-
 
 async function writeArrayToNamedRange(arrayData, rangeName) {
   return Excel.run(async (context) => {
@@ -2393,7 +2384,7 @@ async function writeArrayToNamedRange(arrayData, rangeName) {
     }
     // 2) If it's 1D, convert to Nx1
     if (!Array.isArray(arrayData[0])) {
-      arrayData = arrayData.map(item => [item]);
+      arrayData = arrayData.map((item) => [item]);
     }
     const rowCount = arrayData.length;
     const colCount = arrayData[0].length;
@@ -2438,14 +2429,10 @@ async function writeArrayToNamedRange(arrayData, rangeName) {
   });
 }
 
-
 async function writeArrayToNamedRangeMatching(matchKeys, newValues, rangeName) {
-  if (!Array.isArray(matchKeys) || !Array.isArray(newValues))
-    throw new Error("Both inputs must be arrays");
-  if (matchKeys.length !== newValues.length)
-    throw new Error("matchKeys and newValues must be same length");
-  if (matchKeys.length === 0)
-    throw new Error("Arrays must be non-empty");
+  if (!Array.isArray(matchKeys) || !Array.isArray(newValues)) throw new Error("Both inputs must be arrays");
+  if (matchKeys.length !== newValues.length) throw new Error("matchKeys and newValues must be same length");
+  if (matchKeys.length === 0) throw new Error("Arrays must be non-empty");
 
   return Excel.run(async (context) => {
     // 1) Locate the named range
@@ -2478,17 +2465,15 @@ async function writeArrayToNamedRangeMatching(matchKeys, newValues, rangeName) {
     const rowCount = baseRange.rowCount;
 
     // 3) Build the left-hand column range
-    const leftRange = baseRange
-      .getOffsetRange(0, -1)
-      .getResizedRange(rowCount - 1, 0);
+    const leftRange = baseRange.getOffsetRange(0, -1).getResizedRange(rowCount - 1, 0);
 
     // 4) Load both columns' values
     leftRange.load("values");
     baseRange.load("values");
     await context.sync();
 
-    const leftVals = leftRange.values;    // [[key1],[key2],...]
-    const outVals = baseRange.values;     // [[oldVal1],[oldVal2],...]
+    const leftVals = leftRange.values; // [[key1],[key2],...]
+    const outVals = baseRange.values; // [[oldVal1],[oldVal2],...]
 
     // 5) Match & replace
     matchKeys.forEach((key, i) => {
@@ -2507,9 +2492,7 @@ async function writeArrayToNamedRangeMatching(matchKeys, newValues, rangeName) {
   });
 }
 
-
-//// forecast library download s3 fucniton 
-
+//// forecast library download s3 fucniton
 
 /**
  * Fetches the given URL with retry and a 1-minute timeout per attempt.
@@ -2538,7 +2521,7 @@ async function fetchDataWithRetry(url, retries = 3, timeoutMs = 60000) {
         throw new Error(`Failed to fetch after ${retries} attempts: ${err.message}`);
       }
       console.warn(`Fetch attempt ${attempt} failed, retrying…`);
-      await new Promise(res => setTimeout(res, 500));
+      await new Promise((res) => setTimeout(res, 500));
     }
   }
 }
@@ -2555,13 +2538,13 @@ function parseCsvOrXlsx1(buffer, url) {
   if (url.toLowerCase().endsWith(".csv")) {
     let txt = new TextDecoder("utf-8").decode(buffer);
     // Strip BOM if present
-    if (txt.charCodeAt(0) === 0xFEFF) {
+    if (txt.charCodeAt(0) === 0xfeff) {
       txt = txt.slice(1);
     }
     return txt
       .split("\n")
-      .filter(line => line.trim() !== "")
-      .map(line => line.split(","));
+      .filter((line) => line.trim() !== "")
+      .map((line) => line.split(","));
   } else {
     const wb = XLSX.read(new Uint8Array(buffer), { type: "array" });
     const ws = wb.Sheets[wb.SheetNames[0]];
@@ -2590,9 +2573,9 @@ export async function downloadFileToArray(s3Url) {
   return rows;
 }
 
-// end of fucntion 
+// end of fucntion
 
-// column flag fucntion 
+// column flag fucntion
 
 /**
  * Inserts a “flag” column at position 31 (index 30), with a header,
@@ -2610,7 +2593,7 @@ function insertFlagColumn(data) {
     "Incident Patients": 35,
     "Compliance Rate": 11,
     /* etc */
-    "Segment Split (For Calculating Bolus Patients)": 0
+    "Segment Split (For Calculating Bolus Patients)": 0,
   };
 
   const rowCount = data.length;
@@ -2647,9 +2630,7 @@ function insertFlagColumn(data) {
 
     // compute flag from metric in col 12
     const key = row[12];
-    newRow[30] = metricFlags.hasOwnProperty(key)
-      ? metricFlags[key]
-      : null;
+    newRow[30] = metricFlags.hasOwnProperty(key) ? metricFlags[key] : null;
 
     // copy columns 30–end
     for (let c = 30; c < colCount; c++) {
@@ -2662,14 +2643,8 @@ function insertFlagColumn(data) {
   return out;
 }
 
-
-
 // end of column flag fucntion
-export async function overwriteViaSheetUltraOptimized(
-  rows,
-  sheetName = "Report Genie Backend",
-  tableName = "Table7"
-) {
+export async function overwriteViaSheetUltraOptimized(rows, sheetName = "Report Genie Backend", tableName = "Table7") {
   const startTime = performance.now();
   const bodyRows = rows.slice(1);
   const totalRows = bodyRows.length;
@@ -2678,7 +2653,7 @@ export async function overwriteViaSheetUltraOptimized(
 
   console.log(`🚀 ULTRA-OPTIMIZED: ${totalRows} rows × ${totalCols} cols = ${totalCells.toLocaleString()} cells`);
 
-  await Excel.run(async ctx => {
+  await Excel.run(async (ctx) => {
     let stepTime = performance.now();
 
     // STEP 1: Maximize performance up front
@@ -2764,11 +2739,9 @@ export async function overwriteViaSheetUltraOptimized(
     const totalTime = performance.now() - startTime;
     const cps = totalCells / (totalTime / 1000);
     console.log(`\n🎉 Completed in ${(totalTime / 1000).toFixed(2)}s — ${cps.toLocaleString()} cells/sec`);
-    console.log(`🎯 Under 15s?  ${totalTime < 15000 ? '✅ YES' : '❌ NO'}`);
+    console.log(`🎯 Under 15s?  ${totalTime < 15000 ? "✅ YES" : "❌ NO"}`);
   });
 }
-
-
 
 // export async function overwriteUltraTuned(rows, sheetName = "Report Genie Backend", tableName = "Table7") {
 //   // 1) Pre-compute everything outside Excel.run
@@ -2788,7 +2761,7 @@ export async function overwriteViaSheetUltraOptimized(
 //     ctx.application.suspendApiCalculationUntilNextSync();
 
 //     // 3) Single load
-//     const ws = ctx.workbook.worksheets.getItemOrNullObject(sheetName);        
+//     const ws = ctx.workbook.worksheets.getItemOrNullObject(sheetName);
 //     const table = ctx.workbook.tables.getItem(tableName);
 //     const header = table.getHeaderRowRange().load(["rowIndex","columnIndex"]);
 //     const bodyRange = table.getDataBodyRange().load(["rowCount"]);
@@ -2827,17 +2800,16 @@ export async function overwriteViaSheetUltraOptimized(
 //   });
 // }
 
-
 /**
  * Convert an ArrayBuffer (or Uint8Array) into a Base64 string.
  *//**
-* Convert an ArrayBuffer (or Uint8Array) into a Base64 string.
-*/
+ * Convert an ArrayBuffer (or Uint8Array) into a Base64 string.
+ */
 /**
  * Convert an ArrayBuffer into a Base64 string.
  *//**
-* Convert an ArrayBuffer (or Uint8Array) into a Base64 string.
-*/
+ * Convert an ArrayBuffer (or Uint8Array) into a Base64 string.
+ */
 function arrayBufferToBase64(buffer) {
   var bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   var binary = "";
@@ -2858,20 +2830,24 @@ function arrayBufferToBase64(buffer) {
 
 /**
  * Download an .xlsx from S3 and drop in all its sheets, with detailed logging.
- */function importCsvToSheet(s3Url, sheetName = "ImportedCSV") {
+ */ function importCsvToSheet(s3Url, sheetName = "ImportedCSV") {
   fetch(s3Url)
-    .then(resp => {
+    .then((resp) => {
       if (!resp.ok) throw new Error(resp.statusText);
       return resp.text();
     })
-    .then(csvText => {
+    .then((csvText) => {
       // 1) Split into rows and columns
-      const rows = csvText.trim().split("\n").map(r => r.split(","));
-      return Excel.run(ctx => {
+      const rows = csvText
+        .trim()
+        .split("\n")
+        .map((r) => r.split(","));
+      return Excel.run((ctx) => {
         // 2) Add or clear target sheet
         let ws = ctx.workbook.worksheets.getItemOrNullObject(sheetName);
         ws.load("isNullObject");
-        return ctx.sync()
+        return ctx
+          .sync()
           .then(() => {
             if (ws.isNullObject) {
               ws = ctx.workbook.worksheets.add(sheetName);
@@ -2885,7 +2861,7 @@ function arrayBufferToBase64(buffer) {
           .then(() => ctx.sync());
       });
     })
-    .catch(err => console.error("CSV import failed:", err));
+    .catch((err) => console.error("CSV import failed:", err));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2912,7 +2888,6 @@ function arrayBufferToBase64(buffer) {
 //   }
 // }
 
-
 // async function refreshAllDataConnections() {
 //   try {
 //     await Excel.run(async (ctx) => {
@@ -2926,12 +2901,10 @@ function arrayBufferToBase64(buffer) {
 //   }
 // }
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 /**
- * Write a new URL to MYURL, refresh all connections, 
+ * Write a new URL to MYURL, refresh all connections,
  * and wait until the target table has been updated.
  *
  * @param {string} newUrl      The pre‐signed URL to load.
@@ -2945,78 +2918,79 @@ function updateUrlAndWaitForRefresh(newUrl, tableName, timeout = 500) {
   let refreshStep = "not started";
 
   // STEP 1: Write the URL
-  return Excel.run(async ctx => {
-    writeStep = "getting named range";
-    console.log(`📌 [Step: ${writeStep}]`);
-    const namedItem = ctx.workbook.names.getItem("MYURL");
-    namedItem.load("name");
-    await ctx.sync();
+  return (
+    Excel.run(async (ctx) => {
+      writeStep = "getting named range";
+      console.log(`📌 [Step: ${writeStep}]`);
+      const namedItem = ctx.workbook.names.getItem("MYURL");
+      namedItem.load("name");
+      await ctx.sync();
 
-    writeStep = "writing new URL into named range";
-    console.log(`📌 [Step: ${writeStep}] value=`, newUrl);
-    const range = namedItem.getRange();
-    range.values = [[newUrl]];
-    await ctx.sync();
+      writeStep = "writing new URL into named range";
+      console.log(`📌 [Step: ${writeStep}] value=`, newUrl);
+      const range = namedItem.getRange();
+      range.values = [[newUrl]];
+      await ctx.sync();
 
-    writeStep = "url written successfully";
-    console.log(`✅ [Step: ${writeStep}]`);
-  })
-    .catch(err => {
-      console.error(`❌ [Error in write step: ${writeStep}]`, {
-        code: err.code || "(no code)",
-        message: err.message,
-        stack: err.stack
-      });
-      throw err;       // propagate to outer Promise
+      writeStep = "url written successfully";
+      console.log(`✅ [Step: ${writeStep}]`);
     })
-    // STEP 2+3: Refresh and wait for table change
-    .then(() => {
-      return new Promise((resolve, reject) => {
-        let pollCount = 0;
-        const maxPolls = Math.ceil(timeout * 1000 / 500);
+      .catch((err) => {
+        console.error(`❌ [Error in write step: ${writeStep}]`, {
+          code: err.code || "(no code)",
+          message: err.message,
+          stack: err.stack,
+        });
+        throw err; // propagate to outer Promise
+      })
+      // STEP 2+3: Refresh and wait for table change
+      .then(() => {
+        return new Promise((resolve, reject) => {
+          let pollCount = 0;
+          const maxPolls = Math.ceil((timeout * 1000) / 500);
 
-        Excel.run(async ctx => {
-          refreshStep = "getting table object";
-          console.log(`📌 [Step: ${refreshStep}] tableName=${tableName}`);
-          const tbl = ctx.workbook.tables.getItem(tableName);
-          tbl.load("name");
-          await ctx.sync();
-
-          refreshStep = "registering onChanged handler";
-          console.log(`📌 [Step: ${refreshStep}]`);
-          const handler = tbl.onChanged.add(async event => {
-            handler.remove();
+          Excel.run(async (ctx) => {
+            refreshStep = "getting table object";
+            console.log(`📌 [Step: ${refreshStep}] tableName=${tableName}`);
+            const tbl = ctx.workbook.tables.getItem(tableName);
+            tbl.load("name");
             await ctx.sync();
-            console.log("✅ [Event] table.onChanged fired:", event);
-            resolve("Success");
-          });
 
-          refreshStep = "triggering dataConnections.refreshAll()";
-          console.log(`📌 [Step: ${refreshStep}]`);
-          ctx.workbook.dataConnections.refreshAll();
-          await ctx.sync();
-          console.log("🔄 [Step done] refreshAll queued");
-        })
-          .catch(err => {
+            refreshStep = "registering onChanged handler";
+            console.log(`📌 [Step: ${refreshStep}]`);
+            const handler = tbl.onChanged.add(async (event) => {
+              handler.remove();
+              await ctx.sync();
+              console.log("✅ [Event] table.onChanged fired:", event);
+              resolve("Success");
+            });
+
+            refreshStep = "triggering dataConnections.refreshAll()";
+            console.log(`📌 [Step: ${refreshStep}]`);
+            ctx.workbook.dataConnections.refreshAll();
+            await ctx.sync();
+            console.log("🔄 [Step done] refreshAll queued");
+          }).catch((err) => {
             console.error(`❌ [Error in refresh step: ${refreshStep}]`, {
               code: err.code || "(no code)",
               message: err.message,
-              stack: err.stack
+              stack: err.stack,
             });
             reject(err);
           });
 
-        // Fallback timeout if no event arrives
-        const ticker = setInterval(() => {
-          pollCount++;
-          if (pollCount >= maxPolls) {
-            clearInterval(ticker);
-            console.error("❌ [Timeout] No table.onChanged after", timeout, "s");
-            reject(new Error(`Timeout waiting ${timeout}s for ${tableName} update`));
-          }
-        }, 500);
-      });
-    });
+          // Fallback timeout if no event arrives
+          const ticker = setInterval(() => {
+            pollCount++;
+            if (pollCount >= maxPolls) {
+              clearInterval(ticker);
+              console.error("❌ [Timeout] No table.onChanged after", timeout, "s");
+              reject(new Error(`Timeout waiting ${timeout}s for ${tableName} update`));
+            }
+          }, 500);
+        });
+      })
+  );
 }
 
 /**
@@ -3036,10 +3010,7 @@ export async function writeMetadataToNamedCell(namedRange, cycle, scenario, stat
       var cell = namedItem.getRange();
 
       // build a single text blob with line breaks
-      var text =
-        "Cycle Name: " + cycle + "\n" +
-        "Scenario Name: " + scenario + "\n" +
-        "Save Status: " + status;
+      var text = "Cycle Name: " + cycle + "\n" + "Scenario Name: " + scenario + "\n" + "Save Status: " + status;
 
       // write into the one cell
       cell.values = [[text]];
@@ -3050,7 +3021,7 @@ export async function writeMetadataToNamedCell(namedRange, cycle, scenario, stat
       await context.sync();
     });
   } catch (error) {
-    console.error("Error writing metadata to \"" + namedRange + "\":", error);
+    console.error('Error writing metadata to "' + namedRange + '":', error);
   }
 }
 function updateUrlInNamedRange(newUrl) {
@@ -3106,7 +3077,7 @@ export async function updateForecastNotes(request_id, forecast_id, notes) {
 
     console.log("📤 Sending notes update request to Lambda A");
     console.log("Request body:", JSON.stringify(body, null, 2));
-    
+
     const response = await fetch(`${CONFIG.LambdaA}UpdateForecasterNotes`, {
       method: "POST",
       headers,
@@ -3138,7 +3109,7 @@ export async function submitModelForecastNotes(model_id, forecast_id = null) {
   try {
     // Auto-generate request ID
     const request_id = uuidv4();
-    
+
     // Read fresh values from localStorage
     const accessToken = localStorage.getItem("accessToken");
     const userId = localStorage.getItem("User_ID");
@@ -3161,7 +3132,7 @@ export async function submitModelForecastNotes(model_id, forecast_id = null) {
 
     console.log("📤 Sending model forecast notes submission to Lambda A");
     console.log("Request body:", JSON.stringify(body, null, 2));
-    
+
     const response = await fetch(`${CONFIG.LambdaA}ModelForecastNotesSubmissions`, {
       method: "POST",
       headers,
@@ -3185,7 +3156,7 @@ export async function submitModelForecastNotes(model_id, forecast_id = null) {
 
 /**
  * Writes forecast metadata to Excel named ranges
- * 
+ *
  * Expected JSON structure:
  * {
  *   "basic_details": {
@@ -3205,7 +3176,7 @@ export async function submitModelForecastNotes(model_id, forecast_id = null) {
  *     "revenue_conversion": "---"
  *   }
  * }
- * 
+ *
  * @param {object} jsonBody - JSON data containing basic_details, forecaster_notes, and detailed_notes
  * @returns {Promise<object>} - Success status and details
  */
@@ -3233,7 +3204,7 @@ export async function writeForecastNotesToExcel(jsonBody) {
       const results = {
         scninfo: { success: false, message: "" },
         fcnotes: { success: false, message: "" },
-        detailednotes: { success: false, message: "" }
+        detailednotes: { success: false, message: "" },
       };
 
       // 1. Write Basic Details (rng.scninfo) - F8:F13 (6 rows x 1 column)
@@ -3244,7 +3215,7 @@ export async function writeForecastNotesToExcel(jsonBody) {
           [jsonBody.basic_details.scenario_name || ""],
           [jsonBody.basic_details.saved_at || ""],
           [jsonBody.basic_details.loaded_at || ""],
-          [jsonBody.basic_details.owner || ""]
+          [jsonBody.basic_details.owner || ""],
         ];
         scnInfoCell.values = basicData;
         results.scninfo = { success: true, message: "Basic details written" };
@@ -3271,7 +3242,7 @@ export async function writeForecastNotesToExcel(jsonBody) {
           [jsonBody.detailed_notes.market_share || ""],
           [jsonBody.detailed_notes.patient_conversion || ""],
           [jsonBody.detailed_notes.demand_conversion || ""],
-          [jsonBody.detailed_notes.revenue_conversion || ""]
+          [jsonBody.detailed_notes.revenue_conversion || ""],
         ];
         detailedNotesCell.values = detailedData;
         results.detailednotes = { success: true, message: "Detailed notes written" };
@@ -3284,19 +3255,18 @@ export async function writeForecastNotesToExcel(jsonBody) {
       await context.sync();
 
       const allSuccess = results.scninfo.success && results.fcnotes.success && results.detailednotes.success;
-      
+
       console.log("📊 Write results:", results);
       return {
         status: allSuccess ? "success" : "partial",
         message: allSuccess ? "All forecast notes written successfully" : "Some ranges failed to write",
-        details: results
+        details: results,
       };
-
     } catch (error) {
       console.error("🚨 Error writing forecast notes to Excel:", error);
       return {
         status: "error",
-        message: error.message || String(error)
+        message: error.message || String(error),
       };
     }
   });
@@ -3304,7 +3274,7 @@ export async function writeForecastNotesToExcel(jsonBody) {
 
 /**
  * Writes forecast changelog data to Excel table starting from named range
- * 
+ *
  * Column mapping:
  * D: cycle_name
  * E: save_status
@@ -3313,7 +3283,7 @@ export async function writeForecastNotesToExcel(jsonBody) {
  * H: forecast_generation_timestamp (converted to EST)
  * I: first_name + last_name
  * J: forecaster_notes
- * 
+ *
  * @param {object} responseBody - API response containing forecasts array
  * @returns {Promise<object>} - Success status and row count
  */
@@ -3321,13 +3291,13 @@ export async function writeForecastChangelogToExcel(responseBody) {
   return Excel.run(async (context) => {
     try {
       console.log("📝 Writing forecast changelog to Excel table");
-      
+
       // Validate input
       if (!responseBody || !Array.isArray(responseBody.forecasts) || responseBody.forecasts.length === 0) {
         console.warn("⚠️ No forecasts data to write");
         return {
           status: "error",
-          message: "No forecasts data provided"
+          message: "No forecasts data provided",
         };
       }
 
@@ -3340,7 +3310,7 @@ export async function writeForecastChangelogToExcel(responseBody) {
         console.error("❌ Named range 'rng.changelogtbl' not found");
         return {
           status: "error",
-          message: "Named range 'rng.changelogtbl' not found"
+          message: "Named range 'rng.changelogtbl' not found",
         };
       }
 
@@ -3366,7 +3336,7 @@ export async function writeForecastChangelogToExcel(responseBody) {
             year: "numeric",
             hour: "2-digit",
             minute: "2-digit",
-            hour12: true
+            hour12: true,
           });
         } catch (error) {
           console.warn("⚠️ Error converting timestamp:", error);
@@ -3383,21 +3353,41 @@ export async function writeForecastChangelogToExcel(responseBody) {
 
       // Build the data array
       // Each row: [cycle_name, save_status, scenario_name, blank, timestamp_EST, full_name, forecaster_notes]
-      const dataRows = responseBody.forecasts.map(forecast => [
-        forecast.cycle_name || "",                                    // Column D
-        forecast.save_status || "",                                   // Column E
-        forecast.scenario_name || "",                                 // Column F
-        "",                                                            // Column G (blank)
-        convertToEST(forecast.forecast_generation_timestamp),         // Column H
-        getFullName(forecast.first_name, forecast.last_name),        // Column I
-        forecast.forecaster_notes || ""                               // Column J
+      const dataRows = responseBody.forecasts.map((forecast) => [
+        forecast.cycle_name || "", // Column D
+        forecast.save_status || "", // Column E
+        forecast.scenario_name || "", // Column F
+        "", // Column G (blank)
+        convertToEST(forecast.forecast_generation_timestamp), // Column H
+        getFullName(forecast.first_name, forecast.last_name), // Column I
+        forecast.forecaster_notes || "", // Column J
       ]);
 
       console.log(`📊 Writing ${dataRows.length} rows to changelog table`);
 
       // Get the worksheet
       const sheet = startCell.worksheet;
-      
+
+      // Clear existing data below the pasting range first
+      const usedRange = sheet.getUsedRange();
+      usedRange.load(["rowCount"]);
+      await context.sync();
+
+      const totalUsedRows = usedRange.rowCount;
+      const rowsToClear = totalUsedRows - startRow;
+
+      if (rowsToClear > 0) {
+        console.log(`🗑️ Clearing ${rowsToClear} existing rows in columns D-J`);
+        const clearRange = sheet.getRangeByIndexes(
+          startRow,
+          startCol,
+          rowsToClear,
+          7 // 7 columns (D through J)
+        );
+        clearRange.clear(Excel.ClearApplyTo.contents);
+        await context.sync();
+      }
+
       // Write data starting from the named range
       const writeRange = sheet.getRangeByIndexes(
         startRow,
@@ -3405,7 +3395,7 @@ export async function writeForecastChangelogToExcel(responseBody) {
         dataRows.length,
         7 // 7 columns (D through J)
       );
-      
+
       writeRange.values = dataRows;
       await context.sync();
 
@@ -3413,14 +3403,13 @@ export async function writeForecastChangelogToExcel(responseBody) {
       return {
         status: "success",
         message: `Successfully wrote ${dataRows.length} forecast records`,
-        rows_written: dataRows.length
+        rows_written: dataRows.length,
       };
-
     } catch (error) {
       console.error("🚨 Error writing forecast changelog to Excel:", error);
       return {
         status: "error",
-        message: error.message || String(error)
+        message: error.message || String(error),
       };
     }
   });

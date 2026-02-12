@@ -14,6 +14,10 @@ import {
   ModalFooter,
   ConfirmButton,
   CheckboxRow,
+  SectionLabel,
+  TextArea,
+  CharacterCount,
+  NotesWrapper,
 } from "./SaveForecastPageAggStyles";
 import { DataFrame } from "dataframe-js";
 import * as AWSconnections from "../../Middleware/AWSConnections";
@@ -28,15 +32,14 @@ const AggSaveScenario = ({ setPageValue }) => {
   const [selectedCycle, setSelectedCycle] = useState("");
   const [scenarioName, setScenarioName] = useState("");
   const [saveInterimToPowerBI, setSaveInterimToPowerBI] = useState(false);
+  const [forecasterNotes, setForecasterNotes] = useState("");
   const [heading, setHeading] = useState("Active Sheet Name");
   const [isOutputSheet, setIsOutputSheet] = useState(false);
   const [modelIDError, setModelIDError] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showNotesPrompt, setShowNotesPrompt] = useState(false);
 
-  const storedUsername = useMemo(
-    () => sessionStorage.getItem("username"),
-    []
-  );
+  const storedUsername = useMemo(() => sessionStorage.getItem("username"), []);
   const [cycleItems, setCycleItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modelIDValue, setModelIDValue] = useState("");
@@ -52,18 +55,14 @@ const AggSaveScenario = ({ setPageValue }) => {
     const df = dataFrames.dfResult1;
     if (!df) return new Set();
     return new Set(
-      df.toCollection().map((r) =>
-        `${r.model_id}|${r.cycle_name}|${r.scenario_name.toString().trim().toLowerCase()}`
-      )
+      df.toCollection().map((r) => `${r.model_id}|${r.cycle_name}|${r.scenario_name.toString().trim().toLowerCase()}`)
     );
   }, [dataFrames.dfResult1]);
 
   const checkScenarioExists = useCallback(
     (modelId, cycle, scen) => {
       if (!dataFrames.dfResult1) return false;
-      return scenarioSet.has(
-        `${modelId}|${cycle}|${scen.trim().toLowerCase()}`
-      );
+      return scenarioSet.has(`${modelId}|${cycle}|${scen.trim().toLowerCase()}`);
     },
     [scenarioSet, dataFrames.dfResult1]
   );
@@ -77,9 +76,7 @@ const AggSaveScenario = ({ setPageValue }) => {
         sheets.load("items/name");
         await context.sync();
 
-        const meta = sheets.items.find(
-          (s) => s.name.toLowerCase() === "cloud_backend_md"
-        );
+        const meta = sheets.items.find((s) => s.name.toLowerCase() === "cloud_backend_md");
         if (!meta) return setIsOutputSheet(false);
 
         const ranges = {
@@ -89,9 +86,7 @@ const AggSaveScenario = ({ setPageValue }) => {
         };
         Object.values(ranges).forEach((r) => r.load("values"));
 
-        const named = context.workbook.names.getItem(
-          "Cloud_LoadModels_List"
-        );
+        const named = context.workbook.names.getItem("Cloud_LoadModels_List");
         const cloudRange = named.getRange();
         cloudRange.load("values");
 
@@ -141,10 +136,7 @@ const AggSaveScenario = ({ setPageValue }) => {
   // Initialize
   useEffect(() => {
     (async () => {
-      await Promise.all([
-        checkofCloudBackendSheet(),
-        fetchDataFromLambda(),
-      ]);
+      await Promise.all([checkofCloudBackendSheet(), fetchDataFromLambda()]);
       setLoading(false);
     })();
   }, [checkofCloudBackendSheet, fetchDataFromLambda]);
@@ -165,17 +157,25 @@ const AggSaveScenario = ({ setPageValue }) => {
       .catch(() => {});
   }, [isOutputSheet]);
 
-  const handleSaveClick = useCallback(async () => {
+  const handleSaveClick = useCallback(() => {
+    // Check if forecaster notes are empty
+    if (!forecasterNotes.trim()) {
+      setShowNotesPrompt(true);
+      return;
+    }
+
+    // Proceed with save
+    proceedWithSave();
+  }, [forecasterNotes]);
+
+  const proceedWithSave = useCallback(async () => {
     console.time("save");
     setPageValue("LoadingCircleComponent", "Checking Access...");
 
     // Permission
     const access = await AWSconnections.ButtonAccess("SAVE_FORECAST");
     if (access?.message === "ACCESS DENIED") {
-      setPageValue(
-        "SaveForecastPageinterim",
-        "You do not have permission to save forecast."
-      );
+      setPageValue("SaveForecastPageinterim", "You do not have permission to save forecast.");
       console.timeEnd("save");
       return;
     }
@@ -201,38 +201,22 @@ const AggSaveScenario = ({ setPageValue }) => {
     }
 
     // Duplicate check (not for sandbox→interim)
-    if (
-      actionType !== "SANDBOXED_TO_INTERIM_FORECAST" &&
-      existing &&
-      existing.save_status !== "Interim"
-    ) {
-      setPageValue(
-        "SaveForecastPageinterim",
-        "Scenario name already exists… choose a different one."
-      );
+    if (actionType !== "SANDBOXED_TO_INTERIM_FORECAST" && existing && existing.save_status !== "Interim") {
+      setPageValue("SaveForecastPageinterim", "Scenario name already exists… choose a different one.");
       console.timeEnd("save");
       return;
     }
 
     // Cycle vs loaded list
-    if (
-      Array.isArray(cloudLoadModelsList) &&
-      cloudLoadModelsList.some((row) => row[1] !== selectedCycle)
-    ) {
-      setPageValue(
-        "SaveForecastPageinterim",
-        "Selected cycle doesn’t match the loaded models."
-      );
+    if (Array.isArray(cloudLoadModelsList) && cloudLoadModelsList.some((row) => row[1] !== selectedCycle)) {
+      setPageValue("SaveForecastPageinterim", "Selected cycle doesn’t match the loaded models.");
       console.timeEnd("save");
       return;
     }
 
     // Sync check
     if (!cloudLoadModelsList.every((row) => row[7] !== false)) {
-      setPageValue(
-        "SaveForecastPageinterim",
-        "All Indication Models must be synced before saving."
-      );
+      setPageValue("SaveForecastPageinterim", "All Indication Models must be synced before saving.");
       console.timeEnd("save");
       return;
     }
@@ -241,17 +225,52 @@ const AggSaveScenario = ({ setPageValue }) => {
       await excelfunctions.setCalculationMode("manual");
       setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
 
-      const longformData = await excelfunctions.generateLongFormData(
-        "US",
-        "DataModel"
-      );
+      const longformData = await excelfunctions.generateLongFormData("US", "DataModel");
       await excelfunctions.saveData();
       setPageValue("LoadingCircleComponent", "50% | Saving your forecast...");
 
-      let saveFlag;
+      // Create notes JSON body for Lambda API
+      const notesBody = {
+        forecaster_notes: forecasterNotes,
+        epidemiology: "-",
+        market_share_assumptions: "-",
+        patient_conversion: "-",
+        demand_conversion: "-",
+        revenue_conversion: "-",
+      };
+      console.log("notes:", JSON.stringify(notesBody, null, 2));
+
+      // Create Excel notes JSON body
+      const currentDate = new Date().toLocaleDateString("en-US");
+      const firstName = localStorage.getItem("firstName") || "";
+      const ownerName = `${firstName}`.trim();
+      const statusLabel = saveInterimToPowerBI ? "Interim + BI" : "Interim";
+
+      const excelNotesBody = {
+        basic_details: {
+          cycle_name: selectedCycle,
+          status: statusLabel,
+          scenario_name: scenarioName,
+          saved_at: currentDate,
+          loaded_at: currentDate,
+          owner: ownerName,
+        },
+        forecaster_notes: forecasterNotes,
+        detailed_notes: {
+          epidemiology: "-",
+          market_share: "-",
+          patient_conversion: "-",
+          demand_conversion: "-",
+          revenue_conversion: "-",
+        },
+      };
+      console.log("Excel notes body:", JSON.stringify(excelNotesBody, null, 2));
+
+      let saveFlag,
+        strippedForecastId = null;
       if (actionType === "SANDBOXED_TO_INTERIM_FORECAST_AGG") {
         const rawId = existing?.forecast_id || "";
-        const stripped = rawId.replace(/^forecast_/, "");
+        strippedForecastId = rawId.replace(/^forecast_/, "");
         saveFlag = await AWSconnections.service_orchestration(
           actionType,
           "",
@@ -260,7 +279,7 @@ const AggSaveScenario = ({ setPageValue }) => {
           "",
           "",
           "",
-          stripped,
+          strippedForecastId,
           [],
           [],
           [],
@@ -268,7 +287,9 @@ const AggSaveScenario = ({ setPageValue }) => {
           [],
           setPageValue,
           [],
-          cloudLoadModelsList.map((row) => `${row[0]} - ${row[6]}|${row[3]}|`)
+          cloudLoadModelsList.map((row) => `${row[0]} - ${row[6]}|${row[3]}|`),
+          [],
+          JSON.stringify(notesBody)
         );
       } else {
         saveFlag = await AWSconnections.service_orchestration(
@@ -287,35 +308,39 @@ const AggSaveScenario = ({ setPageValue }) => {
           [],
           setPageValue,
           [],
-          cloudLoadModelsList.map((row) => `${row[0]} - ${row[6]}|${row[3]}|`)
+          cloudLoadModelsList.map((row) => `${row[0]} - ${row[6]}|${row[3]}|`),
+          [],
+          JSON.stringify(notesBody)
         );
       }
 
       if (saveFlag === "SUCCESS" || saveFlag?.result === "DONE") {
         // await AWSconnections.sync_MetaData_AGG(setPageValue);
+        // Write notes to Excel named ranges
+        const excelWriteResult = await AWSconnections.writeForecastNotesToExcel(excelNotesBody);
+        console.log("Excel notes write result:", excelWriteResult);
+
+        // Submit model forecast notes and get changelog data
+        console.log("📤 Fetching forecast changelog for model:", modelIDValue);
+        const notesSubmissionResponse = await AWSconnections.submitModelForecastNotes(modelIDValue, strippedForecastId);
+        console.log("Notes submission response:", notesSubmissionResponse);
+
+        // Write changelog to Excel if successful
+        if (notesSubmissionResponse.status === "success" && notesSubmissionResponse.data) {
+          const changelogResult = await AWSconnections.writeForecastChangelogToExcel(notesSubmissionResponse.data);
+          console.log("Changelog write result:", changelogResult);
+        } else {
+          console.warn("⚠️ Failed to fetch changelog data:", notesSubmissionResponse.message);
+        }
         await excelfunctions.setCalculationMode("automatic");
-        setPageValue(
-          "SuccessMessagePage",
-          `Saved: ${heading}\nCycle: ${selectedCycle}\nScenario: ${scenarioName}`
-        );
+        setPageValue("SuccessMessagePage", `Saved: ${heading}\nCycle: ${selectedCycle}\nScenario: ${scenarioName}`);
         const statusLabel = saveInterimToPowerBI ? "Interim + BI" : "Interim";
-        await AWSconnections.writeMetadataToNamedCell(
-          "last_scn_update",
-          selectedCycle,
-          scenarioName,
-          statusLabel
-        );
+        await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, scenarioName, statusLabel);
       } else {
-        setPageValue(
-          "SaveForecastPageinterim",
-          "Error occurred while saving."
-        );
+        setPageValue("SaveForecastPageinterim", "Error occurred while saving.");
       }
     } catch {
-      setPageValue(
-        "SaveForecastPageinterim",
-        "Error occurred while saving."
-      );
+      setPageValue("SaveForecastPageinterim", "Error occurred while saving.");
     } finally {
       console.timeEnd("save");
     }
@@ -325,6 +350,7 @@ const AggSaveScenario = ({ setPageValue }) => {
     selectedCycle,
     scenarioName,
     saveInterimToPowerBI,
+    forecasterNotes,
     cloudLoadModelsList,
     setPageValue,
     heading,
@@ -337,22 +363,23 @@ const AggSaveScenario = ({ setPageValue }) => {
     handleSaveClick();
   }, [handleSaveClick]);
 
-  if (loading)
-    return <MessageBox>Connecting to data lake, please wait…</MessageBox>;
+  const handleNotesPromptOk = () => {
+    setShowNotesPrompt(false);
+  };
+
+  if (loading) return <MessageBox>Connecting to data lake, please wait…</MessageBox>;
   if (modelIDError) return <MessageBox>{modelIDError}</MessageBox>;
-  if (!isOutputSheet)
-    return <MessageBox>Open a compatible forecast model to use this feature.</MessageBox>;
+  if (!isOutputSheet) return <MessageBox>Open a compatible forecast model to use this feature.</MessageBox>;
 
   const isDisabled = !selectedCycle || !scenarioName;
+  const maxCharacters = 500;
+  const remainingCharacters = maxCharacters - forecasterNotes.length;
 
   return (
     <Container>
       <Heading>{heading}</Heading>
       <DropdownContainer>
-        <SelectDropdown
-          value={selectedCycle}
-          onChange={(e) => setSelectedCycle(e.target.value)}
-        >
+        <SelectDropdown value={selectedCycle} onChange={(e) => setSelectedCycle(e.target.value)}>
           <option value="" disabled>
             Select Cycle
           </option>
@@ -382,18 +409,45 @@ const AggSaveScenario = ({ setPageValue }) => {
         </label>
       </CheckboxRow>
 
+      <NotesWrapper>
+        <SectionLabel>Forecaster Notes</SectionLabel>
+        <TextArea
+          placeholder="Add your notes here..."
+          value={forecasterNotes}
+          onChange={(e) => {
+            if (e.target.value.length <= maxCharacters) {
+              setForecasterNotes(e.target.value);
+            }
+          }}
+          maxLength={maxCharacters}
+        />
+        <CharacterCount isNearLimit={remainingCharacters < 50}>
+          {remainingCharacters} characters remaining
+        </CharacterCount>
+      </NotesWrapper>
+
       <SaveButton
         onClick={handleInitialClick}
         disabled={isDisabled}
-        style={
-          isDisabled
-            ? { backgroundColor: "#ccc", cursor: "not-allowed" }
-            : {}
-        }
+        style={isDisabled ? { backgroundColor: "#ccc", cursor: "not-allowed" } : {}}
       >
         Save
       </SaveButton>
 
+      {/* Prompt: Forecaster Notes Required */}
+      {showNotesPrompt && (
+        <Overlay>
+          <Modal>
+            <ModalHeader>Forecaster Notes Required</ModalHeader>
+            <ModalBody>Please add forecaster notes before saving.</ModalBody>
+            <ModalFooter>
+              <ConfirmButton onClick={handleNotesPromptOk}>OK</ConfirmButton>
+            </ModalFooter>
+          </Modal>
+        </Overlay>
+      )}
+
+      {/* Prompt: Output Refresh Confirmation */}
       {showConfirm && (
         <Overlay>
           <Modal>

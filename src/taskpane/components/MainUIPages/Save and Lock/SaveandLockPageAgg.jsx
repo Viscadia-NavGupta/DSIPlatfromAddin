@@ -7,6 +7,10 @@ import {
   SelectDropdown,
   Input,
   SaveButton,
+  SectionLabel,
+  TextArea,
+  CharacterCount,
+  NotesWrapper,
   Overlay,
   Modal,
   ModalHeader,
@@ -26,6 +30,7 @@ const AggLockScenario = ({ setPageValue }) => {
   // =============================================================================
   const [selectedCycle, setSelectedCycle] = useState("");
   const [scenarioName, setScenarioName] = useState("");
+  const [forecasterNotes, setForecasterNotes] = useState("");
   const [heading, setHeading] = useState("Active Sheet Name");
   const [isOutputSheet, setIsOutputSheet] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -34,6 +39,7 @@ const AggLockScenario = ({ setPageValue }) => {
   const [showRefreshPrompt, setShowRefreshPrompt] = useState(false);
   const [showLockedWarning, setShowLockedWarning] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showNotesPrompt, setShowNotesPrompt] = useState(false);
 
   const [lockedScenarioInfo, setLockedScenarioInfo] = useState(null);
 
@@ -205,6 +211,18 @@ const AggLockScenario = ({ setPageValue }) => {
   // =============================================================================
 
   const handleSaveClick = useCallback(() => {
+    // Debug: Log forecaster notes before validation
+    console.log("🔍 Forecaster Notes State:", forecasterNotes);
+    console.log("🔍 Notes Length:", forecasterNotes.length);
+    console.log("🔍 Notes Trimmed:", forecasterNotes.trim());
+    
+    // Check if forecaster notes are empty
+    if (!forecasterNotes.trim()) {
+      console.warn("⚠️ Notes are empty - showing prompt");
+      setShowNotesPrompt(true);
+      return;
+    }
+
     // 1) scenario-name-exists guard
     if (
       checkScenarioExists(modelIDValue, selectedCycle, scenarioName)
@@ -224,6 +242,7 @@ const AggLockScenario = ({ setPageValue }) => {
       setShowConfirm(true);
     }
   }, [
+    forecasterNotes,
     checkScenarioExists,
     findLockedScenario,
     modelIDValue,
@@ -237,6 +256,7 @@ const AggLockScenario = ({ setPageValue }) => {
     handleSaveConfirmed();
   };
   const handleLockedCancel = () => setShowLockedWarning(false);
+  const handleNotesPromptOk = () => setShowNotesPrompt(false);
 
   // =============================================================================
   //            AFTER USER CONFIRMS → ACTUAL SAVE LOGIC
@@ -323,6 +343,17 @@ const AggLockScenario = ({ setPageValue }) => {
       console.timeEnd("Parallel processes");
       setPageValue("LoadingCircleComponent", "50% | Saving your forecast...");
 
+      // Create notes JSON body for Lambda API (AGG uses simplified notes)
+      const notesBody = {
+        forecaster_notes: forecasterNotes,
+        epidemiology: "-",
+        market_share_assumptions: "-",
+        patient_conversion: "-",
+        demand_conversion: "-",
+        revenue_conversion: "-",
+      };
+      console.log("notes:", JSON.stringify(notesBody, null, 2));
+
       console.time("save forecast");
       const saveFlag = await AWSconnections.service_orchestration(
         "SAVE_LOCKED_FORECAST_AGG",
@@ -342,11 +373,55 @@ const AggLockScenario = ({ setPageValue }) => {
         [],
         cloudLoadModelsList.map(row =>
           row.length >= 7 ? `${row[0]} - ${row[6]}|${row[3]}|` : ""
-        )
+        ),
+        [],
+        JSON.stringify(notesBody)
       );
       console.timeEnd("save forecast");
 
       if (saveFlag === "SUCCESS" || saveFlag.result === "DONE" ||  saveFlag.status ==="SUCCESS") {
+        // Create Excel notes JSON body
+        const currentDate = new Date().toLocaleDateString("en-US");
+        const firstName = localStorage.getItem("firstName") || "";
+        const ownerName = `${firstName}`.trim();
+
+        const excelNotesBody = {
+          basic_details: {
+            cycle_name: selectedCycle,
+            status: "Locked",
+            scenario_name: scenarioName,
+            saved_at: currentDate,
+            loaded_at: currentDate,
+            owner: ownerName,
+          },
+          forecaster_notes: forecasterNotes,
+          detailed_notes: {
+            epidemiology: "-",
+            market_share: "-",
+            patient_conversion: "-",
+            demand_conversion: "-",
+            revenue_conversion: "-",
+          },
+        };
+        console.log("Excel notes body:", JSON.stringify(excelNotesBody, null, 2));
+
+        // Write notes to Excel named ranges
+        const excelWriteResult = await AWSconnections.writeForecastNotesToExcel(excelNotesBody);
+        console.log("Excel notes write result:", excelWriteResult);
+
+        // Submit model forecast notes and get changelog data
+        console.log("📤 Fetching forecast changelog for model:", modelIDValue);
+        const notesSubmissionResponse = await AWSconnections.submitModelForecastNotes(modelIDValue, null);
+        console.log("Notes submission response:", notesSubmissionResponse);
+
+        // Write changelog to Excel if successful
+        if (notesSubmissionResponse.status === "success" && notesSubmissionResponse.data) {
+          const changelogResult = await AWSconnections.writeForecastChangelogToExcel(notesSubmissionResponse.data);
+          console.log("Changelog write result:", changelogResult);
+        } else {
+          console.warn("⚠️ Failed to fetch changelog data:", notesSubmissionResponse.message);
+        }
+
         const message = `Forecast scenario saved & locked for model: ${heading.replace(
           "Save & Lock Aggregator Scenario for: ",
           ""
@@ -381,6 +456,7 @@ const AggLockScenario = ({ setPageValue }) => {
       console.timeEnd("Total save time request");
     }
   }, [
+    forecasterNotes,
     checkScenarioExists,
     dataFrames,
     cloudLoadModelsList,
@@ -397,6 +473,8 @@ const AggLockScenario = ({ setPageValue }) => {
   //                                RENDER
   // =============================================================================
   const isDisabled = !selectedCycle || !scenarioName;
+  const maxCharacters = 500;
+  const remainingCharacters = maxCharacters - forecasterNotes.length;
 
   return (
     <Container>
@@ -426,6 +504,23 @@ const AggLockScenario = ({ setPageValue }) => {
               onChange={(e) => setScenarioName(e.target.value)}
             />
           </DropdownContainer>
+
+          <NotesWrapper>
+            <SectionLabel>Forecaster Notes</SectionLabel>
+            <TextArea
+              placeholder="Add your notes here..."
+              value={forecasterNotes}
+              onChange={(e) => {
+                if (e.target.value.length <= maxCharacters) {
+                  setForecasterNotes(e.target.value);
+                }
+              }}
+              maxLength={maxCharacters}
+            />
+            <CharacterCount isNearLimit={remainingCharacters < 50}>
+              {remainingCharacters} characters remaining
+            </CharacterCount>
+          </NotesWrapper>
 
           <SaveButton
             onClick={() => setShowRefreshPrompt(true)}
@@ -515,6 +610,21 @@ const AggLockScenario = ({ setPageValue }) => {
                   >
                     No
                   </ConfirmButton>
+                </ModalFooter>
+              </Modal>
+            </Overlay>
+          )}
+
+          {/* Prompt: Forecaster Notes Required */}
+          {showNotesPrompt && (
+            <Overlay>
+              <Modal>
+                <ModalHeader>Forecaster Notes Required</ModalHeader>
+                <ModalBody>
+                  Please add forecaster notes before saving.
+                </ModalBody>
+                <ModalFooter>
+                  <ConfirmButton onClick={handleNotesPromptOk}>OK</ConfirmButton>
                 </ModalFooter>
               </Modal>
             </Overlay>

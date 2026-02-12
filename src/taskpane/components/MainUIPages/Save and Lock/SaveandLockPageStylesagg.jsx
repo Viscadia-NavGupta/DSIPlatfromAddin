@@ -159,3 +159,48 @@ export const ConfirmButton = styled("button")({
     backgroundColor: "#8A1F1A",
   },
 });
+
+// --- Notes Styles ---
+
+export const NotesWrapper = styled("div")({
+  width: "100%",
+  maxWidth: "400px",
+  marginTop: "20px",
+});
+
+export const SectionLabel = styled("label")({
+  display: "block",
+  fontFamily: "Roboto, sans-serif",
+  fontWeight: 500,
+  fontSize: "14px",
+  color: "#333333",
+  marginBottom: "8px",
+});
+
+export const TextArea = styled("textarea")({
+  width: "100%",
+  minHeight: "100px",
+  padding: "12px",
+  fontFamily: "Roboto, sans-serif",
+  fontWeight: 400,
+  fontSize: "14px",
+  lineHeight: "160%",
+  color: "#4F4F4F",
+  border: "1px solid #E0E0E0",
+  borderRadius: "8px",
+  boxSizing: "border-box",
+  backgroundColor: "#F7F7F7",
+  resize: "vertical",
+  "&:focus": {
+    outline: "none",
+    borderColor: "#BD302B",
+  },
+});
+
+export const CharacterCount = styled("div")(({ isNearLimit }) => ({
+  fontFamily: "Roboto, sans-serif",
+  fontSize: "12px",
+  color: isNearLimit ? "#BD302B" : "#828282",
+  textAlign: "right",
+  marginTop: "4px",
+}));

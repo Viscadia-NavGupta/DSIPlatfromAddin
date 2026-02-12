@@ -12,6 +12,18 @@ import {
   SelectDropdown,
   Input,
   SaveButton,
+  SectionLabel,
+  TextArea,
+  CharacterCount,
+  DetailedNotesButton,
+  DetailedNotesContainer,
+  DetailedNoteField,
+  DetailedNoteLabel,
+  DetailedTextArea,
+  BackButton,
+  NotesWrapper,
+  BackButtonContainer,
+  DetailedHeading,
   Overlay,
   Modal,
   ModalHeader,
@@ -28,6 +40,15 @@ import CONFIG from "../../Middleware/AWSConnections";
 const SaveandLockScenario = ({ setPageValue }) => {
   const [selectedCycle, setSelectedCycle] = useState("");
   const [scenarioName, setScenarioName] = useState("");
+  const [forecasterNotes, setForecasterNotes] = useState("");
+  const [showDetailedNotes, setShowDetailedNotes] = useState(false);
+  const [detailedNotes, setDetailedNotes] = useState({
+    epidemiology: "",
+    marketShareAssumptions: "",
+    patientConversion: "",
+    demandConversion: "",
+    revenueConversion: "",
+  });
   const [heading, setHeading] = useState("Active Sheet Name");
   const [isOutputSheet, setIsOutputSheet] = useState(false);
   const [cycleItems, setCycleItems] = useState([]);
@@ -37,6 +58,8 @@ const SaveandLockScenario = ({ setPageValue }) => {
   const [modelIDError, setModelIDError] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
   const [showOverwriteWarning, setShowOverwriteWarning] = useState(false);
+  const [showNotesPrompt, setShowNotesPrompt] = useState(false);
+  const [showDetailedNotesPrompt, setShowDetailedNotesPrompt] = useState(false);
   const [lockedScenarioInfo, setLockedScenarioInfo] = useState(null);
 
   const [dataFrames, setDataFrames] = useState({
@@ -206,13 +229,26 @@ const SaveandLockScenario = ({ setPageValue }) => {
   }, [loading, modelIDValue, dataFrames.dfResult3]);
 
   const handleSaveClick = useCallback(() => {
+    // Check if forecaster notes are empty
+    if (!forecasterNotes.trim()) {
+      setShowNotesPrompt(true);
+      return;
+    }
+
+    // Check if detailed notes are all empty
+    const hasDetailedNotes = Object.values(detailedNotes).some(note => note.trim());
+    if (!hasDetailedNotes) {
+      setShowDetailedNotesPrompt(true);
+      return;
+    }
+
     const lockedExists = checkLockedScenarioExists(modelIDValue, selectedCycle);
     if (lockedExists) {
       setShowOverwriteWarning(true);
     } else {
       setShowConfirm(true);
     }
-  }, [checkLockedScenarioExists, modelIDValue, selectedCycle]);
+  }, [forecasterNotes, detailedNotes, checkLockedScenarioExists, modelIDValue, selectedCycle]);
 
   const proceedWithSave = useCallback(async () => {
     console.time("Total save time request");
@@ -239,6 +275,17 @@ const SaveandLockScenario = ({ setPageValue }) => {
 
       setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
 
+      // Create notes JSON body for Lambda API
+      const notesBody = {
+        forecaster_notes: forecasterNotes,
+        epidemiology: detailedNotes.epidemiology,
+        market_share_assumptions: detailedNotes.marketShareAssumptions,
+        patient_conversion: detailedNotes.patientConversion,
+        demand_conversion: detailedNotes.demandConversion,
+        revenue_conversion: detailedNotes.revenueConversion,
+      };
+      console.log("notes:", JSON.stringify(notesBody, null, 2));
+
       const saveFlag = await AWSconnections.service_orchestration(
         "SAVE_LOCKED_FORECAST",
         "",
@@ -253,7 +300,11 @@ const SaveandLockScenario = ({ setPageValue }) => {
         [],
         [],
         [],
-        setPageValue
+        setPageValue,
+        [],
+        [],
+        [],
+        JSON.stringify(notesBody)
       );
 
       const message = `Forecast scenario saved for
@@ -262,13 +313,55 @@ Cycle: ${selectedCycle}
 Scenario: ${scenarioName}`;
 
       if (saveFlag === "SUCCESS" || (saveFlag && saveFlag.result === "DONE")) {
-        setPageValue("SuccessMessagePage", message);
+        // Create Excel notes JSON body
+        const currentDate = new Date().toLocaleDateString("en-US");
+        const firstName = localStorage.getItem("firstName") || "";
+        const ownerName = `${firstName}`.trim();
+
+        const excelNotesBody = {
+          basic_details: {
+            cycle_name: selectedCycle,
+            status: "Locked",
+            scenario_name: scenarioName,
+            saved_at: currentDate,
+            loaded_at: currentDate,
+            owner: ownerName,
+          },
+          forecaster_notes: forecasterNotes,
+          detailed_notes: {
+            epidemiology: detailedNotes.epidemiology,
+            market_share: detailedNotes.marketShareAssumptions,
+            patient_conversion: detailedNotes.patientConversion,
+            demand_conversion: detailedNotes.demandConversion,
+            revenue_conversion: detailedNotes.revenueConversion,
+          },
+        };
+        console.log("Excel notes body:", JSON.stringify(excelNotesBody, null, 2));
+
+        // Write notes to Excel named ranges
+        const excelWriteResult = await AWSconnections.writeForecastNotesToExcel(excelNotesBody);
+        console.log("Excel notes write result:", excelWriteResult);
+
+        // Submit model forecast notes and get changelog data
+        console.log("📤 Fetching forecast changelog for model:", modelIDValue);
+        const notesSubmissionResponse = await AWSconnections.submitModelForecastNotes(modelIDValue, null);
+        console.log("Notes submission response:", notesSubmissionResponse);
+
+        // Write changelog to Excel if successful
+        if (notesSubmissionResponse.status === "success" && notesSubmissionResponse.data) {
+          const changelogResult = await AWSconnections.writeForecastChangelogToExcel(notesSubmissionResponse.data);
+          console.log("Changelog write result:", changelogResult);
+        } else {
+          console.warn("⚠️ Failed to fetch changelog data:", notesSubmissionResponse.message);
+        }
+
         await AWSconnections.writeMetadataToNamedCell(
           "last_scn_update",
           selectedCycle,
           scenarioName,
           "Locked"
         );
+        setPageValue("SuccessMessagePage", message);
       } else {
         setPageValue(
           "SaveForecastPageinterim",
@@ -284,7 +377,7 @@ Scenario: ${scenarioName}`;
     } finally {
       console.timeEnd("Total save time request");
     }
-  }, [heading, modelIDValue, scenarioName, selectedCycle, setPageValue]);
+  }, [forecasterNotes, detailedNotes, heading, modelIDValue, scenarioName, selectedCycle, setPageValue]);
 
   const handleSaveConfirmed = useCallback(async () => {
     setShowConfirm(false);
@@ -301,6 +394,23 @@ Scenario: ${scenarioName}`;
   }, [modelIDValue, selectedCycle, scenarioName, checkScenarioExists, proceedWithSave]);
 
   const handleCancel = () => setShowConfirm(false);
+  const handleDetailedNotesYes = () => {
+    setShowDetailedNotesPrompt(false);
+    const lockedExists = checkLockedScenarioExists(modelIDValue, selectedCycle);
+    if (lockedExists) {
+      setShowOverwriteWarning(true);
+    } else {
+      setShowConfirm(true);
+    }
+  };
+  const handleDetailedNotesNo = () => setShowDetailedNotesPrompt(false);
+  const handleNotesPromptOk = () => setShowNotesPrompt(false);
+  const handleDetailedNoteChange = (field, value) => {
+    setDetailedNotes((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
   if (loading) {
     return <MessageBox>Connecting to data lake, please wait… </MessageBox>;
@@ -316,11 +426,16 @@ Scenario: ${scenarioName}`;
     );
   }
 
+  const maxCharacters = 500;
+  const remainingCharacters = maxCharacters - forecasterNotes.length;
+
   return (
     <Container>
-      <Heading>{heading}</Heading>
+      {!showDetailedNotes ? (
+        <>
+          <Heading>{heading}</Heading>
 
-      <DropdownContainer>
+          <DropdownContainer>
         <SelectDropdown
           value={selectedCycle}
           onChange={(e) => setSelectedCycle(e.target.value)}
@@ -335,20 +450,108 @@ Scenario: ${scenarioName}`;
           ))}
         </SelectDropdown>
 
-        <Input
-          type="text"
-          placeholder="Enter Scenario Name"
-          value={scenarioName}
-          onChange={(e) => setScenarioName(e.target.value)}
-        />
-      </DropdownContainer>
+            <Input
+              type="text"
+              placeholder="Enter Scenario Name"
+              value={scenarioName}
+              onChange={(e) => setScenarioName(e.target.value)}
+            />
+          </DropdownContainer>
 
-      <SaveButton
-        onClick={handleSaveClick}
-        disabled={!selectedCycle || !scenarioName}
-      >
-        Save & Lock
-      </SaveButton>
+          <NotesWrapper>
+            <SectionLabel>Forecaster Notes</SectionLabel>
+            <TextArea
+              placeholder="Add your notes here..."
+              value={forecasterNotes}
+              onChange={(e) => {
+                if (e.target.value.length <= maxCharacters) {
+                  setForecasterNotes(e.target.value);
+                }
+              }}
+              maxLength={maxCharacters}
+            />
+            <CharacterCount isNearLimit={remainingCharacters < 50}>
+              {remainingCharacters} characters remaining
+            </CharacterCount>
+          </NotesWrapper>
+
+          {forecasterNotes.trim() && (
+            <DetailedNotesButton onClick={() => setShowDetailedNotes(true)} type="button" style={{ border: "1px solid #bd302b" }}>
+              Add Detailed Notes
+            </DetailedNotesButton>
+          )}
+
+          <SaveButton
+            onClick={handleSaveClick}
+            disabled={!selectedCycle || !scenarioName}
+          >
+            Save & Lock
+          </SaveButton>
+        </>
+      ) : (
+        <>
+          <BackButtonContainer>
+            <BackButton onClick={() => setShowDetailedNotes(false)} type="button">
+              ←
+            </BackButton>
+            <DetailedHeading>{heading}</DetailedHeading>
+          </BackButtonContainer>
+
+          <DetailedNotesContainer>
+            <DetailedNoteField>
+              <DetailedNoteLabel>Epidemiology</DetailedNoteLabel>
+              <DetailedTextArea
+                placeholder="-"
+                value={detailedNotes.epidemiology}
+                onChange={(e) => handleDetailedNoteChange("epidemiology", e.target.value)}
+              />
+            </DetailedNoteField>
+
+            <DetailedNoteField>
+              <DetailedNoteLabel>Market Share</DetailedNoteLabel>
+              <DetailedTextArea
+                placeholder="-"
+                value={detailedNotes.marketShareAssumptions}
+                onChange={(e) => handleDetailedNoteChange("marketShareAssumptions", e.target.value)}
+              />
+            </DetailedNoteField>
+
+            <DetailedNoteField>
+              <DetailedNoteLabel>Persistency & Dosing</DetailedNoteLabel>
+              <DetailedTextArea
+                placeholder="-"
+                value={detailedNotes.patientConversion}
+                onChange={(e) => handleDetailedNoteChange("patientConversion", e.target.value)}
+              />
+            </DetailedNoteField>
+
+            <DetailedNoteField>
+              <DetailedNoteLabel>Compliance & Access</DetailedNoteLabel>
+              <DetailedTextArea
+                placeholder="-"
+                value={detailedNotes.demandConversion}
+                onChange={(e) => handleDetailedNoteChange("demandConversion", e.target.value)}
+              />
+            </DetailedNoteField>
+
+            <DetailedNoteField>
+              <DetailedNoteLabel>WAC & GTN</DetailedNoteLabel>
+              <DetailedTextArea
+                placeholder="-"
+                value={detailedNotes.revenueConversion}
+                onChange={(e) => handleDetailedNoteChange("revenueConversion", e.target.value)}
+              />
+            </DetailedNoteField>
+          </DetailedNotesContainer>
+
+          <SaveButton
+            onClick={handleSaveClick}
+            disabled={!selectedCycle || !scenarioName}
+          >
+            Save & Lock
+          </SaveButton>
+        </>
+      )}
 
       {showConfirm && (
         <Overlay>
@@ -395,6 +598,42 @@ Scenario: ${scenarioName}`;
                 onClick={() => setShowOverwriteWarning(false)}
               >
                 Cancel
+              </ConfirmButton>
+            </ModalFooter>
+          </Modal>
+        </Overlay>
+      )}
+
+      {/* Prompt: Forecaster Notes Required */}
+      {showNotesPrompt && (
+        <Overlay>
+          <Modal>
+            <ModalHeader>Forecaster Notes Required</ModalHeader>
+            <ModalBody>
+              Please add forecaster notes before saving.
+            </ModalBody>
+            <ModalFooter>
+              <ConfirmButton onClick={handleNotesPromptOk}>OK</ConfirmButton>
+            </ModalFooter>
+          </Modal>
+        </Overlay>
+      )}
+
+      {/* Prompt: Add Detailed Notes? */}
+      {showDetailedNotesPrompt && (
+        <Overlay>
+          <Modal>
+            <ModalHeader>Add Detailed Notes?</ModalHeader>
+            <ModalBody>
+              Detailed notes are not included. Would you like to proceed with saving?
+            </ModalBody>
+            <ModalFooter>
+              <ConfirmButton onClick={handleDetailedNotesYes}>Yes</ConfirmButton>
+              <ConfirmButton
+                style={{ backgroundColor: "#63666A" }}
+                onClick={handleDetailedNotesNo}
+              >
+                No
               </ConfirmButton>
             </ModalFooter>
           </Modal>
