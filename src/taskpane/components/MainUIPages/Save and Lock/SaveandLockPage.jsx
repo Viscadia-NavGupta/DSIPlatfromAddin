@@ -242,13 +242,22 @@ const SaveandLockScenario = ({ setPageValue }) => {
       return;
     }
 
+    // Check for duplicate scenario names first
+    if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
+      setPageValue(
+        "SaveForecastPageinterim",
+        "Scenario names already exist… choose a different one."
+      );
+      return;
+    }
+
     const lockedExists = checkLockedScenarioExists(modelIDValue, selectedCycle);
     if (lockedExists) {
       setShowOverwriteWarning(true);
     } else {
       setShowConfirm(true);
     }
-  }, [forecasterNotes, detailedNotes, checkLockedScenarioExists, modelIDValue, selectedCycle]);
+  }, [forecasterNotes, detailedNotes, checkScenarioExists, checkLockedScenarioExists, modelIDValue, selectedCycle, scenarioName, setPageValue]);
 
   const proceedWithSave = useCallback(async () => {
     console.time("Total save time request");
@@ -381,7 +390,14 @@ Scenario: ${scenarioName}`;
 
   const handleSaveConfirmed = useCallback(async () => {
     setShowConfirm(false);
+    await proceedWithSave();
+  }, [proceedWithSave]);
 
+  const handleCancel = () => setShowConfirm(false);
+  const handleDetailedNotesYes = () => {
+    setShowDetailedNotesPrompt(false);
+    
+    // Check for duplicate scenario names first
     if (checkScenarioExists(modelIDValue, selectedCycle, scenarioName)) {
       setPageValue(
         "SaveForecastPageinterim",
@@ -389,13 +405,7 @@ Scenario: ${scenarioName}`;
       );
       return;
     }
-
-    await proceedWithSave();
-  }, [modelIDValue, selectedCycle, scenarioName, checkScenarioExists, proceedWithSave]);
-
-  const handleCancel = () => setShowConfirm(false);
-  const handleDetailedNotesYes = () => {
-    setShowDetailedNotesPrompt(false);
+    
     const lockedExists = checkLockedScenarioExists(modelIDValue, selectedCycle);
     if (lockedExists) {
       setShowOverwriteWarning(true);

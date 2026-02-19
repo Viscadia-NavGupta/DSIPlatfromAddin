@@ -59,25 +59,31 @@ const AggLockScenario = ({ setPageValue }) => {
   //                       HELPER FUNCTIONS & CALLBACKS
   // =============================================================================
 
+  const scenarioSet = useMemo(() => {
+    const df = dataFrames.dfResult1;
+    if (!df) return new Set();
+    return new Set(
+      df
+        .toCollection()
+        .map((r) => {
+          const id = (r.model_id ?? "").toString().trim();
+          const cycle = (r.cycle_name ?? "").toString().trim();
+          const scen = (r.scenario_name ?? "")
+            .toString()
+            .trim()
+            .toLowerCase();
+          return `${id}|${cycle}|${scen}`;
+        })
+    );
+  }, [dataFrames.dfResult1]);
+
   const checkScenarioExists = useCallback(
     (modelId, cycleName, scenarioName) => {
-      const df1 = dataFrames.dfResult1;
-      if (!df1) return false;
+      if (!dataFrames.dfResult1) return false;
       const key = `${modelId}|${cycleName}|${scenarioName.trim().toLowerCase()}`;
-      return new Set(
-        df1
-          .toCollection()
-          .map((r) =>
-            `${(r.model_id ?? "").toString()}|${(r.cycle_name ?? "").toString()}|${(
-              r.scenario_name ?? ""
-            )
-              .toString()
-              .trim()
-              .toLowerCase()}`
-          )
-      ).has(key);
+      return scenarioSet.has(key);
     },
-    [dataFrames]
+    [dataFrames.dfResult1, scenarioSet]
   );
 
   const findLockedScenario = useCallback(() => {
@@ -278,18 +284,6 @@ const AggLockScenario = ({ setPageValue }) => {
       return;
     }
 
-    // redundant scenario-exists guard
-    if (
-      checkScenarioExists(modelIDValue, selectedCycle, scenarioName)
-    ) {
-      setPageValue(
-        "SaveForecastPageinterim",
-        "Scenario names already exist in the database. Please choose a different scenario name."
-      );
-      console.timeEnd("Total save time request");
-      return;
-    }
-
     // begin save
     setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
     const df1 = dataFrames.dfResult1;
@@ -457,7 +451,6 @@ const AggLockScenario = ({ setPageValue }) => {
     }
   }, [
     forecasterNotes,
-    checkScenarioExists,
     dataFrames,
     cloudLoadModelsList,
     heading,
