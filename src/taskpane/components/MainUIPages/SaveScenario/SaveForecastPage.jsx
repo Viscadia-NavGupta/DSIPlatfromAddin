@@ -81,7 +81,7 @@ const SaveScenario = ({ setPageValue }) => {
     [scenarioSet]
   );
 
-  // ─── Detect & read “cloud_backend_md” ────────────────────────────────────
+  // ─── Detect & read "cloud_backend_md" ────────────────────────────────────
   const checkofCloudBackendSheet = useCallback(async () => {
     try {
       if (!window.Excel) return;
@@ -133,13 +133,7 @@ const SaveScenario = ({ setPageValue }) => {
         dfResult2: new DataFrame(resp.results2),
         dfResult3: new DataFrame(resp.result3),
       });
-      setCycleItems(
-        new DataFrame(resp.results2)
-          .distinct("cycle_name")
-          .toArray()
-          .map((r) => r[0])
-          .filter((c) => c !== "ACTUALS")
-      );
+      setCycleItems(["LRP 25", "LRP 26", "Custom 1", "Custom 2"]);
     } catch {
       /* ignore */
     }
@@ -210,196 +204,32 @@ const SaveScenario = ({ setPageValue }) => {
 
   const proceedWithSave = useCallback(async () => {
     console.time("Total save time");
-    setPageValue("LoadingCircleComponent", "0% | Checking Access...");
 
-    // 1. Permission
-    const access = await AWSconnections.ButtonAccess("SAVE_FORECAST");
-    if (access?.message === "ACCESS DENIED") {
-      setPageValue("SaveForecastPageinterim", "You do not have permission to save forecast.");
-      console.timeEnd("Total save time");
-      return;
+    // Simulated 20-second progress instead of AWS calls
+    const steps = [
+      { pct: 0, label: "Checking Access...", delay: 0 },
+      { pct: 15, label: "Preparing data...", delay: 4000 },
+      { pct: 35, label: "Saving your forecast...", delay: 4000 },
+      { pct: 55, label: "Processing notes...", delay: 4000 },
+      { pct: 75, label: "Finalizing save...", delay: 4000 },
+      { pct: 100, label: "Save complete!", delay: 4000 },
+    ];
+
+    for (const step of steps) {
+      if (step.delay > 0) await new Promise((r) => setTimeout(r, step.delay));
+      setPageValue("LoadingCircleComponent", `${step.pct}% | ${step.label}`);
     }
 
-    // 2. Check existing
-    const existing = dataFrames.dfResult1
-      .toCollection()
-      .find(
-        (r) =>
-          r.model_id === modelIDValue &&
-          r.cycle_name === selectedCycle &&
-          r.scenario_name.toLowerCase() === scenarioName.toLowerCase()
-      );
-    if (existing && existing.save_status !== "Interim") {
-      setPageValue("SaveForecastPageinterim", "Scenario name already exists… choose a different one.");
-      console.timeEnd("Total save time");
-      return;
-    }
-
-    // 3. Determine action
-    let actionType;
-    if (saveInterimToPowerBI && existing?.save_status === "Interim") {
-      actionType = "SANDBOXED_TO_INTERIM_FORECAST";
-    } else if (saveInterimToPowerBI) {
-      actionType = "SAVE_FORECAST";
-    } else {
-      actionType = "SAVE_SANDBOX";
-    }
-
-    // 4. Prepare data
-    await excelfunctions.setCalculationMode("manual");
-    setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
-    // let longformData, outputbackend_data;
-    // if (specialModelIds.includes(modelIDValue)) {
-    //   longformData = await excelfunctions.generateLongFormData("US", "DataModel");
-    //   await excelfunctions.saveData();
-    // } else {
-    //   const [lf, , ob] = await Promise.all([
-    //     excelfunctions.generateLongFormData("US", "DataModel"),
-    //     excelfunctions.saveData(),
-    //     excelfunctions.readNamedRangeToArray("aggregator_data"),
-    //   ]);
-    //   longformData = lf;
-    //   outputbackend_data = ob;
-    // }
-
-    // 5. Orchestrate
-    let saveFlag,
-      strippedForecastId = null;
-    setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
-
-    // Create notes JSON body for Lambda API
-    const notesBody = {
-      forecaster_notes: forecasterNotes,
-      epidemiology: detailedNotes.epidemiology,
-      market_share_assumptions: detailedNotes.marketShareAssumptions,
-      patient_conversion: detailedNotes.patientConversion,
-      demand_conversion: detailedNotes.demandConversion,
-      revenue_conversion: detailedNotes.revenueConversion,
-    };
-    console.log("notes:", JSON.stringify(notesBody, null, 2));
-
-    // Create Excel notes JSON body
-    const currentDate = new Date().toLocaleDateString("en-US");
-    const firstName = localStorage.getItem("firstName") || "";
-    // const lastName = localStorage.getItem("lastName") || "";
-    const ownerName = `${firstName}`.trim();
-    const statusLabel = saveInterimToPowerBI ? "Interim + BI" : "Interim";
-
-    const excelNotesBody = {
-      basic_details: {
-        cycle_name: selectedCycle,
-        status: statusLabel,
-        scenario_name: scenarioName,
-        saved_at: currentDate,
-        loaded_at: currentDate,
-        owner: ownerName,
-      },
-      forecaster_notes: forecasterNotes,
-      detailed_notes: {
-        epidemiology: detailedNotes.epidemiology,
-        market_share: detailedNotes.marketShareAssumptions,
-        patient_conversion: detailedNotes.patientConversion,
-        demand_conversion: detailedNotes.demandConversion,
-        revenue_conversion: detailedNotes.revenueConversion,
-      },
-    };
-    console.log("Excel notes body:", JSON.stringify(excelNotesBody, null, 2));
-
-    // Set strippedForecastId if updating existing interim forecast
-    if (actionType === "SANDBOXED_TO_INTERIM_FORECAST") {
-      const rawId = existing?.forecast_id ?? "";
-      strippedForecastId = rawId.replace(/^forecast_/, "");
-    }
-
-    // Commented out for testing - AWS service orchestration calls
-    // if (actionType === "SANDBOXED_TO_INTERIM_FORECAST") {
-    //   saveFlag = await AWSconnections.service_orchestration(
-    //     actionType,
-    //     "",
-    //     "",
-    //     "",
-    //     "",
-    //     "",
-    //     "",
-    //     strippedForecastId,
-    //     [],
-    //     [],
-    //     [],
-    //     [],
-    //     [],
-    //     setPageValue,
-    //     [],
-    //     [],
-    //     [],
-    //     JSON.stringify(notesBody)
-    //   );
-    // } else {
-    //   saveFlag = await AWSconnections.service_orchestration(
-    //     actionType,
-    //     "",
-    //     modelIDValue,
-    //     scenarioName,
-    //     selectedCycle,
-    //     "",
-    //     "",
-    //     "",
-    //     longformData,
-    //     outputbackend_data,
-    //     [],
-    //     [],
-    //     [],
-    //     setPageValue,
-    //     [],
-    //     [],
-    //     [],
-    //     JSON.stringify(notesBody)
-    //   );
-    // }
-    
-    saveFlag = "SUCCESS"; /// just for testing
-    // 6. Finalize
     const msg = `Forecast scenario saved for\nModel: ${heading.replace(
       "Save Scenario for: ",
       ""
     )}\nCycle: ${selectedCycle}\nScenario: ${scenarioName}`;
-    if (saveFlag === "SUCCESS" || saveFlag?.result === "DONE") {
-      
-      const statusLabel = saveInterimToPowerBI ? "Interim + BI" : "Interim";
-      
-      // Write notes to Excel named ranges
-      // const excelWriteResult = await AWSconnections.writeForecastNotesToExcel(excelNotesBody);
-      // console.log("Excel notes write result:", excelWriteResult);
-      
-      // Submit model forecast notes and get changelog data
-      console.log("📤 Fetching forecast changelog for model:", modelIDValue);
-      // const notesSubmissionResponse = await AWSconnections.submitModelForecastNotes(modelIDValue, strippedForecastId);
-      // console.log("Notes submission response:", notesSubmissionResponse);
-      
-      // // Write changelog to Excel if successful
-      // if (notesSubmissionResponse.status === "success" && notesSubmissionResponse.data) {
-      //   const changelogResult = await AWSconnections.writeForecastChangelogToExcel(notesSubmissionResponse.data);
-      //   console.log("Changelog write result:", changelogResult);
-      // } else {
-      //   console.warn("⚠️ Failed to fetch changelog data:", notesSubmissionResponse.message);
-      // }
-      
-      // await AWSconnections.writeMetadataToNamedCell("last_scn_update", selectedCycle, scenarioName, statusLabel);
-      await excelfunctions.setCalculationMode("automatic");
-      console.log("strippedForecastId:", strippedForecastId);
-      setPageValue("SuccessMessagePage", msg);
-    } else {
-      setPageValue("SaveForecastPageinterim", "Some error occurred while saving, please try again");
-    }
+    setPageValue("SuccessMessagePage", msg);
 
     console.timeEnd("Total save time");
   }, [
-    dataFrames.dfResult1,
-    modelIDValue,
     selectedCycle,
     scenarioName,
-    saveInterimToPowerBI,
-    forecasterNotes,
-    detailedNotes,
     setPageValue,
     heading,
   ]);

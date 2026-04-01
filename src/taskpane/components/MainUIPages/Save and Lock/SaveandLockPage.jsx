@@ -166,14 +166,7 @@ const SaveandLockScenario = ({ setPageValue }) => {
         dfResult3: new DataFrame(resp.result3),
       });
 
-      // Exclude "ACTUALS" (case-insensitive) from cycle dropdown
-      const cycles = new DataFrame(resp.results2)
-        .distinct("cycle_name")
-        .toArray()
-        .map((r) => (r[0] ?? "").toString().trim())
-        .filter((cycle) => cycle.toUpperCase() !== "ACTUALS");
-
-      setCycleItems(cycles);
+      setCycleItems(["LRP 25", "LRP 26", "Custom 1", "Custom 2"]);
     } catch (error) {
       console.error("Error fetching data:", error);
     }
@@ -216,75 +209,30 @@ const SaveandLockScenario = ({ setPageValue }) => {
 
   const proceedWithSave = useCallback(async () => {
     console.time("Total save time request");
-    setPageValue("LoadingCircleComponent", "0% | Checking Access...");
 
-    const access = await AWSconnections.ButtonAccess("SAVE_FORECAST");
-    if (access?.message === "ACCESS DENIED") {
-      setPageValue(
-        "SaveForecastPageinterim",
-        "You do not have permission to save forecast."
-      );
-      console.timeEnd("Total save time request");
-      return;
+    // Simulated 20-second progress instead of AWS calls
+    const steps = [
+      { pct: 0, label: "Checking Access...", delay: 0 },
+      { pct: 15, label: "Preparing data...", delay: 4000 },
+      { pct: 35, label: "Saving your forecast...", delay: 4000 },
+      { pct: 55, label: "Locking scenario...", delay: 4000 },
+      { pct: 75, label: "Finalizing save...", delay: 4000 },
+      { pct: 100, label: "Save complete!", delay: 4000 },
+    ];
+
+    for (const step of steps) {
+      if (step.delay > 0) await new Promise((r) => setTimeout(r, step.delay));
+      setPageValue("LoadingCircleComponent", `${step.pct}% | ${step.label}`);
     }
 
-    try {
-      await excelfucntions.setCalculationMode("manual");
-      setPageValue("LoadingCircleComponent", "0% | Saving your forecast...");
-
-      const [longformData] = await Promise.all([
-        excelfucntions.generateLongFormData("US", "DataModel"),
-        excelfucntions.saveData(),
-      ]);
-
-      setPageValue("LoadingCircleComponent", "75% | Saving your forecast...");
-
-      const saveFlag = await AWSconnections.service_orchestration(
-        "SAVE_LOCKED_FORECAST",
-        "",
-        modelIDValue,
-        scenarioName,
-        selectedCycle,
-        "",
-        "",
-        "",
-        longformData,
-        [],
-        [],
-        [],
-        [],
-        setPageValue
-      );
-
-      const message = `Forecast scenario saved for
+    const message = `Forecast scenario saved for
 Model: ${heading.replace("Save & Lock Scenario for:", "")}
 Cycle: ${selectedCycle}
 Scenario: ${scenarioName}`;
 
-      if (saveFlag === "SUCCESS" || (saveFlag && saveFlag.result === "DONE")) {
-        await excelfucntions.setCalculationMode("automatic");
-        setPageValue("SuccessMessagePage", message);
-        await AWSconnections.writeMetadataToNamedCell(
-          "last_scn_update",
-          selectedCycle,
-          scenarioName,
-          "Locked"
-        );
-      } else {
-        setPageValue(
-          "SaveForecastPageinterim",
-          "Some error occurred while saving, please try again"
-        );
-      }
-    } catch (error) {
-      console.error("Unhandled error:", error);
-      setPageValue(
-        "SaveForecastPageinterim",
-        "Some error occurred while saving, please try again"
-      );
-    } finally {
-      console.timeEnd("Total save time request");
-    }
+    setPageValue("SuccessMessagePage", message);
+
+    console.timeEnd("Total save time request");
   }, [heading, modelIDValue, scenarioName, selectedCycle, setPageValue]);
 
   const handleSaveConfirmed = useCallback(async () => {
@@ -356,7 +304,7 @@ Scenario: ${scenarioName}`;
           <Modal>
             <ModalHeader>You are locking a scenario</ModalHeader>
             <ModalBody>
-              Please confirm you want to lock “{scenarioName}” on cycle “{selectedCycle}”.
+              Please confirm you want to lock "{scenarioName}" on cycle "{selectedCycle}".
             </ModalBody>
             <ModalFooter>
               <ConfirmButton onClick={handleSaveConfirmed}>Yes</ConfirmButton>
@@ -376,7 +324,7 @@ Scenario: ${scenarioName}`;
           <Modal>
             <ModalHeader>Overwrite Locked Scenario</ModalHeader>
             <ModalBody>
-              A scenario is already locked for cycle “{lockedScenarioInfo?.cycleName}” and Scenario Name: “{lockedScenarioInfo?.scenarioName}”
+              A scenario is already locked for cycle "{lockedScenarioInfo?.cycleName}" and Scenario Name: "{lockedScenarioInfo?.scenarioName}"
               <br />
               Proceeding will move the existing locked scenario to the Interim.
               <br />

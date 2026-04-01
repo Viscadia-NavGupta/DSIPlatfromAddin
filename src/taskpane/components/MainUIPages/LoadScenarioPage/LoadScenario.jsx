@@ -78,15 +78,11 @@ const LoadScenario = ({ setPageValue }) => {
     }
   }, [modelIDValue]);
 
-  // Set fixed dropdown values instead of dynamic ones
+  // Set fixed dropdown values
   useEffect(() => {
-    setFilteredSaveStatus(["Interim"]);
-    setFilteredCycles(["LRP 26"]);
-    setFilteredScenarios(["Evaluation Base Case"]);
-    // Don't pre-select values - let user choose from dropdown
-    // setSaveStatus("Interim");
-    // setSelectedCycle("LRP 26");
-    // setSelectedScenario("Evaluation Base Case");
+    setFilteredSaveStatus(["Locked", "Interim", "Interim + BI"]);
+    setFilteredCycles(["LRP 25", "LRP 26", "Custom 1", "Custom 2"]);
+    setFilteredScenarios(["Scenario 1", "Scenario 2", "Scenario 3"]);
   }, []);
 
   const checkofCloudBackendSheet = async () => {
@@ -147,36 +143,12 @@ const LoadScenario = ({ setPageValue }) => {
       const filteredData = responseBody.results1.filter((row) => row.model_id === modelIDValue);
       setFullData(filteredData);
 
-      // Keep fixed dropdown values instead of dynamic ones
-      // setFilteredSaveStatus([...new Set(filteredData.map((row) => row.save_status).filter(Boolean))]);
-      // setFilteredCycles([...new Set(filteredData.map((row) => row.cycle_name).filter(Boolean))]);
-      // setFilteredScenarios([...new Set(filteredData.map((row) => row.scenario_name).filter(Boolean))]);
-
       setMetadataLoaded(true);
     } catch (error) {
       console.error("Error fetching metadata:", error);
       setMetadataLoaded(true);
     }
   };
-
-  // Commented out - using fixed values instead
-  // const updateDropdownOptions = () => {
-  //   let filteredData = [...fullData];
-
-  //   if (saveStatus) filteredData = filteredData.filter((row) => row.save_status === saveStatus);
-  //   if (selectedCycle) filteredData = filteredData.filter((row) => row.cycle_name === selectedCycle);
-  //   if (selectedScenario) filteredData = filteredData.filter((row) => row.scenario_name === selectedScenario);
-
-  //   if (!saveStatus) {
-  //     setFilteredSaveStatus([...new Set(filteredData.map((row) => row.save_status).filter(Boolean))]);
-  //   }
-  //   if (!selectedCycle) {
-  //     setFilteredCycles([...new Set(filteredData.map((row) => row.cycle_name).filter(Boolean))]);
-  //   }
-  //   if (!selectedScenario) {
-  //     setFilteredScenarios([...new Set(filteredData.map((row) => row.scenario_name).filter(Boolean))]);
-  //   }
-  // };
 
   const handleSelect = (key, value) => {
     if (key === "saveStatus") {
@@ -204,51 +176,37 @@ const LoadScenario = ({ setPageValue }) => {
     setDropdownOpen((prev) => ({ ...prev, [key]: false }));
   };
 
-  const increaseProgressDuringExport = async () => {
-    for (let i = 55; i <= 95; i += 5) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setImportProgress(i);
-      setPageValue("LoadingCircleComponent", `${i}% | Importing assumptions...`);
-    }
-  };
-
   const handleImportClick = async () => {
-    console.log("🔘 Import button clicked");
+    console.log("Import button clicked");
     console.log("Selected values:", { saveStatus, selectedCycle, selectedScenario });
-    
+
     const newWarnings = {
       saveStatus: !saveStatus,
       cycle: !selectedCycle,
       scenario: !selectedScenario,
     };
     setWarnings(newWarnings);
-    
+
     if (!saveStatus || !selectedCycle || !selectedScenario) {
-      console.log("⚠️ Missing required selections");
+      console.log("Missing required selections");
       return;
     }
 
-    // Simulate progress from 0 to 100%
-    setImportProgress(0);
-    setPageValue("LoadingCircleComponent", "0% | Starting import...");
-    
-    // Progress 0-50%
-    for (let i = 0; i <= 50; i += 10) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      setPageValue("LoadingCircleComponent", `${i}% | Importing scenario...`);
-      setImportProgress(i);
-    }
-    
-    // Progress 50-100%
-    for (let i = 55; i <= 100; i += 5) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      setPageValue("LoadingCircleComponent", `${i}% | Importing assumptions...`);
-      setImportProgress(i);
-    }
+    // Simulated 20-second progress instead of AWS calls
+    const steps = [
+      { pct: 0, label: "Starting import...", delay: 0 },
+      { pct: 15, label: "Importing scenario...", delay: 4000 },
+      { pct: 35, label: "Importing assumptions...", delay: 4000 },
+      { pct: 55, label: "Processing data...", delay: 4000 },
+      { pct: 75, label: "Applying changes...", delay: 4000 },
+      { pct: 100, label: "Import completed", delay: 4000 },
+    ];
 
-    // Complete at 100%
-    setImportProgress(100);
-    setPageValue("LoadingCircleComponent", "100% | Import completed");
+    for (const step of steps) {
+      if (step.delay > 0) await new Promise((resolve) => setTimeout(resolve, step.delay));
+      setImportProgress(step.pct);
+      setPageValue("LoadingCircleComponent", `${step.pct}% | ${step.label}`);
+    }
 
     // Show success message
     const modelNameOnly = heading.replace("Import Scenario for: ", "");
