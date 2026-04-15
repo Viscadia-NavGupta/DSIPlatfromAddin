@@ -314,7 +314,7 @@ const AggSaveScenario = ({ setPageValue }) => {
         );
       }
 
-      if (saveFlag === "SUCCESS" || saveFlag?.result === "DONE") {
+      if (saveFlag === "SUCCESS" || saveFlag === "DONE" || saveFlag?.result === "DONE") {
         // await AWSconnections.sync_MetaData_AGG(setPageValue);
         // Write notes to Excel named ranges
         const excelWriteResult = await AWSconnections.writeForecastNotesToExcel(excelNotesBody);

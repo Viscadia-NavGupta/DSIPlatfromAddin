@@ -871,7 +871,7 @@ export async function service_orchestration(
           pollingResult = typeof serviceStatus === "string" ? serviceStatus : (serviceStatus.status ?? serviceStatus);
         }
         // 3️⃣ If polling didn’t finish with DONE, exit immediately
-        if (pollingResult !== "DONE") {
+        if (pollingResult !== "DONE" && pollingResult !== "SUCCESS") {
           console.error(`❌ Lock‑sandbox‑to‑interim failed: ${pollingResult}`);
           return {
             status: "error",
