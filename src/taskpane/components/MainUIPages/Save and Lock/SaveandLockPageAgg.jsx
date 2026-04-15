@@ -411,6 +411,7 @@ const AggLockScenario = ({ setPageValue }) => {
         // Write changelog to Excel if successful
         if (notesSubmissionResponse.status === "success" && notesSubmissionResponse.data) {
           const changelogResult = await AWSconnections.writeForecastChangelogToExcel(notesSubmissionResponse.data);
+          await AWSconnections.sync_MetaData_AGG(setPageValue);
           console.log("Changelog write result:", changelogResult);
         } else {
           console.warn("⚠️ Failed to fetch changelog data:", notesSubmissionResponse.message);
