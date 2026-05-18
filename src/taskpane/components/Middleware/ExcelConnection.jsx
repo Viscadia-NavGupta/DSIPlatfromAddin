@@ -1843,7 +1843,8 @@ export async function MetaDataSyncwithoutheaders(apiResponse, sheetName, startRa
       const table = sheet.tables.getItem('Table5');
 
       // Clear old data and formatting
-      sheet.getRange('A2:Z1000').clear(Excel.ClearApplyTo.all);
+      // sheet.getRange('A2:Z1000').clear(Excel.ClearApplyTo.all);
+      sheet.getRange("A2:Z1000").clear(Excel.ClearApplyTo.contents);
 
       // Write new data
       const dataStartCell = sheet.getRange(startRange);
