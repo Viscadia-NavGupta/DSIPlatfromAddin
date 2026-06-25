@@ -298,7 +298,7 @@ export function getRangeFromUsedRanges(rangeStr, workbookData) {
 }
 
 
-async function combineArraysSingleCell(array1, array2) {
+function combineArraysSingleCell(array1, array2) {
   try {
     // ✅ Ensure `array1` is always an array
     if (!Array.isArray(array1)) {
@@ -350,7 +350,7 @@ async function combineArraysSingleCell(array1, array2) {
   }
 }
 
-async function combineArrays(array1, array2) {
+function combineArrays(array1, array2) {
   try {
     // ✅ Convert strings to 2D arrays
     if (typeof array1 === "string") array1 = [[array1]];
@@ -484,6 +484,19 @@ export async function generateLongFormData(region, DataModelNameRange) {
 
       let currentRow = 1;
 
+      // Coerce numeric-looking values (incl. "2.36...E-10" text) into real numbers
+      // so Excel stores/exports the actual value instead of scientific-notation text.
+      // Genuine text (non-numeric strings) is passed through unchanged.
+      const NUMERIC_RE = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
+      const toNumber = (v) => {
+        if (typeof v !== "string") return v; // numbers/booleans/null untouched
+        const t = v.trim();
+        if (t !== "" && NUMERIC_RE.test(t)) {
+          const n = Number(t);
+          if (isFinite(n)) return n;
+        }
+        return v; // leave real text as text
+      };
 
       for (let i = 0; i < extractedData.length; i++) {
         let baseRow = currentRow;
@@ -506,7 +519,7 @@ export async function generateLongFormData(region, DataModelNameRange) {
             typeof extractedData[i][a][2] === "string" &&
             Boolean(isValidRange(extractedData[i][a][2]))
           ) {
-            let level1data = await getRangeFromUsedRanges(
+            let level1data = getRangeFromUsedRanges(
               extractedData[i][a][2],
               workbookData
             );
@@ -515,11 +528,11 @@ export async function generateLongFormData(region, DataModelNameRange) {
 
             if (runflag) {
               if (level1data.length === 1 && level1data[0].length === 1) {
-                levelData = await combineArraysSingleCell(levelData, level1data);
+                levelData = combineArraysSingleCell(levelData, level1data);
               } else if (level1data.length >= level1data[0].length) {
-                levelData = await combineArrays(level1data, levelData);
+                levelData = combineArrays(level1data, levelData);
               } else {
-                levelData = await combineArrays(convert2DTo1D(level1data), levelData);
+                levelData = combineArrays(convert2DTo1D(level1data), levelData);
               }
             } else {
               levelData =
@@ -569,7 +582,7 @@ export async function generateLongFormData(region, DataModelNameRange) {
           }
         }
 
-        let valueRange = await getRangeFromUsedRanges(extractedData[i][0][3], workbookData);
+        let valueRange = getRangeFromUsedRanges(extractedData[i][0][3], workbookData);
         if (!Array.isArray(valueRange)) {
           valueRange = [[valueRange]];
         }
@@ -579,16 +592,16 @@ export async function generateLongFormData(region, DataModelNameRange) {
 
         let rangeArray;
         if (LHSdata.length === 1) {
-          rangeArray = await combineArrays(valueRange, LHSdata);
+          rangeArray = combineArrays(valueRange, LHSdata);
         } else if (size1 <= size2 && size1 === 1) {
-          rangeArray = await combineArrays(await convert2DTo1D(valueRange), LHSdata);
+          rangeArray = combineArrays(convert2DTo1D(valueRange), LHSdata);
           transformFlag = true;
         } else {
-          rangeArray = await combineArrays(valueRange, LHSdata);
+          rangeArray = combineArrays(valueRange, LHSdata);
         }
 
         let timelineArray = extractedData[i][0][4]
-          ? await getRangeFromUsedRanges(extractedData[i][0][4], workbookData)
+          ? getRangeFromUsedRanges(extractedData[i][0][4], workbookData)
           : "";
         if (!Array.isArray(timelineArray)) {
           timelineArray = [[timelineArray]];
@@ -613,7 +626,7 @@ export async function generateLongFormData(region, DataModelNameRange) {
               input_output,
               ...rangeArray[y].slice(0, 15),
               timelineValue,
-              rangeArray[y][k + 15],
+              toNumber(rangeArray[y][k + 15]),
               currentRow,
             ];
             longFormData.push(row);
@@ -630,15 +643,37 @@ export async function generateLongFormData(region, DataModelNameRange) {
       // await context.sync();
       workbook = null;
       extractedData = null;
-      const chunkSize = 50000; // Adjust based on performance testing
       App.suspendScreenUpdatingUntilNextSync();
 
-      let outputRange = flatFileSheet
-        .getRange("A1")
-        .getResizedRange(longFormData.length - 1, longFormData[0].length - 1);
+      const rowCount = longFormData.length;
+      const colCount = longFormData[0].length;
+      const valueColIndex = longFormData[0].indexOf("value"); // "value" column (0-based)
+
+      // Clear any leftover rows from a previous (possibly larger) run so stale
+      // data isn't left behind when the new dataset is smaller.
+      let oldUsedRange = flatFileSheet.getUsedRangeOrNullObject();
+      oldUsedRange.load("isNullObject");
+      await context.sync();
+      if (!oldUsedRange.isNullObject) {
+        oldUsedRange.clear(Excel.ClearApplyTo.contents);
+      }
+
+      let outputRange = flatFileSheet.getRangeByIndexes(0, 0, rowCount, colCount);
       outputRange.values = longFormData;
-      outputRange.format.autofitColumns();
-      outputRange.format.autofitRows();
+
+      // Force the value column to render the real number instead of scientific
+      // notation (e.g. 2.36971473994502E-10 -> 0.000000000236971473994502).
+      if (valueColIndex >= 0 && rowCount > 1) {
+        let valueColRange = flatFileSheet.getRangeByIndexes(1, valueColIndex, rowCount - 1, 1);
+        valueColRange.numberFormat = new Array(rowCount - 1).fill(["0.####################"]);
+      }
+
+      // autofitColumns over the whole dataset is expensive; sampling the first
+      // rows is enough to size columns sensibly and is far faster on big outputs.
+      // (autofitRows on hundreds of thousands of rows was the main bottleneck.)
+      flatFileSheet
+        .getRangeByIndexes(0, 0, Math.min(rowCount, 200), colCount)
+        .format.autofitColumns();
       await context.sync();
       console.timeEnd("writing data");
       console.log(`Data processed successfully. Final row count: ${currentRow - 1}`);
