@@ -30,7 +30,7 @@ const SaveandLockScenario = ({ setPageValue }) => {
   const [scenarioName, setScenarioName] = useState("");
   const [heading, setHeading] = useState("Active Sheet Name");
   const [isOutputSheet, setIsOutputSheet] = useState(false);
-  const [cycleItems, setCycleItems] = useState([]);
+  const [cycleItems, setCycleItems] = useState(["LRP 25", "LRP 26"]);
   const [loading, setLoading] = useState(true);
   const [modelIDValue, setModelIDValue] = useState("");
   const [modelType, setModelType] = useState("");
@@ -166,7 +166,7 @@ const SaveandLockScenario = ({ setPageValue }) => {
         dfResult3: new DataFrame(resp.result3),
       });
 
-      setCycleItems(["LRP 25", "LRP 26", "Custom 1", "Custom 2"]);
+      setCycleItems(["LRP 25", "LRP 26"]);
     } catch (error) {
       console.error("Error fetching data:", error);
     }
@@ -210,14 +210,14 @@ const SaveandLockScenario = ({ setPageValue }) => {
   const proceedWithSave = useCallback(async () => {
     console.time("Total save time request");
 
-    // Simulated 20-second progress instead of AWS calls
+    // Simulated 5-second progress instead of AWS calls
     const steps = [
       { pct: 0, label: "Checking Access...", delay: 0 },
-      { pct: 15, label: "Preparing data...", delay: 4000 },
-      { pct: 35, label: "Saving your forecast...", delay: 4000 },
-      { pct: 55, label: "Locking scenario...", delay: 4000 },
-      { pct: 75, label: "Finalizing save...", delay: 4000 },
-      { pct: 100, label: "Save complete!", delay: 4000 },
+      { pct: 15, label: "Preparing data...", delay: 1000 },
+      { pct: 35, label: "Saving your forecast...", delay: 1000 },
+      { pct: 55, label: "Locking scenario...", delay: 1000 },
+      { pct: 75, label: "Finalizing save...", delay: 1000 },
+      { pct: 100, label: "Save complete!", delay: 1000 },
     ];
 
     for (const step of steps) {
