@@ -74,15 +74,15 @@ const HomePage = ({ userName, setPageValue }) => {
       disabled: false,
     },
     {
-      name: "Forecast Management",
+      name: "import assumptions",
       icon: <ForecastManagement width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-      action: () => setPageValue("ForecastManagement"),
+      action: () => ProdExcelConnections.exportData2(),
       disabled: false,
     },
     {
-      name: "Forecast Library",
+      name: "Input File",
       icon: <AssumptionsCatalogue width={buttonSize.iconSize} height={buttonSize.iconSize} />,
-      action: () => setPageValue("ForecastLibrarypage"),
+      action: () =>  ProdExcelConnections.saveData(),
       disabled: false,
     },
     // {
