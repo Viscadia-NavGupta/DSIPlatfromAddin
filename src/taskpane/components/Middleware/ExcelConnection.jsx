@@ -386,12 +386,18 @@ function combineArrays(array1, array2) {
     // Initialize combined array
     let combinedArray = new Array(rowCount).fill(null).map(() => new Array(colCountArray1 + colCountArray2).fill(null));
 
-    // Copy array2 into the left columns
-    for (let i = 0; i < rowCount2; i++) {
-      if (Array.isArray(array2[i])) {
+    // Copy array2 into the left columns.
+    // When array2 holds a single accumulated row of constant (single-cell)
+    // level values but the combined result spans multiple rows — because a
+    // multi-row level range is being merged in — broadcast that single row
+    // down EVERY row. Previously only row 0 was filled, which left the
+    // single-cell levels sitting *before* the multi-row level blank in rows 2..N.
+    for (let i = 0; i < rowCount; i++) {
+      let srcRow = rowCount2 === 1 ? array2[0] : array2[i];
+      if (Array.isArray(srcRow)) {
         // Ensure row exists
         for (let j = 0; j < colCountArray2; j++) {
-          combinedArray[i][j] = array2[i][j];
+          combinedArray[i][j] = srcRow[j];
         }
       }
     }
